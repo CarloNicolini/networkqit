@@ -1,2 +1,2 @@
 # networkqit
-Experimental
+Experimental library for spectral entropies calculations
