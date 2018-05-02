@@ -1,11 +1,17 @@
-Dependencies:
+# Networkqit package
+## Experimental library for manipulation of network models within the spectral entropy framework
 
-sudo pip3 install cairocffi
-sudo pip3 install matplotlib
-sudo pip3 install drawnow
-sudo pip3 install cython
-sudo pip3 install eigency
-sudo pip3 install seaborn
+##Dependencies:
 
-sudo apt-get install libffi-dev
-sudo pip3 install cairocffi
+# Basic dependencies
+
+	sudo pip3 install matplotlib numpy pandas networkx
+	
+# Additional stuff
+
+	sudo pip3 install cairocffi
+	sudo pip3 install drawnow
+	sudo pip3 install seaborn
+
+	sudo apt-get install libffi-dev
+	sudo pip3 install cairocffi
