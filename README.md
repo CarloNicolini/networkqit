@@ -63,7 +63,6 @@ Now install the created Python package, that should come with all its dependenci
 	# In the networkqit framework we always treat graphs as adjacency matrices expressed as numpy arrays
 	# do not use numpy matrix
 	A = nx.to_numpy_array(nx.karate_club_graph())
-
 	
 	# 2. Create the standard Maximum Likelihood solver, for a problem with N variables
 	# randomly initialized
