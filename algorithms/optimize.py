@@ -74,8 +74,6 @@ class MLEOptimizer(ModelOptimizer):
                                  xtol=kwargs.get('xtol', 2E-10),
                                  gtol=kwargs.get('gtol', 2E-10),
                                  max_nfev=kwargs.get('max_nfev',len(self.x0)*100000))
-        
-        print(likelihood(self.sol.x))
         return self.sol
 
     def runfsolve(self, **kwargs):
@@ -103,16 +101,6 @@ class MLEOptimizer(ModelOptimizer):
         # Use the Trust-Region reflective algorithm to optimize likelihood
         self.sol = fsolve(func=f, x0=np.squeeze(self.x0), xtol=1E-16)
 
-        def likelihood(x):
-            pijx = UBCM(N=34)(x)
-            one_min_pij = 1.0 - pijx
-            one_min_pij[one_min_pij <= 0] = eps
-            l = triu(W * (log(pijx) - log(one_min_pij)) +
-                     log(one_min_pij), 1).sum()
-            return l
-        #, xtol=kwargs.get('xtol', 1E-8),
-        #  maxfev=kwargs.get('max_nfev',len(self.x0)*100))
-        print(likelihood(self.sol))
         return self.sol
 
 
