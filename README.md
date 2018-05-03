@@ -44,53 +44,6 @@ To use the networkqit package we suggest to use `virtualenv`. The `networkqit` p
 	cd networkqit
 	python3 setup.py sdist
 
-You should get this ouput:
-
-	running sdist
-	running egg_info
-	creating networkqit.egg-info
-	writing top-level names to networkqit.egg-info/top_level.txt
-	writing networkqit.egg-info/PKG-INFO
-	writing requirements to networkqit.egg-info/requires.txt
-	writing dependency_links to networkqit.egg-info/dependency_links.txt
-	writing manifest file 'networkqit.egg-info/SOURCES.txt'
-	reading manifest file 'networkqit.egg-info/SOURCES.txt'
-	writing manifest file 'networkqit.egg-info/SOURCES.txt'
-	running check
-	creating networkqit-0.1
-	creating networkqit-0.1/algorithms
-	creating networkqit-0.1/graphtheory
-	creating networkqit-0.1/graphtheory/models
-	creating networkqit-0.1/infotheory
-	creating networkqit-0.1/networkqit.egg-info
-	copying files to networkqit-0.1...
-	copying README.md -> networkqit-0.1
-	copying setup.cfg -> networkqit-0.1
-	copying setup.py -> networkqit-0.1
-	copying algorithms/__init__.py -> networkqit-0.1/algorithms
-	copying algorithms/community.py -> networkqit-0.1/algorithms
-	copying algorithms/optimize.py -> networkqit-0.1/algorithms
-	copying algorithms/threshold.py -> networkqit-0.1/algorithms
-	copying graphtheory/__init__.py -> networkqit-0.1/graphtheory
-	copying graphtheory/graphs.py -> networkqit-0.1/graphtheory
-	copying graphtheory/matrices.py -> networkqit-0.1/graphtheory
-	copying graphtheory/models/GraphModel.py -> networkqit-0.1/graphtheory/models
-	copying graphtheory/models/__init__.py -> networkqit-0.1/graphtheory/models
-	copying graphtheory/models/generative.py -> networkqit-0.1/graphtheory/models
-	copying graphtheory/models/maxent.py -> networkqit-0.1/graphtheory/models
-	copying infotheory/__init__.py -> networkqit-0.1/infotheory
-	copying infotheory/density.py -> networkqit-0.1/infotheory
-	copying networkqit.egg-info/PKG-INFO -> networkqit-0.1/networkqit.egg-info
-	copying networkqit.egg-info/SOURCES.txt -> networkqit-0.1/networkqit.egg-info
-	copying networkqit.egg-info/dependency_links.txt -> networkqit-0.1/networkqit.egg-info
-	copying networkqit.egg-info/requires.txt -> networkqit-0.1/networkqit.egg-info
-	copying networkqit.egg-info/top_level.txt -> networkqit-0.1/networkqit.egg-info
-	Writing networkqit-0.1/setup.cfg
-	creating dist
-	Creating tar archive
-	removing 'networkqit-0.1' (and everything under it)
-
-
 Now install the created Python package, that should come with all its dependencies `matplotlib`, `numpy`, `networkx`, `pandas`, `numdifftools`, `bctpy`
 
 	cd ..
