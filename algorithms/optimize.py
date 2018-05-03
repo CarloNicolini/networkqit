@@ -53,24 +53,26 @@ class MLEOptimizer(ModelOptimizer):
     def run(self, model, **kwargs):
         n = len(self.x0)
         eps = np.finfo(float).eps
-        bounds = ((eps) * len(self.A), (inf) * len(self.x0))
+        bounds = ((0) * len(self.A), (inf) * len(self.x0))
         A = (self.A > 0).astype(float)
         W = self.A
         
+        # See the definition here:
+        # Garlaschelli, D., & Loffredo, M. I. (2008). Maximum likelihood: Extracting unbiased information from complex networks. 
+        # PRE 78(1), 1–4. https://doi.org/10.1103/PhysRevE.78.015101
         def likelihood(x):
             pijx = model(x)
             one_min_pij = 1.0 - pijx
-            one_min_pij[one_min_pij <= 0] = 0
+            one_min_pij[one_min_pij <= 0] = eps
             l = triu(W * (log(pijx) - log(one_min_pij)) + log(one_min_pij), 1).sum()
             return l
-
 
         # Use the Trust-Region reflective algorithm to optimize likelihood
         self.sol = least_squares(fun=likelihood, x0=np.squeeze(self.x0),
                                  method='trf',
                                  bounds=bounds,
-                                 xtol=kwargs.get('xtol', 1E-12),
-                                 gtol=kwargs.get('gtol', 1E-12),
+                                 xtol=kwargs.get('xtol', 2E-10),
+                                 gtol=kwargs.get('gtol', 2E-10),
                                  max_nfev=kwargs.get('max_nfev',len(self.x0)*100000))
         
         print(likelihood(self.sol.x))
