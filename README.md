@@ -52,7 +52,7 @@ Now install the created Python package, that should come with all its dependenci
 
 ### 5. You can try to run this example of fitting the undirected binary configuration to the **karate club graph**, both using the standard maximum likelihood method or using the spectral entropy method:
 
-	{%highlight python %}
+
 	import numpy as np
 	import pandas as pd
 	import networkqit as nq
@@ -72,6 +72,5 @@ Now install the created Python package, that should come with all its dependenci
 	solver.setup() 
 	# Run the optimization
 	sol = solver.runfsolve(model='UBCM')
-	{%endhighlight%}
 
 ## Examples:
