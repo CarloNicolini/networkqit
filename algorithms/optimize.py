@@ -50,24 +50,18 @@ class MLEOptimizer(ModelOptimizer):
     def setup(self, **kwargs):
         pass
 
-    def run(self, **kwargs):
+    def run(self, model, **kwargs):
         n = len(self.x0)
         eps = np.finfo(float).eps
         bounds = ((eps) * len(self.A), (inf) * len(self.x0))
-        pij = None
         A = (self.A > 0).astype(float)
         W = self.A
-        if 'model' not in kwargs:
-            raise Exception('Must specify model')
-        else:
-            pij = kwargs['model']
-
+        
         def likelihood(x):
-            pijx = pij(x)
+            pijx = model(x)
             one_min_pij = 1.0 - pijx
-            one_min_pij[one_min_pij <= 0] = eps
-            l = triu(W * (log(pijx) - log(one_min_pij)) +
-                     log(one_min_pij), 1).sum()
+            one_min_pij[one_min_pij <= 0] = 0
+            l = triu(W * (log(pijx) - log(one_min_pij)) + log(one_min_pij), 1).sum()
             return l
 
 
@@ -75,9 +69,11 @@ class MLEOptimizer(ModelOptimizer):
         self.sol = least_squares(fun=likelihood, x0=np.squeeze(self.x0),
                                  method='trf',
                                  bounds=bounds,
-                                 xtol=kwargs.get('xtol', 1E-8),
-                                 gtol=kwargs.get('gtol', 1E-8),
-                                 max_nfev=kwargs.get('max_nfev',len(self.x0)*100))
+                                 xtol=kwargs.get('xtol', 1E-12),
+                                 gtol=kwargs.get('gtol', 1E-12),
+                                 max_nfev=kwargs.get('max_nfev',len(self.x0)*100000))
+        
+        print(likelihood(self.sol.x))
         return self.sol
 
     def runfsolve(self, **kwargs):
@@ -104,8 +100,17 @@ class MLEOptimizer(ModelOptimizer):
         
         # Use the Trust-Region reflective algorithm to optimize likelihood
         self.sol = fsolve(func=f, x0=np.squeeze(self.x0), xtol=1E-16)
+
+        def likelihood(x):
+            pijx = UBCM(N=34)(x)
+            one_min_pij = 1.0 - pijx
+            one_min_pij[one_min_pij <= 0] = eps
+            l = triu(W * (log(pijx) - log(one_min_pij)) +
+                     log(one_min_pij), 1).sum()
+            return l
         #, xtol=kwargs.get('xtol', 1E-8),
         #  maxfev=kwargs.get('max_nfev',len(self.x0)*100))
+        print(likelihood(self.sol))
         return self.sol
 
 
