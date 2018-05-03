@@ -22,7 +22,7 @@
 
 To use the networkqit package we suggest to use `virtualenv`. The `networkqit` package is pure Python, so it should work on Linux, Mac OSX and Windows. Here we report instructions for usage in a standard Ubuntu linux installation.
 
-1. Open a terminal, install `pip` and `virtualenv` and clone this repository
+### 1. Open a terminal, install `pip` and `virtualenv` and clone this repository
 	
 	cd
 	sudo apt-get install python3-pip
@@ -31,15 +31,15 @@ To use the networkqit package we suggest to use `virtualenv`. The `networkqit` p
 	cd workspace
 	git clone https://bitbucket.org/carlonicolini/networkqit
 	
-2. You cloned the repository. Now start the virtualenv session.
+### 2.. You cloned the repository. Now start the virtualenv session.
 
 	source bin/activate
 
-3. If you are inside the `virtualenv` session, check that the Python version you are using is the one provided by `virtualenv`.
+### 3. If you are inside the `virtualenv` session, check that the Python version you are using is the one provided by `virtualenv`.
 
 	which python3
 
-4. Now install the networkqit package within the `virtualenv` environment.
+### 4. Now install the networkqit package within the `virtualenv` environment.
 
 	cd networkqit
 	python3 setup.py sdist
@@ -97,7 +97,7 @@ Now install the created Python package, that should come with all its dependenci
 	pip3 install networkqit/dist/networkqit-0.1.tar.gz 
 
 
-5. You can try to run this example of fitting the undirected binary configuration to the **karate club graph**, both using the standard maximum likelihood method or using the spectral entropy method:
+### 5. You can try to run this example of fitting the undirected binary configuration to the **karate club graph**, both using the standard maximum likelihood method or using the spectral entropy method:
 
 	{%highlight python %}
 	import numpy as np
