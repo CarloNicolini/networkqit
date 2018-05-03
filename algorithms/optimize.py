@@ -108,7 +108,6 @@ class MLEOptimizer(ModelOptimizer):
 ## Spectral entropy optimization ###
 ####################################
 
-
 class ContinuousModelOptimizer(ModelOptimizer):
     def __init__(self, A, x0, beta_range, **kwargs):
         self.A = A
