@@ -1,10 +1,10 @@
 """
 networkqit
-========
+==========
 
-    NetworkQIT (NX) is a Python package for the fitting of complex generative models to networks using quantum information theory.
+    networkqit (nq) is a Python package for the fitting of complex generative models to networks using quantum information theory.
 
-    https://networkqit.github.io
+    https://carlonicolini.github.io/networkqit
 
 Using
 -----
@@ -18,6 +18,7 @@ Using
     >>> spdens = nq.SpectralDensity(A,beta)
     >>> print(spdens.rho)
 """
+
 #    Copyright (C) 2018 by
 #    Carlo Nicolini <carlo.nicolini@iit.it>
 #    All rights reserved.

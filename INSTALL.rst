@@ -1,7 +1,7 @@
 Install
 =======
 
-NetworkQit requires Python 2.7, 3.4, 3.5, or 3.6.  If you do not already
+networkqit requires Python 2.7, 3.4, 3.5, or 3.6.  If you do not already
 have a Python environment configured on your computer, please see the
 instructions for installing the full `scientific Python stack
 <https://scipy.org/install.html>`_.
@@ -18,7 +18,7 @@ instructions for installing the full `scientific Python stack
    documentation.
 
 Below we assume you have the default Python environment already configured on
-your computer and you intend to install ``NetworkQit`` inside of it.  If you want
+your computer and you intend to install ``networkqit`` inside of it.  If you want
 to create and work with Python virtual environments, please follow instructions
 on `venv <https://docs.python.org/3/library/venv.html>`_ and `virtual
 environments <http://docs.python-guide.org/en/latest/dev/virtualenvs/>`_.
@@ -30,22 +30,22 @@ installed. If you do not, refer to the `Pip documentation
 Install the released version
 ----------------------------
 
-Install the current release of ``NetworkQit`` with ``pip``::
+Install the current release of ``networkqit`` with ``pip``::
 
-    $ pip install NetworkQit
+    $ pip install networkqit
 
 To upgrade to a newer release use the ``--upgrade`` flag::
 
-    $ pip install --upgrade NetworkQit
+    $ pip install --upgrade networkqit
 
 If you do not have permission to install software systemwide, you can
 install into your user directory using the ``--user`` flag::
 
-    $ pip install --user NetworkQit
+    $ pip install --user networkqit
 
-Alternatively, you can manually download ``NetworkQit`` from
-`GitHub <https://github.com/NetworkQit/NetworkQit/releases>`_  or
-`PyPI <https://pypi.python.org/pypi/NetworkQit>`_.
+Alternatively, you can manually download ``networkqit`` from
+`GitHub <https://bitbucket.org/carlonicolini/networkqit/>`_  or
+`PyPI <https://pypi.python.org/pypi/networkqit>`_.
 To install one of these versions, unpack it and run the following from the
 top-level source directory using the Terminal::
 
@@ -55,24 +55,24 @@ Install the development version
 -------------------------------
 
 If you have `Git <https://git-scm.com/>`_ installed on your system, it is also
-possible to install the development version of ``NetworkQit``.
+possible to install the development version of ``networkqit``.
 
 Before installing the development version, you may need to uninstall the
-standard version of ``NetworkQit`` using ``pip``::
+standard version of ``networkqit`` using ``pip``::
 
-    $ pip uninstall NetworkQit
+    $ pip uninstall networkqit
 
 Then do::
 
-    $ git clone https://github.com/NetworkQit/NetworkQit.git
-    $ cd NetworkQit
+    $ git clone https://bitbucket.org/carlonicolini/networkqit
+    $ cd networkqit
     $ pip install -e .
 
 The ``pip install -e .`` command allows you to follow the development branch as
 it changes by creating links in the right places and installing the command
 line scripts to the appropriate locations.
 
-Then, if you want to update ``NetworkQit`` at any time, in the same directory do::
+Then, if you want to update ``networkqit`` at any time, in the same directory do::
 
     $ git pull
 
@@ -87,89 +87,24 @@ Optional packages
 
 The following optional packages provide additional functionality.
 
-- `NumPy <http://www.numpy.org/>`_ (>= 1.12.0) provides matrix representation of
-  graphs and is used in some graph algorithms for high-performance matrix
-  computations.
-- `SciPy <http://scipy.org/>`_ (>= 0.19.0) provides sparse matrix representation
-  of graphs and many numerical scientific tools.
 - `pandas <http://pandas.pydata.org/>`_ (>= 0.20.0) provides a DataFrame, which
   is a tabular data structure with labeled axes.
 - `Matplotlib <http://matplotlib.org/>`_ (>= 2.0.2) provides flexible drawing of
   graphs.
-- `PyGraphviz <http://pygraphviz.github.io/>`_ and
-  `pydot <https://github.com/erocarrera/pydot>`_ (>= 1.2.3) provide graph drawing
-  and graph layout algorithms via `GraphViz <http://graphviz.org/>`_.
-- `PyYAML <http://pyyaml.org/>`_ provides YAML format reading and writing.
-- `gdal <http://www.gdal.org/>`_ provides shapefile format reading and writing.
-- `lxml <http://lxml.de/>`_ used for GraphML XML format.
+- `drawnow <https://pypi.org/project/drawnow/>`_(>=0.72.0) is a MATLAB-like drawnow command to monitor the optimization process.
 
-To install ``NetworkQit`` and all optional packages, do::
+- `numdifftools <https://pypi.org/project/Numdifftools/>`_ (>=0.9.20) is a suite of tools written in _Python to solve automatic numerical differentiation problems in one or more variables. It can be necessary to exactly compute gradients of relative entropy.
 
-    $ pip install NetworkQit[all]
+- `seaborn <https://pypi.org/project/seaborn/>`_ (>=0.8.1) is a library for making attractive and informative statistical graphics in Python.
+
+To install ``networkqit`` and all optional packages, do::
+
+    $ pip install networkqit[all]
 
 To explicitly install all optional packages, do::
 
-    $ pip install numpy scipy pandas matplotlib pygraphviz pydot pyyaml gdal
+    $ pip install numpy scipy pandas matplotlib seaborn numdifftools drawnow
 
 Or, install any optional package (e.g., ``numpy``) individually::
 
     $ pip install numpy
-
-Testing
--------
-
-NetworkQit uses the Python ``nose`` testing package.  If you don't already have
-that package installed, follow the directions on the `nose homepage
-<https://nose.readthedocs.org/>`_.
-
-Test a source distribution
-^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-You can test the complete package from the unpacked source directory with::
-
-    nosetests NetworkQit -v
-
-Test an installed package
-^^^^^^^^^^^^^^^^^^^^^^^^^
-
-If you have a file-based (not a Python egg) installation you can test the
-installed package with::
-
-    >>> import NetworkQit as nx
-    >>> nx.test()
-
-or::
-
-    python -c "import NetworkQit as nx; nx.test()"
-
-Testing for developers
-^^^^^^^^^^^^^^^^^^^^^^
-
-You can test any or all of NetworkQit by using the ``nosetests`` test runner.
-
-First make sure the NetworkQit version you want to test is in your ``PYTHONPATH``
-(either installed or pointing to your unpacked source directory).
-
-Then you can run individual test files with::
-
-    nosetests path/to/file
-
-or all tests found in dir and an directories contained in dir::
-
-    nosetests path/to/dir
-
-By default nosetests does not test docutils style tests in
-Python modules but you can turn that on with::
-
-    nosetests --with-doctest
-
-For doctests in stand-alone files NetworkQit uses the extension ``txt`` so
-you can add::
-
-    nosetests --with-doctest --doctest-extension=txt
-
-to also execute those tests.
-
-These options are on by default if you run nosetests from the root of the
-NetworkQit distribution since they are specified in the ``setup.cfg`` file found
-there.

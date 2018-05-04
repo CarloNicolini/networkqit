@@ -4,35 +4,42 @@
 
 Overview
 ========
-
-networkqit is a Python package for 
-
-
-Free software
--------------
-
-networkqit is free software; you can redistribute it and/or modify it under the
-terms of the :doc:`3-clause BSD License </license>`.  We welcome contributions.
-Join us on `GitHub <https://github.com/networkqit/networkqit>`_.
-
-
-Documentation
--------------
-
 .. only:: html
 
     :Release: |version|
     :Date: |today|
 
-.. toctree::
-   :maxdepth: 2
+**networkqit** is a Python package for working within the spectral entropy framework of complex networks.
+It allows to compute spectral entropies and to fit different models to your observed network easily.
 
-   install
-   tutorial
-   reference/index
-   license
-   citing
-   auto_examples/index
+
+Free software
+-------------
+
+**networkqit** is free software; you can redistribute it and/or modify it under the
+terms of the :doc:`3-clause BSD License </license>`.  I welcome contributions. Join me on `Bitbucket <https://bitbucket.org/carlonicolini/networkqit>`_.
+
+
+Documentation
+-------------
+
+.. automodule:: networkqit.graphtheory
+   :members:
+
+List of contents
+----------------
+
+.. toctree::
+  :maxdepth: 2
+
+  install
+  tutorial
+  reference/index
+  license
+  citing
+
+.. automodule:: networkqit
+
 
 Indices and tables
 ------------------
@@ -40,4 +47,3 @@ Indices and tables
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
-* :ref:`glossary`

@@ -6,7 +6,8 @@ Algorithms
 
 .. automodule:: networkqit.algorithms
 .. autosummary::
-   ::toctree:: generated/
+   :toctree: generated/
 
    optimize
    community
+   threshold
