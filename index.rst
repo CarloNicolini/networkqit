@@ -10,6 +10,9 @@ Welcome to networkqit's documentation!
    :maxdepth: 2
    :caption: Contents:
 
+   tutorial
+   code
+   project
 
 
 Indices and tables
