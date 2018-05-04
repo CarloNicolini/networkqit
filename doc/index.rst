@@ -35,6 +35,8 @@ List of contents
   install
   tutorial
   reference/index
+  reference/infotheory/
+  reference/graphtheory
   license
   citing
 
