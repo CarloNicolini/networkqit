@@ -1,8 +1,5 @@
 #!/usr/bin/env python
 """
-==========
-Properties
-==========
 
 Utility functions to generate benchmark graphs
 

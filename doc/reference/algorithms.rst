@@ -10,4 +10,3 @@ Algorithms
 
    optimize
    community
-   threshold

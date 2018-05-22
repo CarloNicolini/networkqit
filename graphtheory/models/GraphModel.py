@@ -1,10 +1,19 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python
 """
-Created on Tue Feb 27 14:48:46 2018
+==========
+Properties
+==========
 
-@author: carlo2
+Graph model. Here are specified many possible models of sparse and dense graphs with continuous dependency on some input parameters.
+Importantly the models defined here are models of **expected** adjacency matrix and Laplacian, so please do not make confusion between
+random graph models and the expected graph models described here.
+
 """
+#    Copyright (C) 2018 by
+#    Carlo Nicolini <carlo.nicolini@iit.it>
+#    All rights reserved.
+#    BSD license.
+
 from networkqit.graphtheory import graph_laplacian as graph_laplacian
 import numpy as np
 import math

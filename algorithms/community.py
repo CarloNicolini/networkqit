@@ -1,10 +1,7 @@
 #!/usr/bin/env python
 """
-==========
-Properties
-==========
 
-Community detection related utility functions
+Community detection related utility functions.
 
 """
 #    Copyright (C) 2018 by

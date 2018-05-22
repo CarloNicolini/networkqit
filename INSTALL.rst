@@ -92,7 +92,6 @@ The following optional packages provide additional functionality.
 - `Matplotlib <http://matplotlib.org/>`_ (>= 2.0.2) provides flexible drawing of
   graphs.
 - `drawnow <https://pypi.org/project/drawnow/>`_(>=0.72.0) is a MATLAB-like drawnow command to monitor the optimization process.
-
 - `numdifftools <https://pypi.org/project/Numdifftools/>`_ (>=0.9.20) is a suite of tools written in _Python to solve automatic numerical differentiation problems in one or more variables. It can be necessary to exactly compute gradients of relative entropy.
 
 - `seaborn <https://pypi.org/project/seaborn/>`_ (>=0.8.1) is a library for making attractive and informative statistical graphics in Python.

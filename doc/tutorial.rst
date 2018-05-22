@@ -21,5 +21,8 @@ In this guide we try to compute the spectral entropy of a small graph over a lar
     >>> import numpy as np
     >>> 
     >>> beta_range = np.logspace(-3,3,20)
-    >>> a=1
+    >>> Sbeta = [nq.compute_vonneumann_entropy(L=nq.graph_laplacian(A),beta=beta) for beta in beta_range]
+    >>> import matplotlib.pyplot as plt
+    >>> plt.semilogx(beta_range,Sbeta)
+    >>> plt.show()
 

@@ -1,11 +1,9 @@
 #!/usr/bin/env python
 """
-==========
-Properties
-==========
 
 Define the base and inherited classes for model optimization, both in the continuous approximation
 and for the stochastic optimization.
+
 """
 #    Copyright (C) 2018 by
 #    Carlo Nicolini <carlo.nicolini@iit.it>
@@ -219,12 +217,18 @@ class ExpectedModelOptimizer(ModelOptimizer):
     def gradient(self, x, rho, beta):
         """
         This method computes the gradient as 
-        $$
-        \frac{s(\rho \| \sigma)}{\partial \theta_k} = \beta \textrm{Tr}\left \lbrack \left( \rho - \sigma(\theta)\right) \frac{\mathbb{E}\mathbf{L}(\theta)}{\partial \theta_k} \right \rbrack
-        $$
+        
+        :math:`\\frac{s(\\rho \| \\sigma)}{\\partial \\theta_k} = \\beta \textrm{Tr}\left \lbrack \left( \rho - \sigma(\theta)\right) \frac{\mathbb{E}\mathbf{L}(\theta)}{\partial \theta_k} \right \rbrack`
+        
+        args:
+            x (numpy.array): the current parameters
+            rho (numpy.array): the observed density matrix
+            beta (float): the beta
+
+        Returns:
+            the gradient as a three index numpy array. The last index is the one pertaining to the k-th component of x
         """
-        sigma = compute_vonneuman_density(
-            graph_laplacian(self.modelfun(x)), beta)
+        sigma = compute_vonneuman_density(graph_laplacian(self.modelfun(x)), beta)
         #print(self.modelfun_grad(x))
         #return np.array([np.trace(np.dot(rho-sigma, self.modelfun_grad(x)[:, i, :])) for i in range(0, len(self.x0))])
         # Here instead of tracing over the matrix product, we just sum over the entrywise product of the two matrices
@@ -330,6 +334,9 @@ class ExpectedModelOptimizer(ModelOptimizer):
     def summary(self, to_dataframe=False):
         """
         A convenience function to summarize all the optimization process, with results of optimization.
+
+        args:
+            to_dataframe (bool): if True, returns a pandas dataframe, otherwise returns a list of dictionaries
         """
         if to_dataframe:
             import pandas as pd
