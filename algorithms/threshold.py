@@ -1,4 +1,16 @@
-#!/usr/bin/python
+#!/usr/bin/env python
+"""
+==========
+Properties
+==========
+
+Definition of some utility function model optimization, both in the continuous approximation
+and for the stochastic optimization.
+"""
+#    Copyright (C) 2018 by
+#    Carlo Nicolini <carlo.nicolini@iit.it>
+#    All rights reserved.
+#    BSD license.
 
 from abc import ABC, abstractmethod
 from scipy.optimize import minimize as minimize

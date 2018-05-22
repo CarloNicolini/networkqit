@@ -38,8 +38,7 @@ del sys
 # Release data
 from networkqit import release
 
-__author__ = '%s <%s>\n%s <%s>\n' % \
-    (release.authors['Nicolini'] + release.authors['Vlasov'])
+__author__ = '%s <%s>\n%s <%s>\n' % (release.authors['Nicolini'] + release.authors['Vlasov'])
 __license__ = release.license
 
 __date__ = release.date

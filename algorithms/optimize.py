@@ -23,35 +23,35 @@ from networkqit.graphtheory.models.GraphModel import *
 
 
 class ModelOptimizer(ABC):
-    """
-    This represents the base abstract class from which to inherit all the possible model optimization classes
-    """
     def __init__(self, A, **kwargs):
+        """
+        This represents the base abstract class from which to inherit all the possible model optimization classes
+        """
         super().__init__()
 
     @abstractmethod
-    """
-    The setup method must be implemented by each single inherited class.
-    Here all the details and additional optimization variables are inserted as kwargs.
-    """
     def setup(self, **kwargs):
+        """
+        The setup method must be implemented by each single inherited class.
+        Here all the details and additional optimization variables are inserted as kwargs.
+        """
         pass
 
     @abstractmethod
-    """
-    The gradient method must be implemented by each single inherited class
-    Here all the details and additional optimization variables are inserted as kwargs.
-    The gradient method muust return a NxNxk array where N is the dimension of the network
-    to optimize and k is the number of free parameters of the model.
-    """
     def gradient(self, **kwargs):
+        """
+        The gradient method must be implemented by each single inherited class
+        Here all the details and additional optimization variables are inserted as kwargs.
+        The gradient method muust return a NxNxk array where N is the dimension of the network
+        to optimize and k is the number of free parameters of the model.
+        """
         pass
 
     @abstractmethod
-    """
-    The  method to call to start optimization
-    """
     def run(self, **kwargs):
+        """
+        The  method to call to start optimization
+        """
         pass
 
     
@@ -60,11 +60,23 @@ class ModelOptimizer(ABC):
 ################################################
 
 class StochasticOptimizer(ModelOptimizer):
-    """
-    This class is at the base of possible implementation of methods based
-    on stochastic gradient descent. Here not implemented. 
-    """
     def __init__(self, A, x0, beta_range, **kwargs):
+        """
+        This class is at the base of possible implementation of methods based
+        on stochastic gradient descent. Here not implemented. 
+        The idea behind this class is to help the user in designing a nice stochastic gradient descent method,
+        such as ADAM, AdaGrad or older methods, like the Munro-Robbins stochastic gradients optimizer.
+
+        """
+        pass
+
+    def gradient(self, x, rho, beta):
+        pass
+
+    def setup(self, modelfun, modelfun_grad=None, step_callback=None):
+        pass
+
+    def run(self, model, **kwargs):
         pass
     
 ###############################################
@@ -75,7 +87,6 @@ class MLEOptimizer(ModelOptimizer):
     """
     This class, inheriting from the model optimizer class solves the problem of 
     maximum likelihood parameters estimation in the classical settings.
-
     """
     def __init__(self, A, x0, **kwargs):
         """
@@ -171,33 +182,73 @@ class MLEOptimizer(ModelOptimizer):
 ## Spectral entropy optimization ###
 ####################################
 
-class ContinuousModelOptimizer(ModelOptimizer):
+class ExpectedModelOptimizer(ModelOptimizer):
+    """
+    This class is at the base of the continuos optimization method
+    """
     def __init__(self, A, x0, beta_range, **kwargs):
+        """
+        Initialization method, must provide the observed network in form of adjacency matrix,
+        the initial optimization parameters and the range over which to span $\beta$.
+
+        args:
+            A (numpy.array): The observed adjacency matrix
+            x0 (numpy.array): The initial value of the optimization parameters.
+            beta_range (numpy.array, list): The values for which to run optimization
+        """
         self.A = A
         self.L = graph_laplacian(A)
         self.beta_range = beta_range
         self.x0 = x0
 
     def setup(self, modelfun, modelfun_grad=None, step_callback=None):
+        """
+        Setup the optimizer. Must specify the model function, as a function that returns the expected adjacency matrix,
+        Optionally one can also provide the modelfun_grad, a function that returns the gradient of the expected Laplacian.
+
+        args:
+            modelfun: a function in the form f(x) that once called returns the expected adjacency matrix of a model.
+            modelfun_grad: a function in the form f(x) that once called returns the gradients of the expected Laplacian of a model.
+            step_callback: a callback function to control the current status of optimization.
+        """
         self.modelfun = modelfun
         self.modelfun_grad = modelfun_grad
         self.step_callback = step_callback
         self.bounds = modelfun.bounds
 
     def gradient(self, x, rho, beta):
+        """
+        This method computes the gradient as 
+        $$
+        \frac{s(\rho \| \sigma)}{\partial \theta_k} = \beta \textrm{Tr}\left \lbrack \left( \rho - \sigma(\theta)\right) \frac{\mathbb{E}\mathbf{L}(\theta)}{\partial \theta_k} \right \rbrack
+        $$
+        """
         sigma = compute_vonneuman_density(
             graph_laplacian(self.modelfun(x)), beta)
-        print(self.modelfun_grad(x))
+        #print(self.modelfun_grad(x))
         #return np.array([np.trace(np.dot(rho-sigma, self.modelfun_grad(x)[:, i, :])) for i in range(0, len(self.x0))])
+        # Here instead of tracing over the matrix product, we just sum over the entrywise product of the two matrices
+        # (rho-sigma) and the dL/dtheta.
         return np.array([np.sum(np.multiply(rho-sigma, self.modelfun_grad(x)[:, i, :].T)) for i in range(0, len(self.x0))])
 
     def hessian(self, x, beta):
+        """
+        If required by an optimization algorithms, here we relyi on the numdifftools Python3 library
+        to compute the Hessian of the model at given parameters x and beta
+        """
         import numdifftools as nd
         H = nd.Hessian(lambda y: SpectralDivergence(
             Lobs=self.L, Lmodel=graph_laplacian(self.modelfun(y)), beta=beta).rel_entropy)(x)
         return H  # (x)
 
     def run(self, **kwargs):
+        """
+        Starts the optimization. Default options are:
+
+        method: 'BFGS'
+        if the optimization problem is bounded, instead use one of the scipy constrained optimizer,
+        which are 'L-BFGS-B', 'TNC', 'SLSQP' or 'least_squares'
+        """
         self.method = kwargs.get('method', 'BFGS')
         if self.bounds is not None and self.method not in ['L-BFGS-B', 'TNC', 'SLSQP', 'least_squares']:
             raise RuntimeWarning(
@@ -236,7 +287,7 @@ class ContinuousModelOptimizer(ModelOptimizer):
                                       loss=kwargs.get('loss','soft_l1'), # robust choice for the loss function of the residuals
                                       xtol = kwargs.get('xtol',1E-9),
                                       gtol = kwargs.get('gtol',1E-10)))
-            else: # otherwise minimize the Dkl function
+            else: # otherwise directly minimize the relative entropy function
                 sol.append(minimize(fun=self.rel_entropy_fun,
                                     x0=self.x0,
                                     jac=fgrad,
@@ -252,6 +303,7 @@ class ContinuousModelOptimizer(ModelOptimizer):
             if self.step_callback is not None:
                 self.step_callback(beta, sol[-1].x)
             
+            # Here creates the output data structure as a dictionary of the optimization parameters and variables
             spect_div = SpectralDivergence(Lobs=self.L, Lmodel=graph_laplacian(self.modelfun(sol[-1].x)), beta=beta)
             sol[-1]['DeltaL'] = (np.trace(self.L) - np.trace(graph_laplacian(self.modelfun(sol[-1].x))))/2
             if kwargs.get('compute_sigma',False):
@@ -276,6 +328,9 @@ class ContinuousModelOptimizer(ModelOptimizer):
         return sol
     
     def summary(self, to_dataframe=False):
+        """
+        A convenience function to summarize all the optimization process, with results of optimization.
+        """
         if to_dataframe:
             import pandas as pd
             return pd.DataFrame(self.sol).set_index('T')  # it's 1/beta
