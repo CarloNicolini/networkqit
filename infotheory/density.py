@@ -7,11 +7,13 @@ from networkqit.graphtheory.matrices import graph_laplacian
 
 
 def compute_vonneuman_density(L, beta):
+    """ Get the von neumann density matrix :math:`e^{-bL}` """
     rho = expm(-beta*L)
     return rho / np.trace(rho)
 
 
-def compute_vonneumann_entropy(**kwargs):        
+def compute_vonneumann_entropy(**kwargs):
+    """ Get the von neumann entropy of the density matrix :math:`Tr[]` """        
     def S(L, beta):
         l = eigvalsh(L)
         #l = l[l > 0] # introduces an error, entropy doesn't tend to 0 in beta=inf
@@ -20,7 +22,6 @@ def compute_vonneumann_entropy(**kwargs):
         return np.log(Z) + beta * (l*lrho).sum()/Z 
         # alternatively use scipy.entropy
         #return entropy(lrho/lrho.sum())
-
 
     if 'density' in kwargs.keys():
         l = eigvalsh(kwargs['density'])
@@ -35,6 +36,7 @@ def compute_vonneumann_entropy(**kwargs):
         return S(kwargs['L'], kwargs['beta'])
 
 def compute_vonneumann_entropy_beta_deriv(**kwargs):
+    """ Get the derivative of entropy with respect to inverse temperature """
     if 'A' in kwargs.keys() and 'beta' in kwargs.keys():
         A = kwargs['A']
         L = graph_laplacian(A)

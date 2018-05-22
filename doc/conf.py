@@ -51,6 +51,8 @@ extensions = [
     'texext'
 ]
 
+mathjax_path = 'https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML'
+
 # https://github.com/sphinx-gallery/sphinx-gallery
 sphinx_gallery_conf = {
     # path to your examples scripts

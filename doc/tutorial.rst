@@ -7,21 +7,19 @@ Tutorial
 
 This guide can help you start working with networkqit.
 
-Creating a graph
-----------------
+Computing the spectral entropy
+------------------------------
 
-Create an empty graph with no nodes and no edges.
+In this guide we try to compute the spectral entropy of a small graph over a large range of $\beta$ parameter.
 
 .. nbplot::
 
-    >>> import networkqit as nx
-    >>> G = nx.Graph()
-
-By definition, a :class:`Graph` is a collection of nodes (vertices) along with
-identified pairs of nodes (called edges, links, etc).  In networkqit, nodes can
-be any hashable object e.g., a text string, an image, an XML object, another
-Graph, a customized node object, etc.
-
-.. note:: Python's ``None`` object should not be used as a node as it determines
-   whether optional function arguments have been assigned in many functions.
+    >>> import networkx as nx
+    >>> G = nx.karate_club_graph()
+    >>> A = nx.to_numpy_array(G)
+    >>> import networkqit as nq
+    >>> import numpy as np
+    >>> 
+    >>> beta_range = np.logspace(-3,3,20)
+    >>> a=1
 

@@ -1,3 +1,17 @@
+#!/usr/bin/env python
+"""
+==========
+Properties
+==========
+
+Utility functions to generate benchmark graphs
+
+"""
+#    Copyright (C) 2018 by
+#    Carlo Nicolini <carlo.nicolini@iit.it>
+#    All rights reserved.
+#    BSD license.
+
 import networkx as nx
 def ring_of_cliques(n, r):
     """
@@ -12,6 +26,13 @@ def ring_of_cliques(n, r):
     return graph
 
 def barthelemy_graph(n_er, prob, n_cliques, k_cliques):
+    """
+    Returns a networkx graph as described in the Barthelemy & Fortunato paper on PNAS
+    Resolution limit in complex networks.
+
+    args:
+
+    """
     graph = nx.connected_component_subgraphs(
         nx.erdos_renyi_graph(n_er, prob))[0]
     graph_k = nx.disjoint_union_all(

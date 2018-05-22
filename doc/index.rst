@@ -30,13 +30,14 @@ List of contents
 ----------------
 
 .. toctree::
-  :maxdepth: 2
+  :maxdepth: 3
 
   install
   tutorial
   reference/index
   reference/infotheory/
-  reference/graphtheory
+  reference/graphtheory/
+  reference/algorithms/
   license
   citing
 

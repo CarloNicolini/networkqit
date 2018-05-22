@@ -1,4 +1,16 @@
-#!/usr/bin/python
+#!/usr/bin/env python
+"""
+==========
+Properties
+==========
+
+Define the base and inherited classes for model optimization, both in the continuous approximation
+and for the stochastic optimization.
+"""
+#    Copyright (C) 2018 by
+#    Carlo Nicolini <carlo.nicolini@iit.it>
+#    All rights reserved.
+#    BSD license.
 
 from abc import ABC, abstractmethod
 from scipy.optimize import minimize, least_squares, fsolve
@@ -9,19 +21,36 @@ from numpy import triu, nan_to_num, log, inf
 import numdifftools as nd
 from networkqit.graphtheory.models.GraphModel import *
 
+
 class ModelOptimizer(ABC):
+    """
+    This represents the base abstract class from which to inherit all the possible model optimization classes
+    """
     def __init__(self, A, **kwargs):
         super().__init__()
 
     @abstractmethod
+    """
+    The setup method must be implemented by each single inherited class.
+    Here all the details and additional optimization variables are inserted as kwargs.
+    """
     def setup(self, **kwargs):
         pass
 
     @abstractmethod
+    """
+    The gradient method must be implemented by each single inherited class
+    Here all the details and additional optimization variables are inserted as kwargs.
+    The gradient method muust return a NxNxk array where N is the dimension of the network
+    to optimize and k is the number of free parameters of the model.
+    """
     def gradient(self, **kwargs):
         pass
 
     @abstractmethod
+    """
+    The  method to call to start optimization
+    """
     def run(self, **kwargs):
         pass
 
@@ -31,30 +60,54 @@ class ModelOptimizer(ABC):
 ################################################
 
 class StochasticOptimizer(ModelOptimizer):
-        def __init__(self, A, x0, beta_range, **kwargs):
-            pass
+    """
+    This class is at the base of possible implementation of methods based
+    on stochastic gradient descent. Here not implemented. 
+    """
+    def __init__(self, A, x0, beta_range, **kwargs):
+        pass
     
 ###############################################
 ## Standard maximum likelihood optimization ###
 ###############################################
 
-
 class MLEOptimizer(ModelOptimizer):
+    """
+    This class, inheriting from the model optimizer class solves the problem of 
+    maximum likelihood parameters estimation in the classical settings.
+
+    """
     def __init__(self, A, x0, **kwargs):
+        """
+        Init the optimizer.
+        
+        Args:
+            A (numpy.array) :is the empirical network to study. A N x N adjacency matrix as numpy.array. Can be weighted or unweighted.
+            x0 (numpy.array): is the k-element array of initial parameters estimates. Typically set as random.    
+        """
         self.A = A
         self.x0 = x0
 
     def gradient(self, **kwargs):
+        """
+        Not implemented for this class
+        """
         pass
 
     def setup(self, **kwargs):
+        """
+        Not implemented for this class
+        """
         pass
 
     def run(self, model, **kwargs):
-        n = len(self.x0)
+        """
+        Optimize the likelihood of the model given the observation A. 
+        """
+        n = len(self.x0) #  number of parameters of the model is recovered by the size of x0
         eps = np.finfo(float).eps
         bounds = ((0) * len(self.A), (inf) * len(self.x0))
-        A = (self.A > 0).astype(float)
+        A = (self.A > 0).astype(float) # binarize the input adjacency matrix
         W = self.A
         
         # See the definition here:
@@ -76,7 +129,17 @@ class MLEOptimizer(ModelOptimizer):
                                  max_nfev=kwargs.get('max_nfev',len(self.x0)*100000))
         return self.sol
 
+
     def runfsolve(self, **kwargs):
+        """
+        Alternative method to estimate model parameters based on 
+        the solution of a non-linear system of equation.
+        The gradients with respect to the parameters are set to zero.
+        
+        kwargs keys:
+            UBCM (string): specify the undirected binary configuration model. xixj/(1-xixj)
+            UWCM (string): specify the undirected weighted configuration model. (yiyj)/(1-yiyj)
+        """
         n = len(self.x0)
         eps = np.finfo(float).eps
         bounds = ((eps) * len(self.A), (inf) * len(self.x0))

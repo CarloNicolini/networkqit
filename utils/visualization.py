@@ -1,10 +1,17 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python
 """
-Created on Tue Feb 27 16:32:44 2018
+==========
+Properties
+==========
 
-@author: carlo2
+Visualization utilities for model optimization and entropy visualization
 """
+#    Copyright (C) 2018 by
+#    Carlo Nicolini <carlo.nicolini@iit.it>
+#    All rights reserved.
+#    BSD license.
+
+
 import matplotlib.pyplot as plt
 from drawnow import drawnow
 import numpy as np
