@@ -77,6 +77,31 @@ class StochasticOptimizer(ModelOptimizer):
     def run(self, model, **kwargs):
         pass
     
+
+class RobbinsMonro(StochasticOptimizer):
+    """
+    Implements the Robbins Monro optimizer described in the paper:
+    A stochastic optimization approach to coarse-graining using a relative-entropy framework
+    by Ilias Bilionis and Nicholas Zabaras
+    The Journal of Chemical Physics  138, 044313 (2013); doi: 10.1063/1.4789308
+    Available at:
+    https://www.predictivesciencelab.org/uploads/4/8/9/6/48962987/bilionis_2013a.pdf
+    """
+    def __init__(self, A, x0, beta_range, **kwargs):
+        self.A = A
+        self.x0 = x0
+        self.beta_range = beta_range
+
+    def gradient(self, x, rho, beta):
+        pass
+        
+    def run(self,**kwargs):
+        num_iters = 100
+        x = self.x0
+        alpha_k = np.array([alpha/((A+k)**r) for k in range(0,num_iters)])
+        for k in range(0,num_iters):
+            x = x - alpha[k]
+
 ###############################################
 ## Standard maximum likelihood optimization ###
 ###############################################
