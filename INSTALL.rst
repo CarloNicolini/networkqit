@@ -107,3 +107,8 @@ To explicitly install all optional packages, do::
 Or, install any optional package (e.g., ``numpy``) individually::
 
     $ pip install numpy
+
+Installation in the virtualenv environment
+------------------------------------------
+
+We suggest to use a Python3 virtualenv to setup the networkqit package.

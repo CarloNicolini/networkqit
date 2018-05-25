@@ -195,7 +195,6 @@ intersphinx_mapping = {'https://docs.python.org/2/': None,
 # The reST default role (used for this markup: `text`) to use for all
 # documents.
 default_role = 'obj'
-
 numpydoc_show_class_members = False
 
 # Add the 'copybutton' javascript, to hide/show the prompt in code

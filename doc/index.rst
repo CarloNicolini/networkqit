@@ -31,7 +31,6 @@ Documentation
 
   install
   tutorial
-  reference/index
   reference/infotheory/
   reference/graphtheory/
   reference/algorithms/

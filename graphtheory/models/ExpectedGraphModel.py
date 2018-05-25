@@ -32,7 +32,7 @@ class ExpectedModel(object):
         """
         super().__init__()
         self.args_mapping = None
-        self.num_classes = len(Model.__subclasses__())
+        self.num_classes = len(ExpectedModel.__subclasses__())
         self.model_type = kwargs.get('model_type', None)
         self.parameters = kwargs
         self.bounds = None

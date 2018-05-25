@@ -4,6 +4,30 @@
 Define the base and inherited classes for model optimization, both in the continuous approximation
 and for the stochastic optimization.
 
+The `ModelOptimizer` class defines the base class where all the other optimization classes must inherit.
+The most important class to optimize an expected adjacency model is `ExpectedModelOptimizer`. In this class the gradients are defined as:
+
+.. math::
+    
+        \\frac{\\partial S(\\rho \\| \\sigma(\\mathbb{E}_{\\theta}[L]))}{\\partial \\theta_k} = \\beta \\textrm{Tr}\\biggl \\lbrack \\left(\\rho - \\sigma(\\mathbb{E}_{\\theta}[L])\\right)\\frac{\\partial \\mathbb{E}_{\\theta}[L]}{\\partial \\theta_k} \\biggr \\rbrack
+
+In the `StochasticOptimizer` class we instead address the issue to implement stochastic gradient descent methods.
+In these methods the gradients are defined as:
+
+.. math::
+   
+   \\frac{\\partial \\mathbb{E}_{\\theta}[S(\\rho \\| \\sigma)]}{\\partial \\theta_k} = \\beta \\textrm{Tr}\\biggl \\lbrack \\rho \\frac{\\partial  \\mathbb{E}_{\\theta}[L]}{\\partial \\theta_k}\\biggr \\rbrack + \\frac{\\partial}{\\partial \\theta_k}\\mathbb{E}_{\\theta}\\biggl \\lbrack \\log \\left( \\textrm{Tr}\\left \\lbrack e^{-\\beta L(\\theta)} \\right \\rbrack \\right) \\biggr \\rbrack
+
+The stochastic optimizer is the **correct** optimizer, as it makes no approximation on the Laplacian eigenvalues.
+It is more suitable for small graphs and intermediate $\\beta$, where the differences between the random matrix spectrum and its expected counterpart are non-neglibile.
+For large and dense enough graphs however the `ExpectedModelOptimizer` works well and yields deterministic results, as the optimization landscape is smooth.
+
+In order to minimize the expected relative entropy then, we need both the expected Laplacian formula, which is simple to get, and a way to estimate the second summand in the gradient, that involves averaging over different realizations of the log trace of  $e^{-\\beta L(\\theta)}$.
+The better the approximation to the expected logtrace $\\mathbb{E}_{\\theta}[\\log \\textrm{Tr}[\\exp{(-\\beta L)}]]$ is, the better is the estimate of the gradients.
+
+
+Finally, the `MLEOptimizer` maximizes the standard likelihood of a model and it is not related to the spectral entropies framework introduced in the paper on which `networkqit` is based.
+
 """
 #    Copyright (C) 2018 by
 #    Carlo Nicolini <carlo.nicolini@iit.it>
@@ -17,6 +41,7 @@ from networkqit.graphtheory import graph_laplacian as graph_laplacian
 import numpy as np
 from numpy import triu, nan_to_num, log, inf
 import numdifftools as nd
+from scipy.linalg import expm
 #from networkqit.graphtheory.models.GraphModel import *
 
 
@@ -53,76 +78,10 @@ class ModelOptimizer(ABC):
         pass
 
     
-################################################
-## Stochastic optimzation from random samples ##
-################################################
-
-class StochasticOptimizer(ModelOptimizer):
-    def __init__(self, A, x0, beta_range, **kwargs):
-        """
-        This class is at the base of possible implementation of methods based
-        on stochastic gradient descent. Here not implemented. 
-        The idea behind this class is to help the user in designing a nice stochastic gradient descent method,
-        such as ADAM, AdaGrad or older methods, like the Munro-Robbins stochastic gradients optimizer.
-
-        """
-        pass
-
-    def gradient(self, x, rho, beta):
-        pass
-
-    def setup(self, expected_adj, modelfun_grad=None, step_callback=None):
-        pass
-
-    def run(self, model, **kwargs):
-        pass
-    
-
-class RobbinsMonro(StochasticOptimizer):
-    """
-    Implements the Robbins Monro optimizer described in the paper:
-    A stochastic optimization approach to coarse-graining using a relative-entropy framework
-    by Ilias Bilionis and Nicholas Zabaras
-    The Journal of Chemical Physics  138, 044313 (2013); doi: 10.1063/1.4789308
-    Available at:
-    https://www.predictivesciencelab.org/uploads/4/8/9/6/48962987/bilionis_2013a.pdf
-    """
-    def __init__(self, A, x0, beta_range, **kwargs):
-        self.A = A
-        self.x0 = x0
-        self.beta_range = beta_range
-
-    def setup(self, expected_adj, modelfun_grad=None, step_callback=None):
-        """
-        Setup the optimizer. Must specify the model function, as a function that returns the expected adjacency matrix,
-        Differently from the expected model optimizer here we need not only the expected Laplacian, but also the expectation
-        of the log(Tr(exp(-betaL))). This can only be compu
-
-        args:
-            modelfun: a function in the form f(x) that once called returns the expected adjacency matrix of a model.
-            modelfun_grad: a function in the form f(x) that once called returns the gradients of the expected Laplacian of a model.
-            step_callback: a callback function to control the current status of optimization.
-        """
-        self.modelfun = modelfun
-        self.modelfun_grad = modelfun_grad
-        self.step_callback = step_callback
-        self.bounds = modelfun.bounds
-
-
-    def gradient(self, x, rho, beta):
-        pass
-        
-    def run(self,**kwargs):
-        num_iters = 100
-        x = self.x0
-        alpha_k = np.array([alpha/((A+k)**r) for k in range(0,num_iters)])
-        for k in range(0,num_iters):
-            x = x - alpha[k]
 
 ###############################################
 ## Standard maximum likelihood optimization ###
 ###############################################
-
 class MLEOptimizer(ModelOptimizer):
     """
     This class, inheriting from the model optimizer class solves the problem of 
@@ -221,7 +180,6 @@ class MLEOptimizer(ModelOptimizer):
 ####################################
 ## Spectral entropy optimization ###
 ####################################
-
 class ExpectedModelOptimizer(ModelOptimizer):
     """
     This class is at the base of the continuos optimization method
@@ -412,3 +370,90 @@ class ExpectedModelOptimizer(ModelOptimizer):
             for i in range(0, len(self.sol)):
                 row = [str(x) for x in self.sol[i].x]
                 print(s.format(self.sol[i]['beta'], *row))
+
+
+################################################
+## Stochastic optimzation from random samples ##
+################################################
+class StochasticOptimizer(ModelOptimizer):
+    """
+    This class is at the base of possible implementation of methods based
+    on stochastic gradient descent. Here not implemented. 
+    The idea behind this class is to help the user in designing a nice stochastic gradient descent method,
+    such as ADAM, AdaGrad or older methods, like the Munro-Robbins stochastic gradients optimizer.
+    Working out the expression for the gradients of the relative entropy, one remains with the following:
+
+    :math: `\nabla_{\theta}S(\rho \| \sigma) = \beta \textrm\biggl \lbrack \rho \nabla_{\theta}\mathbb{E}_{\theta}[L]} \biggr \rbrack`
+        
+    :math: `\frac{\partial S(\rho \| \sigma)}{\partial \theta_k} = \beta \textrm{Tr}\lbrack \rho \frac{\partial}{\partial \theta_k} \rbrack + \frac{\partial}{\partial \theta_k}\mathbb{E}_{\theta}\log \textrm{Tr} e^{-\beta L(\theta)}\lbrack \rbrack`
+    """
+    def __init__(self, A, x0, beta_range, **kwargs):
+        pass
+
+    def setup(self, expected_adj_fun, adj_sampling_fun, expected_laplacian_grad=None, step_callback=None):
+        """
+        Setup the optimizer. Must specify the model function, as a function that returns the expected adjacency matrix,
+        Differently from the expected model optimizer here we need not only the expected Laplacian, but also the expectation
+        of the log(Tr(exp(-betaL))). This can only be compu
+
+        args:
+            adj_fun: a function in the form f(x) that once called returns the adjacency matrix of a random graph. Not to be confused with the expected adjacency matrix.
+            expected_laplacian_grad: a function in the form f(x) that once called returns the expected gradients of the laplacian of the random graph.
+            step_callback: a callback function to control the current status of optimization.
+        """
+        self.modelfun = expected_adj_fun
+        self.samplingfun = adj_sampling_fun
+        self.modelfun_grad = expected_laplacian_grad
+        self.step_callback = step_callback
+        self.bounds = expected_adj_fun.bounds
+
+
+    def gradient(self, x, rho, beta):
+        """
+        This method must be defined from inherited classes.
+        It returns the gradients of the expected relative entropy at given parameters x.
+        The expectation can either be estimated numerically by repeated sampling or via some smarter methods.
+        """
+        pass
+
+
+    def run(self, model, **kwargs):
+        """
+        Start the optimization process
+        """
+        pass
+    
+
+class StochasticGradientDescent(StochasticOptimizer):
+    """
+    Implements the stochastic gradient descent.
+    """
+    def __init__(self, A, x0, beta_range, **kwargs):
+        self.A = A
+        self.x0 = x0
+        self.beta_range = beta_range
+
+
+    def gradient(self, x, rho, beta):
+        sigma = compute_vonneuman_density(graph_laplacian(self.modelfun(x)), beta)
+        average = 10
+        # Compute the first part of the gradient, the one depending linearly on the expected laplacian, easy to get
+        grad = np.array([beta*np.trace(rho@self.modelfun_grad(x)[:,i,:]) for i in range(0,len(self.x0))])
+        # Now compute the second part, dependent on the gradient of the expected log partition function
+        logZ = lambda y: np.log(np.trace(expm(-beta*graph_laplacian(self.samplingfun(y)))))
+        meanlogZ = lambda w: np.mean([ logZ(w) for i in range(0,average)])
+        print(grad)
+        print(nd.Gradient(meanlogZ)(x))
+        grad += np.array([nd.Gradient(meanlogZ)(x)])
+        
+        return grad
+        
+    def run(self,**kwargs):
+        num_iters = 100
+        x = self.x0
+        eta = 0.01 # learning rate
+        for beta in self.beta_range:
+            for k in range(0,num_iters):
+                x -= eta * self.gradient(x,rho,beta)
+
+        return x

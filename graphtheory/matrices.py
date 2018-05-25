@@ -5,8 +5,11 @@
 #    BSD license.
 
 """
-Define the base and inherited classes for model optimization, both in the continuous approximation
-and for the stochastic optimization.
+Definition of some utility matrices.
+
+The graph Laplacian is computed from an adjacency matrix as $L=D-A$.
+
+The normalized graph Laplacian is computed as $\\mathcal{L}=I - D^{-1/2} A D^{-1/2}$.
 """
 
 import numpy as np
