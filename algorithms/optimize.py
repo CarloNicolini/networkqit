@@ -17,7 +17,7 @@ from networkqit.graphtheory import graph_laplacian as graph_laplacian
 import numpy as np
 from numpy import triu, nan_to_num, log, inf
 import numdifftools as nd
-from networkqit.graphtheory.models.GraphModel import *
+#from networkqit.graphtheory.models.GraphModel import *
 
 
 class ModelOptimizer(ABC):
@@ -71,7 +71,7 @@ class StochasticOptimizer(ModelOptimizer):
     def gradient(self, x, rho, beta):
         pass
 
-    def setup(self, modelfun, modelfun_grad=None, step_callback=None):
+    def setup(self, expected_adj, modelfun_grad=None, step_callback=None):
         pass
 
     def run(self, model, **kwargs):
@@ -91,6 +91,23 @@ class RobbinsMonro(StochasticOptimizer):
         self.A = A
         self.x0 = x0
         self.beta_range = beta_range
+
+    def setup(self, expected_adj, modelfun_grad=None, step_callback=None):
+        """
+        Setup the optimizer. Must specify the model function, as a function that returns the expected adjacency matrix,
+        Differently from the expected model optimizer here we need not only the expected Laplacian, but also the expectation
+        of the log(Tr(exp(-betaL))). This can only be compu
+
+        args:
+            modelfun: a function in the form f(x) that once called returns the expected adjacency matrix of a model.
+            modelfun_grad: a function in the form f(x) that once called returns the gradients of the expected Laplacian of a model.
+            step_callback: a callback function to control the current status of optimization.
+        """
+        self.modelfun = modelfun
+        self.modelfun_grad = modelfun_grad
+        self.step_callback = step_callback
+        self.bounds = modelfun.bounds
+
 
     def gradient(self, x, rho, beta):
         pass
@@ -216,7 +233,7 @@ class ExpectedModelOptimizer(ModelOptimizer):
 
         args:
             A (numpy.array): The observed adjacency matrix
-            x0 (numpy.array): The initial value of the optimization parameters.
+            x0 (numpy.array): The initial value of the optimization parameters (also called θ_0)
             beta_range (numpy.array, list): The values for which to run optimization
         """
         self.A = A
@@ -224,18 +241,18 @@ class ExpectedModelOptimizer(ModelOptimizer):
         self.beta_range = beta_range
         self.x0 = x0
 
-    def setup(self, modelfun, modelfun_grad=None, step_callback=None):
+    def setup(self, expected_adj_fun, expected_lapl_grad_fun=None, step_callback=None):
         """
         Setup the optimizer. Must specify the model function, as a function that returns the expected adjacency matrix,
         Optionally one can also provide the modelfun_grad, a function that returns the gradient of the expected Laplacian.
 
         args:
-            modelfun: a function in the form f(x) that once called returns the expected adjacency matrix of a model.
-            modelfun_grad: a function in the form f(x) that once called returns the gradients of the expected Laplacian of a model.
+            expected_adj_fun: a function in the form f(θ) that once called returns the expected adjacency matrix of a model E_θ[A].
+            expected_lapl_grad_fun: a function in the form f(θ) that once called returns the gradients of the expected Laplacian of a model ∇_θ[E_θ[A]]. 
             step_callback: a callback function to control the current status of optimization.
         """
-        self.modelfun = modelfun
-        self.modelfun_grad = modelfun_grad
+        self.modelfun = expected_adj_fun
+        self.modelfun_grad = expected_lapl_grad_fun
         self.step_callback = step_callback
         self.bounds = modelfun.bounds
 
@@ -248,16 +265,14 @@ class ExpectedModelOptimizer(ModelOptimizer):
         args:
             x (numpy.array): the current parameters
             rho (numpy.array): the observed density matrix
-            beta (float): the beta
+            beta (float): the beta, a positive real.
 
         Returns:
             the gradient as a three index numpy array. The last index is the one pertaining to the k-th component of x
         """
         sigma = compute_vonneuman_density(graph_laplacian(self.modelfun(x)), beta)
-        #print(self.modelfun_grad(x))
-        #return np.array([np.trace(np.dot(rho-sigma, self.modelfun_grad(x)[:, i, :])) for i in range(0, len(self.x0))])
         # Here instead of tracing over the matrix product, we just sum over the entrywise product of the two matrices
-        # (rho-sigma) and the dL/dtheta.
+        # (rho-sigma) and the ∂E_θ[L]/.
         return np.array([np.sum(np.multiply(rho-sigma, self.modelfun_grad(x)[:, i, :].T)) for i in range(0, len(self.x0))])
 
     def hessian(self, x, beta):
