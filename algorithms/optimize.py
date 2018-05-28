@@ -447,15 +447,38 @@ class StochasticGradientDescent(StochasticOptimizer):
         x = self.x0
         num_iters = kwargs.get('num_iters',100)
         eta = kwargs.get('eta',1E-3) # learning rate
+        
+        alphaval = 1E-3
+        beta1 = 0.9
+        beta2 = 0.999
+        epsilon = 1E-8
+        
         # Populate the solution list as function of beta
         # the list sol contains all optimization points
         sol = []
         # Iterate over all beta provided by the user
+        
         for beta in self.beta_range:
             rho = VonNeumannDensity(A=None, L=self.L, beta=beta).density
-            for k in range(0,num_iters):                
-                x -= eta * self.gradient(x,rho,beta)
+            converged = False
+            mt = np.zeros([1,len(self.x0)])
+            vt = mt
+            t = 0
+            while not converged:
+                t += 1
+                grad_t = self.gradient(x,rho,beta)
+                mt = beta1 * mt + (1.0-beta1) * grad_t
+                vt = beta2 *vt  + (1.0-beta2) * (grad_t*grad_t)
+                mttilde = mt/(1.0-(beta1**t)) # compute bias corrected first moment estimate
+                vttilde = vt/(1.0-(beta2**t)) # compute bias-corrected second raw moment estimate
+                x_old = x
+                x -= alphaval*mttilde/np.sqrt(vttilde + epsilon)
                 print('\r',beta,np.triu(self.modelfun(x)).sum(),x.T.tolist(),end='')
+                if t>100:
+                    break
+            #for k in range(0,num_iters):                
+            #    x -= eta * self.gradient(x,rho,beta)
+            #    print('\r',beta,np.triu(self.modelfun(x)).sum(),x.T.tolist(),end='')
             sol.append({'x':x})
                 
             # Here creates the output data structure as a dictionary of the optimization parameters and variables
@@ -480,45 +503,3 @@ class StochasticGradientDescent(StochasticOptimizer):
             #    sol[-1][self.modelfun.args_mapping[i]] = sol[-1]['x'][i]
         self.sol = sol
         return sol
-
-    def summary(self, to_dataframe=False):
-        """
-        A convenience function to summarize all the optimization process, with results of optimization.
-
-        args:
-            to_dataframe (bool): if True, returns a pandas dataframe, otherwise returns a list of dictionaries
-        """
-        if to_dataframe:
-            import pandas as pd
-            return pd.DataFrame(self.sol).set_index('T')  # it's 1/beta
-        else:
-            s = "{:>20} " * (len(self.modelfun.args_mapping) + 1)
-            print('=' * 20 * (len(self.modelfun.args_mapping) + 1))
-            print('Summary:')
-            print('Model:\t' + str(self.modelfun.formula))
-            print('=' * 20 * (len(self.modelfun.args_mapping) + 1))
-            print('Optimization method: ' + self.method)
-            print('Variables bounds: ')
-            for i, b in enumerate(self.bounds):
-                left = '-∞' if self.bounds[i][0] is None else str(
-                    self.bounds[i][0])
-                right = '+∞' if self.bounds[i][1] is None else str(
-                    self.bounds[i][1])
-                print("{: >1} {:} {: >10} {:} {: >1}".format(
-                    left, '<=', self.modelfun.args_mapping[i], '<=', right))
-            print('=' * 20 * (len(self.modelfun.args_mapping) + 1))
-            print('Results:')
-            print('=' * 20 * (len(self.modelfun.args_mapping) + 1))
-            print('Von Neumann Log Likelihood:\t' +
-                  str(self.sol[-1]['loglike']))
-            print('Von Neumann Entropy:\t\t' + str(self.sol[-1]['entropy']))
-            print('Von Neumann Relative entropy:\t' +
-                  str(self.sol[-1]['rel_entropy']))
-            print('AIC:\t\t\t\t' + str(self.sol[-1]['AIC']))
-            print('=' * 20 * (len(self.modelfun.args_mapping) + 1))
-            print('Estimate:')
-            print('=' * 20 * (len(self.modelfun.args_mapping) + 1))
-            print(s.format('beta', * self.modelfun.args_mapping))
-            for i in range(0, len(self.sol)):
-                row = [str(x) for x in self.sol[i].x]
-                print(s.format(self.sol[i]['beta'], *row))
