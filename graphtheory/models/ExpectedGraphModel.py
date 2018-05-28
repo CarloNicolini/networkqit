@@ -179,7 +179,7 @@ class ErdosRenyi(ExpectedModel):
     def expected_laplacian_grad(self, x):
         N = self.parameters['N']
         G = np.zeros([N,1,N])
-        G[:,0,:] = (1-np.eye(N)) + (N-1)*np.eye(N)
+        G[:,0,:] = (N-1)*np.eye(N) - (1-np.eye(N))
         return G
 
 

@@ -35,15 +35,13 @@ Finally, the `MLEOptimizer` maximizes the standard likelihood of a model and it 
 #    BSD license.
 
 from abc import ABC, abstractmethod
+import numpy as np
+from numpy import triu, nan_to_num, log, inf
+from scipy.linalg import expm, logm, eigvalsh
 from scipy.optimize import minimize, least_squares, fsolve
 from networkqit.infotheory.density import VonNeumannDensity, SpectralDivergence, compute_vonneuman_density
 from networkqit.graphtheory import graph_laplacian as graph_laplacian
-import numpy as np
-from numpy import triu, nan_to_num, log, inf
 import numdifftools as nd
-from scipy.linalg import expm
-#from networkqit.graphtheory.models.GraphModel import *
-
 
 class ModelOptimizer(ABC):
     def __init__(self, A, **kwargs):
@@ -422,7 +420,6 @@ class StochasticOptimizer(ModelOptimizer):
         Start the optimization process
         """
         pass
-    
 
 class StochasticGradientDescent(StochasticOptimizer):
     """
@@ -430,30 +427,98 @@ class StochasticGradientDescent(StochasticOptimizer):
     """
     def __init__(self, A, x0, beta_range, **kwargs):
         self.A = A
+        self.L = graph_laplacian(self.A)
         self.x0 = x0
         self.beta_range = beta_range
 
 
-    def gradient(self, x, rho, beta):
-        sigma = compute_vonneuman_density(graph_laplacian(self.modelfun(x)), beta)
-        average = 10
+    def gradient(self, x, rho, beta,num_samples=1):
         # Compute the first part of the gradient, the one depending linearly on the expected laplacian, easy to get
-        grad = np.array([beta*np.trace(rho@self.modelfun_grad(x)[:,i,:]) for i in range(0,len(self.x0))])
+        grad = np.array([beta*np.sum(np.multiply(rho,self.modelfun_grad(x)[:,i,:])) for i in range(0,len(self.x0))])
         # Now compute the second part, dependent on the gradient of the expected log partition function
-        logZ = lambda y: np.log(np.trace(expm(-beta*graph_laplacian(self.samplingfun(y)))))
-        meanlogZ = lambda w: np.mean([ logZ(w) for i in range(0,average)])
-        print(grad)
-        print(nd.Gradient(meanlogZ)(x))
-        grad += np.array([nd.Gradient(meanlogZ)(x)])
-        
-        return grad
-        
+        def estimate_gradient_log_trace(x, rho, beta, num_samples=1):
+            logZ = lambda y :np.log(np.sum(np.exp(-eigvalsh(graph_laplacian(self.samplingfun(y)))*beta)))
+            meanlogZ = lambda w: np.mean([ logZ(w) for i in range(0,num_samples)])
+            return nd.Gradient(meanlogZ)(x)
+        gradlogtrace = estimate_gradient_log_trace(x,rho,beta)
+        return np.expand_dims(grad + gradlogtrace,axis=1)
+                
     def run(self,**kwargs):
-        num_iters = 100
         x = self.x0
-        eta = 0.01 # learning rate
+        num_iters = kwargs.get('num_iters',100)
+        eta = kwargs.get('eta',1E-3) # learning rate
+        # Populate the solution list as function of beta
+        # the list sol contains all optimization points
+        sol = []
+        # Iterate over all beta provided by the user
         for beta in self.beta_range:
-            for k in range(0,num_iters):
+            rho = VonNeumannDensity(A=None, L=self.L, beta=beta).density
+            for k in range(0,num_iters):                
                 x -= eta * self.gradient(x,rho,beta)
+                print('\r',beta,np.triu(self.modelfun(x)).sum(),x.T.tolist(),end='')
+            sol.append({'x':x})
+                
+            # Here creates the output data structure as a dictionary of the optimization parameters and variables
+            spect_div = SpectralDivergence(Lobs=self.L, Lmodel=graph_laplacian(self.samplingfun(sol[-1]['x'])), beta=beta)
+            sol[-1]['DeltaL'] = (np.trace(self.L) - np.trace(graph_laplacian(self.samplingfun(sol[-1]['x']))))/2
+            if kwargs.get('compute_sigma',False):
+                Lmodel = graph_laplacian(self.modelfun(sol[-1]['x']))
+                rho = VonNeumannDensity(A=None, L=self.L, beta=beta).density
+                sigma = VonNeumannDensity(A=None, L=Lmodel, beta=beta).density
+                sol[-1]['<DeltaL>'] = np.trace(np.dot(rho,Lmodel)) - np.trace(np.dot(sigma,Lmodel))
+                #from scipy.integrate import quad
+                #from numpy import vectorize
+                #Q1 = vectorize(quad)(lambda x : expm(-x*beta*self.L)@(self.L-Lmodel)@expm(x*beta*self.L),0,1)
+                #sol[-1]['<DeltaL>_1'] = beta*( np.trace(rho@Q1@Lmodel) - np.trace(rho@Q1)*np.trace(rho@Lmodel) )
+            sol[-1]['T'] = 1/beta
+            sol[-1]['beta'] = beta
+            sol[-1]['loglike'] = spect_div.loglike
+            sol[-1]['rel_entropy'] = spect_div.rel_entropy
+            sol[-1]['entropy'] = spect_div.entropy
+            sol[-1]['AIC'] = 2 * len(self.modelfun.args_mapping) - 2 * sol[-1]['loglike']
+            #for i in range(0, len(self.modelfun.args_mapping)):
+            #    sol[-1][self.modelfun.args_mapping[i]] = sol[-1]['x'][i]
+        self.sol = sol
+        return sol
 
-        return x
+    def summary(self, to_dataframe=False):
+        """
+        A convenience function to summarize all the optimization process, with results of optimization.
+
+        args:
+            to_dataframe (bool): if True, returns a pandas dataframe, otherwise returns a list of dictionaries
+        """
+        if to_dataframe:
+            import pandas as pd
+            return pd.DataFrame(self.sol).set_index('T')  # it's 1/beta
+        else:
+            s = "{:>20} " * (len(self.modelfun.args_mapping) + 1)
+            print('=' * 20 * (len(self.modelfun.args_mapping) + 1))
+            print('Summary:')
+            print('Model:\t' + str(self.modelfun.formula))
+            print('=' * 20 * (len(self.modelfun.args_mapping) + 1))
+            print('Optimization method: ' + self.method)
+            print('Variables bounds: ')
+            for i, b in enumerate(self.bounds):
+                left = '-∞' if self.bounds[i][0] is None else str(
+                    self.bounds[i][0])
+                right = '+∞' if self.bounds[i][1] is None else str(
+                    self.bounds[i][1])
+                print("{: >1} {:} {: >10} {:} {: >1}".format(
+                    left, '<=', self.modelfun.args_mapping[i], '<=', right))
+            print('=' * 20 * (len(self.modelfun.args_mapping) + 1))
+            print('Results:')
+            print('=' * 20 * (len(self.modelfun.args_mapping) + 1))
+            print('Von Neumann Log Likelihood:\t' +
+                  str(self.sol[-1]['loglike']))
+            print('Von Neumann Entropy:\t\t' + str(self.sol[-1]['entropy']))
+            print('Von Neumann Relative entropy:\t' +
+                  str(self.sol[-1]['rel_entropy']))
+            print('AIC:\t\t\t\t' + str(self.sol[-1]['AIC']))
+            print('=' * 20 * (len(self.modelfun.args_mapping) + 1))
+            print('Estimate:')
+            print('=' * 20 * (len(self.modelfun.args_mapping) + 1))
+            print(s.format('beta', * self.modelfun.args_mapping))
+            for i in range(0, len(self.sol)):
+                row = [str(x) for x in self.sol[i].x]
+                print(s.format(self.sol[i]['beta'], *row))
