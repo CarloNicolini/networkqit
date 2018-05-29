@@ -41,6 +41,7 @@ from scipy.linalg import expm, logm, eigvalsh
 from scipy.optimize import minimize, least_squares, fsolve
 from networkqit.infotheory.density import VonNeumannDensity, SpectralDivergence, compute_vonneuman_density
 from networkqit.graphtheory import graph_laplacian as graph_laplacian
+from scipy.misc import logsumexp
 import numdifftools as nd
 
 class ModelOptimizer(ABC):
@@ -437,18 +438,19 @@ class StochasticGradientDescent(StochasticOptimizer):
         grad = np.array([beta*np.sum(np.multiply(rho,self.modelfun_grad(x)[:,i,:])) for i in range(0,len(self.x0))])
         # Now compute the second part, dependent on the gradient of the expected log partition function
         def estimate_gradient_log_trace(x, rho, beta, num_samples=1):
-            logZ = lambda y :np.log(np.sum(np.exp(-eigvalsh(graph_laplacian(self.samplingfun(y)))*beta)))
+            #logZ = lambda y :np.log(np.sum(np.exp(-eigvalsh(graph_laplacian(self.samplingfun(y)))*beta)))
+            logZ = lambda y : logsumexp(-beta*eigvalsh(graph_laplacian(self.samplingfun(y))))
             meanlogZ = lambda w: np.mean([ logZ(w) for i in range(0,num_samples)])
             return nd.Gradient(meanlogZ)(x)
         gradlogtrace = estimate_gradient_log_trace(x,rho,beta)
-        return np.expand_dims(grad + gradlogtrace,axis=1)
+        return grad + gradlogtrace
                 
     def run(self,**kwargs):
         x = self.x0
-        num_iters = kwargs.get('num_iters',100)
+        max_iters = kwargs.get('max_iters',1000)
         eta = kwargs.get('eta',1E-3) # learning rate
         
-        alphaval = 1E-3
+        alpha = 1E-3
         beta1 = 0.9
         beta2 = 0.999
         epsilon = 1E-8
@@ -461,26 +463,22 @@ class StochasticGradientDescent(StochasticOptimizer):
         for beta in self.beta_range:
             rho = VonNeumannDensity(A=None, L=self.L, beta=beta).density
             converged = False
-            mt = np.zeros([1,len(self.x0)])
-            vt = mt
+            mt,vt = np.zeros(self.x0.shape),np.zeros(self.x0.shape)
             t = 0
             while not converged:
                 t += 1
                 grad_t = self.gradient(x,rho,beta)
                 mt = beta1 * mt + (1.0-beta1) * grad_t
-                vt = beta2 *vt  + (1.0-beta2) * (grad_t*grad_t)
+                vt = beta2 * vt  + (1.0-beta2) * (grad_t*grad_t)
                 mttilde = mt/(1.0-(beta1**t)) # compute bias corrected first moment estimate
                 vttilde = vt/(1.0-(beta2**t)) # compute bias-corrected second raw moment estimate
                 x_old = x
-                x -= alphaval*mttilde/np.sqrt(vttilde + epsilon)
-                print('\r',beta,np.triu(self.modelfun(x)).sum(),x.T.tolist(),end='')
-                if t>100:
+                x -= alpha*mttilde/np.sqrt(vttilde + epsilon)
+                if self.step_callback is not None:
+                    self.step_callback(beta,x)
+                if np.linalg.norm(x_old-x) < 1E-4 or t > max_iters:
                     break
-            #for k in range(0,num_iters):                
-            #    x -= eta * self.gradient(x,rho,beta)
-            #    print('\r',beta,np.triu(self.modelfun(x)).sum(),x.T.tolist(),end='')
             sol.append({'x':x})
-                
             # Here creates the output data structure as a dictionary of the optimization parameters and variables
             spect_div = SpectralDivergence(Lobs=self.L, Lmodel=graph_laplacian(self.samplingfun(sol[-1]['x'])), beta=beta)
             sol[-1]['DeltaL'] = (np.trace(self.L) - np.trace(graph_laplacian(self.samplingfun(sol[-1]['x']))))/2
