@@ -62,6 +62,17 @@ class VonNeumannDensity(object):
 
 
 class SpectralDivergence(object):
+    """
+    This class defines the object SpectralDivergence that permits to avoid repetitive computations of the observed density rho.
+    args:
+        Lobs (numpy.array): the observed Laplacian matrix.
+        Lmodel (numpy.array): the observed Laplacian matrix.
+        beta (float): the beta hyperparameter.
+
+    kwargs:
+        rho (numpy.array): you can avoid computation of rho, if in some optimization method this is kept constant.
+        fast_mode (bool): if fast_mode is set to True (default) the average model and observed energy are coompuuted as sum of elementwise products, otherwise trace of matrix product is used. Moreover computation of eigenvalues instead of tracing of matrix exponential is used.
+    """
     def __init__(self, Lobs: np.array, Lmodel: np.array, beta: float, **kwargs):
         self.Lmodel = Lmodel
         self.Lobs = Lobs

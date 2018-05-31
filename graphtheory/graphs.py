@@ -10,11 +10,14 @@ Utility functions to generate benchmark graphs
 #    BSD license.
 
 import networkx as nx
+
 def ring_of_cliques(n, r):
     """
     Returns a networkx graph of ring of cliques with n cliques, each with of r nodes
-    n number of nodes in every clique
-    r number of connected cliques
+    
+    args:
+        n number of nodes in every clique
+        r number of connected cliques
     """
     graph = nx.disjoint_union_all([nx.complete_graph(r) for i in range(0, n)])
     graph.add_edges_from([(u, u + r + 1) for u in range(0, r * n, r)])
@@ -28,7 +31,10 @@ def barthelemy_graph(n_er, prob, n_cliques, k_cliques):
     Resolution limit in complex networks.
 
     args:
-
+        n_er (int): number of nodes in the random graph
+        prob (float): probability of linking in the random graph
+        n_cliques (int): number of cliques
+        k_cliques (int): number of nodes per clique
     """
     graph = nx.connected_component_subgraphs(
         nx.erdos_renyi_graph(n_er, prob))[0]
