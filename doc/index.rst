@@ -18,9 +18,9 @@ It allows to compute spectral entropies and to fit different models to your obse
   - scipy
   - pandas
 
-In the current state of development, **networkqit** features only one method of optimization for the relative entropy between observation and model. It is based on an approximation that makes the problem tractable analytically.
-In future releases we plan to implement stochastic optimization methods, to obtain correct estimates of the model parameters, with no approximation.
-
+In the current state of development, **networkqit** features two methods of optimization for the relative entropy between observation and model.
+The first is based on an approximation that makes the problem tractable analytically.
+The second is based on stochastic optimization and allows one to obtain correct estimates of the model parameters, with no approximations, however at the expenses of speed and precision.
 
 
 Documentation

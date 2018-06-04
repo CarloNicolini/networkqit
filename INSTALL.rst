@@ -27,42 +27,17 @@ First, make sure you have the latest version of ``pip`` (the Python package mana
 installed. If you do not, refer to the `Pip documentation
 <https://pip.pypa.io/en/stable/installing/>`_ and install ``pip`` first.
 
-Install the released version
-----------------------------
-
-Install the current release of ``networkqit`` with ``pip``::
-
-    $ pip install networkqit
-
-To upgrade to a newer release use the ``--upgrade`` flag::
-
-    $ pip install --upgrade networkqit
-
-If you do not have permission to install software systemwide, you can
-install into your user directory using the ``--user`` flag::
-
-    $ pip install --user networkqit
-
-Alternatively, you can manually download ``networkqit`` from
-`GitHub <https://bitbucket.org/carlonicolini/networkqit/>`_  or
-`PyPI <https://pypi.python.org/pypi/networkqit>`_.
-To install one of these versions, unpack it and run the following from the
-top-level source directory using the Terminal::
-
-    $ pip install .
-
 Install the development version
 -------------------------------
 
-If you have `Git <https://git-scm.com/>`_ installed on your system, it is also
-possible to install the development version of ``networkqit``.
+At the moment `networkqit` is in alpha stage and its API could change very fast.
+For this reason `networkqit` is still not available on `pip`.
+However you can manually download ``networkqit`` from the repository:
+`Bitbucket <https://bitbucket.org/carlonicolini/networkqit/>`_ 
 
-Before installing the development version, you may need to uninstall the
-standard version of ``networkqit`` using ``pip``::
+If you have `Git <https://git-scm.com/>`_ installed on your system, do
 
-    $ pip uninstall networkqit
-
-Then do::
+::
 
     $ git clone https://bitbucket.org/carlonicolini/networkqit
     $ cd networkqit
@@ -70,7 +45,8 @@ Then do::
 
 The ``pip install -e .`` command allows you to follow the development branch as
 it changes by creating links in the right places and installing the command
-line scripts to the appropriate locations.
+line scripts to the appropriate locations. 
+The package comes with its dependencies which get installed automatically.
 
 Then, if you want to update ``networkqit`` at any time, in the same directory do::
 
