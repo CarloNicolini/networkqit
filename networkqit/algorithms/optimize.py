@@ -211,7 +211,7 @@ class ExpectedModelOptimizer(ModelOptimizer):
         self.modelfun = expected_adj_fun
         self.modelfun_grad = expected_lapl_grad_fun
         self.step_callback = step_callback
-        self.bounds = modelfun.bounds
+        self.bounds = expected_adj_fun.bounds
 
     def gradient(self, x, rho, beta):
         """
