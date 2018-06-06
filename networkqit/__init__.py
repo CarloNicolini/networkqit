@@ -50,7 +50,7 @@ author={Nicolini, Carlo and Vlasov, Vladimir and Bifone, Angelo},
 journal={arXiv preprint arXiv:1801.06009},
 year={2018}}"""
 
-name = "networkqit"
+name = "Networkqit"
 
 import numpy as np
 import networkx as nx
