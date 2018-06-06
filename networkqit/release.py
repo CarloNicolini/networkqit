@@ -186,7 +186,7 @@ description = "Python package for creating and manipulating graphs and networks"
 
 long_description = \
 """
-networkqit is a Python package.
+networkqit is a Python package to work with the spectral entropies framework of complex networks
 
 """
 license = 'BSD'

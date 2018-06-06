@@ -10,28 +10,24 @@ Overview
     :Date: |today|
 
 **networkqit** is a Python package for working within the spectral entropy framework of complex networks.
-The spectral entropies framework was firstly introduced by Dedomenico and Biamonte in the PRX paper Spectral Entropies as Information-Theoretic Tools for Complex Network Comparison
+The spectral entropies framework was firstly introduced in the paper:
 
-Manlio De Domenico and Jacob Biamonte
-Phys. Rev. X 6, 041062
+Spectral Entropies as Information-Theoretic Tools for Complex Network Comparison, Phys. Rev. X 6, 041062 (2016)
 
-A first temptative implementation of model fitting methods was studied in
+This toolbox is among the first implementations of the spectral entropy framework.
+It entails both computation of the density matrices, as well as number of methods of model fitting methods.
+If you are using `networkqit` please cite the following paper:
 
 Thermodynamics of network model fitting with spectral entropies
 Carlo Nicolini, Vladimir Vlasov, Angelo Bifone
 https://arxiv.org/abs/1801.06009
 
-Networkqit allows to compute spectral entropies and to fit different models to your observed network easily.
-**networkqit** is heavily based on existing packages, such as:
+Installing
+----------
 
-  - networkx
-  - numpy
-  - scipy
-  - pandas
+You can install the latest stable version of networkqit with pip:
 
-In the current state of development, **networkqit** features two methods of optimization for the relative entropy between observation and model.
-The first is based on an approximation that makes the problem tractable analytically.
-The second is based on stochastic optimization and allows one to obtain correct estimates of the model parameters, with no approximations, however at the expenses of speed and precision.
+    pip install networkqit 
 
 
 Documentation
