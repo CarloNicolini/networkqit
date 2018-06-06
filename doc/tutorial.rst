@@ -76,4 +76,5 @@ Finally the `beta_range` is a numpy array with the range of `beta` over which to
 
    >>> solver = nq.ExpectedModelOptimizer(A=A, x0=np.array([0.2]), beta_range=beta_range)
    >>> solver.setup(ermodel, ermodel.expected_laplacian_grad, step_callback=None)
-   >>> 
+   >>> sol = solver.run()
+   >>> print(sol)
