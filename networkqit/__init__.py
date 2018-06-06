@@ -44,7 +44,13 @@ __license__ = release.license
 __date__ = release.date
 __version__ = release.version
 
-__bibtex__ = """xxx"""
+__bibtex__ = """@article{nicolini2018thermodynamics,
+title={Thermodynamics of network model fitting with spectral entropies},
+author={Nicolini, Carlo and Vlasov, Vladimir and Bifone, Angelo},
+journal={arXiv preprint arXiv:1801.06009},
+year={2018}}"""
+
+name = "networkqit"
 
 import numpy as np
 import networkx as nx
