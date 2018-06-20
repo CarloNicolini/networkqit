@@ -44,6 +44,7 @@ from networkqit.graphtheory import graph_laplacian as graph_laplacian
 from scipy.misc import logsumexp
 import numdifftools as nd
 
+
 class ModelOptimizer(ABC):
     def __init__(self, A, **kwargs):
         """
@@ -424,7 +425,7 @@ class StochasticOptimizer(ModelOptimizer):
 
 class StochasticGradientDescent(StochasticOptimizer):
     """
-    Implements the stochastic gradient descent.
+    Implements the ADAM stochastic gradient descent.
     """
     def __init__(self, A, x0, beta_range, **kwargs):
         self.A = A
@@ -438,7 +439,6 @@ class StochasticGradientDescent(StochasticOptimizer):
         grad = np.array([beta*np.sum(np.multiply(rho,self.modelfun_grad(x)[:,i,:])) for i in range(0,len(self.x0))])
         # Now compute the second part, dependent on the gradient of the expected log partition function
         def estimate_gradient_log_trace(x, rho, beta, num_samples=1):
-            #logZ = lambda y :np.log(np.sum(np.exp(-eigvalsh(graph_laplacian(self.samplingfun(y)))*beta)))
             logZ = lambda y : logsumexp(-beta*eigvalsh(graph_laplacian(self.samplingfun(y))))
             meanlogZ = lambda w: np.mean([ logZ(w) for i in range(0,num_samples)])
             return nd.Gradient(meanlogZ)(x)
@@ -447,36 +447,29 @@ class StochasticGradientDescent(StochasticOptimizer):
                 
     def run(self,**kwargs):
         x = self.x0
-        max_iters = kwargs.get('max_iters',1000)
-        eta = kwargs.get('eta',1E-3) # learning rate
-        
-        alpha = 1E-3
-        beta1 = 0.9
-        beta2 = 0.999
-        epsilon = 1E-8
+        num_samples = kwargs.get('num_samples',1)
+        clip_gradients = kwargs.get('clip_gradients',None)
+        max_iters = kwargs.get('max_iters',1000)        
         
         # Populate the solution list as function of beta
         # the list sol contains all optimization points
         sol = []
         # Iterate over all beta provided by the user
-        
         for beta in self.beta_range:
             rho = VonNeumannDensity(A=None, L=self.L, beta=beta).density
             converged = False
-            mt,vt = np.zeros(self.x0.shape),np.zeros(self.x0.shape)
             t = 0
             while not converged:
                 t += 1
-                grad_t = self.gradient(x,rho,beta)
-                mt = beta1 * mt + (1.0-beta1) * grad_t
-                vt = beta2 * vt  + (1.0-beta2) * (grad_t*grad_t)
-                mttilde = mt/(1.0-(beta1**t)) # compute bias corrected first moment estimate
-                vttilde = vt/(1.0-(beta2**t)) # compute bias-corrected second raw moment estimate
-                x_old = x
-                x -= alpha*mttilde/np.sqrt(vttilde + epsilon)
+                grad_t = None
+                if clip_gradients is None:
+                    grad_t = self.gradient(x,rho,beta)
+                else:
+                    grad_t = np.clip(self.gradient(x,rho,beta),clip_gradients[0],clip_gradients[1]) # clip the gradients
+                x -= eta*grad_t
                 if self.step_callback is not None:
                     self.step_callback(beta,x)
-                if np.linalg.norm(x_old-x) < 1E-4 or t > max_iters:
+                if np.linalg.norm(x_old-x) < 1E-5 or t > max_iters:
                     break
             sol.append({'x':x})
             # Here creates the output data structure as a dictionary of the optimization parameters and variables
@@ -501,3 +494,93 @@ class StochasticGradientDescent(StochasticOptimizer):
             #    sol[-1][self.modelfun.args_mapping[i]] = sol[-1]['x'][i]
         self.sol = sol
         return sol
+
+    
+    
+class Adam(StochasticOptimizer):
+    """
+    Implements the ADAM stochastic gradient descent.
+    """
+    def __init__(self, A, x0, beta_range, **kwargs):
+        self.A = A
+        self.L = graph_laplacian(self.A)
+        self.x0 = x0
+        self.beta_range = beta_range
+
+
+    def gradient(self, x, rho, beta,num_samples=1):
+        # Compute the first part of the gradient, the one depending linearly on the expected laplacian, easy to get
+        grad = np.array([beta*np.sum(np.multiply(rho,self.modelfun_grad(x)[:,i,:])) for i in range(0,len(self.x0))])
+        # Now compute the second part, dependent on the gradient of the expected log partition function
+        def elogz(x):
+            elogz = 0
+            for i in range(0,num_samples):
+                L = graph_laplacian(self.samplingfun(x))
+                l = eigvalsh(L)
+                elogz += logsumexp(-beta*l)/num_samples
+            return elogz
+        
+        nablaelogz = nd.Gradient(elogz)
+        return grad + nablaelogz(x)
+                
+    def run(self,**kwargs):
+        x = self.x0
+        num_samples = kwargs.get('num_samples',1)
+        clip_gradients = kwargs.get('clip_gradients',None)
+        max_iters = kwargs.get('max_iters',1000)        
+        alpha = kwargs.get('alpha',1E-3)
+        beta1 = 0.9
+        beta2 = 0.999
+        epsilon = 1E-8
+        
+        # Populate the solution list as function of beta
+        # the list sol contains all optimization points
+        sol = []
+        # Iterate over all beta provided by the user
+        mt,vt = np.zeros(self.x0.shape),np.zeros(self.x0.shape)
+        all_x = []
+        for beta in self.beta_range:
+            rho = VonNeumannDensity(A=None, L=self.L, beta=beta).density
+            converged = False
+            t = 0
+            while not converged:
+                t += 1
+                grad_t = None
+                if clip_gradients is None:
+                    grad_t = self.gradient(x,rho,beta,num_samples)
+                else:
+                    grad_t = np.clip(self.gradient(x,rho,beta),clip_gradients[0],clip_gradients[1]) # clip the gradients
+                mt = beta1 * mt + (1.0-beta1) * grad_t
+                vt = beta2 * vt  + (1.0-beta2) * grad_t*grad_t
+                mttilde = mt/(1.0-(beta1**t)) # compute bias corrected first moment estimate
+                vttilde = vt/(1.0-(beta2**t)) # compute bias-corrected second raw moment estimate
+                x_old = x
+                x -= alpha * mttilde / np.sqrt(vttilde + epsilon)
+                if t > max_iters:
+                    break
+                if self.step_callback is not None:
+                    self.step_callback(beta,x)
+                all_x.append(x[0])
+                sol.append({'x':x})
+                # Here creates the output data structure as a dictionary of the optimization parameters and variables
+                spect_div = SpectralDivergence(Lobs=self.L, Lmodel=graph_laplacian(self.samplingfun(sol[-1]['x'])), beta=beta)
+                sol[-1]['DeltaL'] = (np.trace(self.L) - np.trace(graph_laplacian(self.samplingfun(sol[-1]['x']))))/2
+                if kwargs.get('compute_sigma',False):
+                    Lmodel = graph_laplacian(self.modelfun(sol[-1]['x']))
+                    rho = VonNeumannDensity(A=None, L=self.L, beta=beta).density
+                    sigma = VonNeumannDensity(A=None, L=Lmodel, beta=beta).density
+                    sol[-1]['<DeltaL>'] = np.trace(np.dot(rho,Lmodel)) - np.trace(np.dot(sigma,Lmodel))
+                    #from scipy.integrate import quad
+                    #from numpy import vectorize
+                    #Q1 = vectorize(quad)(lambda x : expm(-x*beta*self.L)@(self.L-Lmodel)@expm(x*beta*self.L),0,1)
+                    #sol[-1]['<DeltaL>_1'] = beta*( np.trace(rho@Q1@Lmodel) - np.trace(rho@Q1)*np.trace(rho@Lmodel) )
+                sol[-1]['T'] = 1/beta
+                sol[-1]['beta'] = beta
+                sol[-1]['loglike'] = spect_div.loglike
+                sol[-1]['rel_entropy'] = spect_div.rel_entropy
+                sol[-1]['entropy'] = spect_div.entropy
+                sol[-1]['AIC'] = 2 * len(self.modelfun.args_mapping) - 2 * sol[-1]['loglike']
+            #for i in range(0, len(self.modelfun.args_mapping)):
+            #    sol[-1][self.modelfun.args_mapping[i]] = sol[-1]['x'][i]
+        self.sol = sol
+        return sol,all_x
