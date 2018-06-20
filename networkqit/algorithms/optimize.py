@@ -527,7 +527,7 @@ class Adam(StochasticOptimizer):
         x = self.x0
         num_samples = kwargs.get('num_samples',1)
         clip_gradients = kwargs.get('clip_gradients',None)
-        max_iters = kwargs.get('max_iters',1000)        
+        max_iters = kwargs.get('max_iters',1000)
         alpha = kwargs.get('alpha',1E-3)
         beta1 = 0.9
         beta2 = 0.999
