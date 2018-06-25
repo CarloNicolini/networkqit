@@ -444,12 +444,13 @@ class StochasticGradientDescent(StochasticOptimizer):
             return nd.Gradient(meanlogZ)(x)
         gradlogtrace = estimate_gradient_log_trace(x,rho,beta)
         return grad + gradlogtrace
-                
+
     def run(self,**kwargs):
         x = self.x0
         num_samples = kwargs.get('num_samples',1)
         clip_gradients = kwargs.get('clip_gradients',None)
-        max_iters = kwargs.get('max_iters',1000)        
+        max_iters = kwargs.get('max_iters',1000)
+        eta = kwargs.get('eta',1E-3)
         
         # Populate the solution list as function of beta
         # the list sol contains all optimization points
@@ -469,7 +470,7 @@ class StochasticGradientDescent(StochasticOptimizer):
                 x -= eta*grad_t
                 if self.step_callback is not None:
                     self.step_callback(beta,x)
-                if np.linalg.norm(x_old-x) < 1E-5 or t > max_iters:
+                if t > max_iters:
                     break
             sol.append({'x':x})
             # Here creates the output data structure as a dictionary of the optimization parameters and variables
