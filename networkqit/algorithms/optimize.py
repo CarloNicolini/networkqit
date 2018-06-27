@@ -449,8 +449,9 @@ class StochasticGradientDescent(StochasticOptimizer):
         x = self.x0
         num_samples = kwargs.get('num_samples',1)
         clip_gradients = kwargs.get('clip_gradients',None)
-        max_iters = kwargs.get('max_iters',1000)        
-        
+        max_iters = kwargs.get('max_iters',1000)       
+        eta = kwargs.get('eta',1E-3)
+        tol = kwargs.get('tol',1E-5)
         # Populate the solution list as function of beta
         # the list sol contains all optimization points
         sol = []
@@ -466,10 +467,11 @@ class StochasticGradientDescent(StochasticOptimizer):
                     grad_t = self.gradient(x,rho,beta)
                 else:
                     grad_t = np.clip(self.gradient(x,rho,beta),clip_gradients[0],clip_gradients[1]) # clip the gradients
-                x -= eta*grad_t
+                x_old = x.copy()
+                x -= eta/t*grad_t
                 if self.step_callback is not None:
                     self.step_callback(beta,x)
-                if np.linalg.norm(x_old-x) < 1E-5 or t > max_iters:
+                if t > max_iters or np.linalg.norm(x_old-x) < tol:
                     break
             sol.append({'x':x})
             # Here creates the output data structure as a dictionary of the optimization parameters and variables
@@ -529,6 +531,7 @@ class Adam(StochasticOptimizer):
         clip_gradients = kwargs.get('clip_gradients',None)
         max_iters = kwargs.get('max_iters',1000)
         alpha = kwargs.get('alpha',1E-3)
+        tol = kwargs.get('tol',1E-5)
         beta1 = 0.9
         beta2 = 0.999
         epsilon = 1E-8
@@ -554,33 +557,32 @@ class Adam(StochasticOptimizer):
                 vt = beta2 * vt  + (1.0-beta2) * grad_t*grad_t
                 mttilde = mt/(1.0-(beta1**t)) # compute bias corrected first moment estimate
                 vttilde = vt/(1.0-(beta2**t)) # compute bias-corrected second raw moment estimate
-                x_old = x
+                x_old = x.copy()
                 x -= alpha * mttilde / np.sqrt(vttilde + epsilon)
-                if t > max_iters:
+                if t > max_iters or np.linalg.norm(x_old-x) < tol:
                     break
                 if self.step_callback is not None:
                     self.step_callback(beta,x)
                 all_x.append(x[0])
-                sol.append({'x':x})
-                # Here creates the output data structure as a dictionary of the optimization parameters and variables
-                spect_div = SpectralDivergence(Lobs=self.L, Lmodel=graph_laplacian(self.samplingfun(sol[-1]['x'])), beta=beta)
-                sol[-1]['DeltaL'] = (np.trace(self.L) - np.trace(graph_laplacian(self.samplingfun(sol[-1]['x']))))/2
-                if kwargs.get('compute_sigma',False):
-                    Lmodel = graph_laplacian(self.modelfun(sol[-1]['x']))
-                    rho = VonNeumannDensity(A=None, L=self.L, beta=beta).density
-                    sigma = VonNeumannDensity(A=None, L=Lmodel, beta=beta).density
-                    sol[-1]['<DeltaL>'] = np.trace(np.dot(rho,Lmodel)) - np.trace(np.dot(sigma,Lmodel))
-                    #from scipy.integrate import quad
-                    #from numpy import vectorize
-                    #Q1 = vectorize(quad)(lambda x : expm(-x*beta*self.L)@(self.L-Lmodel)@expm(x*beta*self.L),0,1)
-                    #sol[-1]['<DeltaL>_1'] = beta*( np.trace(rho@Q1@Lmodel) - np.trace(rho@Q1)*np.trace(rho@Lmodel) )
-                sol[-1]['T'] = 1/beta
-                sol[-1]['beta'] = beta
-                sol[-1]['loglike'] = spect_div.loglike
-                sol[-1]['rel_entropy'] = spect_div.rel_entropy
-                sol[-1]['entropy'] = spect_div.entropy
-                sol[-1]['AIC'] = 2 * len(self.modelfun.args_mapping) - 2 * sol[-1]['loglike']
-            #for i in range(0, len(self.modelfun.args_mapping)):
-            #    sol[-1][self.modelfun.args_mapping[i]] = sol[-1]['x'][i]
+            sol.append({'x':x.copy()})
+            # Here creates the output data structure as a dictionary of the optimization parameters and variables
+            spect_div = SpectralDivergence(Lobs=self.L, Lmodel=graph_laplacian(self.samplingfun(sol[-1]['x'])), beta=beta)
+            sol[-1]['DeltaL'] = (np.trace(self.L) - np.trace(graph_laplacian(self.samplingfun(sol[-1]['x']))))/2
+            sol[-1]['T'] = 1/beta
+            sol[-1]['beta'] = beta
+            sol[-1]['loglike'] = spect_div.loglike
+            sol[-1]['rel_entropy'] = spect_div.rel_entropy
+            sol[-1]['entropy'] = spect_div.entropy
+            sol[-1]['AIC'] = 2 * len(self.modelfun.args_mapping) - 2 * sol[-1]['loglike']
+            for i in range(0, len(self.modelfun.args_mapping)):
+                sol[-1][self.modelfun.args_mapping[i]] = sol[-1]['x'][i]
+                
+            if kwargs.get('compute_sigma',False):
+                Lmodel = graph_laplacian(self.modelfun(sol[-1]['x']))
+                rho = VonNeumannDensity(A=None, L=self.L, beta=beta).density
+                sigma = VonNeumannDensity(A=None, L=Lmodel, beta=beta).density
+                sol[-1]['<DeltaL>'] = np.trace(np.dot(rho,Lmodel)) - np.trace(np.dot(sigma,Lmodel))
+            
+            
         self.sol = sol
-        return sol,all_x
+        return sol
