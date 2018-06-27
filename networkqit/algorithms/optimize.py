@@ -471,11 +471,7 @@ class StochasticGradientDescent(StochasticOptimizer):
                 x -= eta/t*grad_t
                 if self.step_callback is not None:
                     self.step_callback(beta,x)
-<<<<<<< HEAD
-                if t > max_iters or np.linalg.norm(x_old-x) < tol:
-=======
                 if t > max_iters:
->>>>>>> 560adf2cb92cc0a150f692ea358e474aa25566f3
                     break
             sol.append({'x':x})
             # Here creates the output data structure as a dictionary of the optimization parameters and variables
