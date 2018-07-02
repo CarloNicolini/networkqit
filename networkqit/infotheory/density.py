@@ -50,6 +50,7 @@ def compute_vonneumann_entropy_beta_deriv(**kwargs):
         return np.trace(L@rho@logmrho) - np.trace(rho@logmrho)*np.trace(L@rho)
 
     elif 'L' in kwargs.keys() and 'beta' in kwargs.keys():
+        L=kwargs['L']
         rho = compute_vonneuman_density(L, kwargs['beta'])
         return np.trace(L@rho@logm(rho)) - np.trace(rho@logm(rho))*np.trace(L@rho)
     
