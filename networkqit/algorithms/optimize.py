@@ -408,13 +408,29 @@ class StochasticOptimizer(ModelOptimizer):
         self.bounds = expected_adj_fun.bounds
 
 
-    def gradient(self, x, rho, beta):
-        """
-        This method must be defined from inherited classes.
-        It returns the gradients of the expected relative entropy at given parameters x.
-        The expectation can either be estimated numerically by repeated sampling or via some smarter methods.
-        """
-        pass
+    def gradient(self, x, rho, beta,num_samples=1):
+        # Compute the first part of the gradient, the one depending linearly on the expected laplacian, easy to get
+        grad = np.array([beta*np.sum(np.multiply(rho,self.modelfun_grad(x)[:,i,:])) for i in range(0,len(self.x0))])
+        # Now compute the second part, dependent on the gradient of the expected log partition function
+        def quenched_log_partition_gradient(x, rho, beta, num_samples=1): # quenched gradient estimation
+            logZ = lambda y : logsumexp(-beta*eigvalsh(graph_laplacian(self.samplingfun(y))))
+            meanlogZ = lambda w: np.mean([ logZ(w) for i in range(0,num_samples)])
+            return nd.Gradient(meanlogZ)(x)
+        def annealed_log_partition_gradient(x, rho, beta, num_samples=1): # annealed gradient estimation
+            logZ = lambda y : logsumexp(-beta*eigvalsh(graph_laplacian(self.samplingfun(y))))
+            meanlogZ = lambda w: np.mean([ logZ(w) for i in range(0,num_samples)])
+            return nd.Gradient(meanlogZ)(x)
+        
+        def quenched(x,rho,beta,num_samples=1):
+            g = np.array([0,])
+            for r in range(0,num_samples):
+                lxplus = eigvalsh(graph_laplacian(self.samplingfun(x+0.01)))
+                lx = eigvalsh(graph_laplacian(self.samplingfun(x)))
+                g[0] += (logsumexp(lxplus)-logsumexp(lx))*100
+            return g/num_samples
+            
+        gradlogtrace = annealed_log_partition_gradient(x,rho,beta,num_samples)
+        return grad + gradlogtrace
 
 
     def run(self, model, **kwargs):
@@ -434,31 +450,24 @@ class StochasticGradientDescent(StochasticOptimizer):
         self.beta_range = beta_range
 
 
-    def gradient(self, x, rho, beta,num_samples=1):
-        # Compute the first part of the gradient, the one depending linearly on the expected laplacian, easy to get
-        grad = np.array([beta*np.sum(np.multiply(rho,self.modelfun_grad(x)[:,i,:])) for i in range(0,len(self.x0))])
-        # Now compute the second part, dependent on the gradient of the expected log partition function
-        def estimate_gradient_log_trace(x, rho, beta, num_samples=1):
-            logZ = lambda y : logsumexp(-beta*eigvalsh(graph_laplacian(self.samplingfun(y))))
-            meanlogZ = lambda w: np.mean([ logZ(w) for i in range(0,num_samples)])
-            return nd.Gradient(meanlogZ)(x)
-        gradlogtrace = estimate_gradient_log_trace(x,rho,beta)
-        return grad + gradlogtrace
-
     def run(self,**kwargs):
         x = self.x0
         num_samples = kwargs.get('num_samples',1)
         clip_gradients = kwargs.get('clip_gradients',None)
         max_iters = kwargs.get('max_iters',1000)       
         eta = kwargs.get('eta',1E-3)
-        tol = kwargs.get('tol',1E-5)
+        gtol = kwargs.get('gtol',1E-5)
+        xtol = kwargs.get('xtol',1E-3)
         # Populate the solution list as function of beta
         # the list sol contains all optimization points
         sol = []
         # Iterate over all beta provided by the user
+        
         for beta in self.beta_range:
+            x = np.random.random(self.x0.shape)
             rho = VonNeumannDensity(A=None, L=self.L, beta=beta).density
             converged = False
+            opt_message = ''
             t = 0
             while not converged:
                 t += 1
@@ -467,14 +476,23 @@ class StochasticGradientDescent(StochasticOptimizer):
                     grad_t = self.gradient(x,rho,beta)
                 else:
                     grad_t = np.clip(self.gradient(x,rho,beta),clip_gradients[0],clip_gradients[1]) # clip the gradients
+                # Convergence status
+                if np.linalg.norm(grad_t) < gtol:
+                    converged, opt_message = True, 'gradient tolerance exceeded'
+                if t > max_iters:
+                    converged, opt_message = True, 'max_iters_exceed'
+                if x[0]<0:
+                    converged, opt_message = True, 'bounds_exceeded'
                 x_old = x.copy()
-                x -= eta/t*grad_t
+                x -= eta*grad_t
+                print('\rbeta=',beta, 'grad=',grad_t[0], 'x=', x, end='')
                 if self.step_callback is not None:
                     self.step_callback(beta,x)
-                if t > max_iters:
-                    break
+
+                    
             sol.append({'x':x})
             # Here creates the output data structure as a dictionary of the optimization parameters and variables
+            sol[-1]['opt_message'] = opt_message
             spect_div = SpectralDivergence(Lobs=self.L, Lmodel=graph_laplacian(self.samplingfun(sol[-1]['x'])), beta=beta)
             sol[-1]['DeltaL'] = (np.trace(self.L) - np.trace(graph_laplacian(self.samplingfun(sol[-1]['x']))))/2
             if kwargs.get('compute_sigma',False):
@@ -482,10 +500,6 @@ class StochasticGradientDescent(StochasticOptimizer):
                 rho = VonNeumannDensity(A=None, L=self.L, beta=beta).density
                 sigma = VonNeumannDensity(A=None, L=Lmodel, beta=beta).density
                 sol[-1]['<DeltaL>'] = np.trace(np.dot(rho,Lmodel)) - np.trace(np.dot(sigma,Lmodel))
-                #from scipy.integrate import quad
-                #from numpy import vectorize
-                #Q1 = vectorize(quad)(lambda x : expm(-x*beta*self.L)@(self.L-Lmodel)@expm(x*beta*self.L),0,1)
-                #sol[-1]['<DeltaL>_1'] = beta*( np.trace(rho@Q1@Lmodel) - np.trace(rho@Q1)*np.trace(rho@Lmodel) )
             sol[-1]['T'] = 1/beta
             sol[-1]['beta'] = beta
             sol[-1]['loglike'] = spect_div.loglike
@@ -497,8 +511,7 @@ class StochasticGradientDescent(StochasticOptimizer):
         self.sol = sol
         return sol
 
-    
-    
+
 class Adam(StochasticOptimizer):
     """
     Implements the ADAM stochastic gradient descent.
@@ -508,22 +521,6 @@ class Adam(StochasticOptimizer):
         self.L = graph_laplacian(self.A)
         self.x0 = x0
         self.beta_range = beta_range
-
-
-    def gradient(self, x, rho, beta,num_samples=1):
-        # Compute the first part of the gradient, the one depending linearly on the expected laplacian, easy to get
-        grad = np.array([beta*np.sum(np.multiply(rho,self.modelfun_grad(x)[:,i,:])) for i in range(0,len(self.x0))])
-        # Now compute the second part, dependent on the gradient of the expected log partition function
-        def elogz(x):
-            elogz = 0
-            for i in range(0,num_samples):
-                L = graph_laplacian(self.samplingfun(x))
-                l = eigvalsh(L)
-                elogz += logsumexp(-beta*l)/num_samples
-            return elogz
-        
-        nablaelogz = nd.Gradient(elogz)
-        return grad + nablaelogz(x)
                 
     def run(self,**kwargs):
         x = self.x0
@@ -531,7 +528,7 @@ class Adam(StochasticOptimizer):
         clip_gradients = kwargs.get('clip_gradients',None)
         max_iters = kwargs.get('max_iters',1000)
         alpha = kwargs.get('alpha',1E-3)
-        tol = kwargs.get('tol',1E-5)
+        gtol = kwargs.get('gtol',1E-3)
         beta1 = 0.9
         beta2 = 0.999
         epsilon = 1E-8
@@ -546,21 +543,33 @@ class Adam(StochasticOptimizer):
             rho = VonNeumannDensity(A=None, L=self.L, beta=beta).density
             converged = False
             t = 0
+            opt_message = ''
             while not converged:
                 t += 1
                 grad_t = None
                 if clip_gradients is None:
-                    grad_t = self.gradient(x,rho,beta,num_samples)
+                    grad_t = 1E3*self.gradient(x,rho,1E-3,num_samples)
                 else:
-                    grad_t = np.clip(self.gradient(x,rho,beta),clip_gradients[0],clip_gradients[1]) # clip the gradients
+                    grad_t = 1E3*np.clip(self.gradient(x,rho,1E-3),clip_gradients[0],clip_gradients[1]) # clip the gradients
+                
+                if np.linalg.norm(grad_t) < gtol:
+                    converged, opt_message = True, 'gradient tolerance exceeded'
+                    break
+                if t > max_iters:
+                    converged, opt_message = True, 'max_iters_exceed'
+                    break
+                if x[0]<0:
+                    converged, opt_message = True, 'bounds_exceeded'
+                    break
+                x_old = x.copy()
+                
                 mt = beta1 * mt + (1.0-beta1) * grad_t
                 vt = beta2 * vt  + (1.0-beta2) * grad_t*grad_t
                 mttilde = mt/(1.0-(beta1**t)) # compute bias corrected first moment estimate
                 vttilde = vt/(1.0-(beta2**t)) # compute bias-corrected second raw moment estimate
                 x_old = x.copy()
                 x -= alpha * mttilde / np.sqrt(vttilde + epsilon)
-                if t > max_iters or np.linalg.norm(x_old-x) < tol:
-                    break
+                print('\rbeta=',beta, 'grad=',grad_t[0], 'x=', x, end='')
                 if self.step_callback is not None:
                     self.step_callback(beta,x)
                 all_x.append(x[0])
