@@ -422,11 +422,11 @@ class StochasticOptimizer(ModelOptimizer):
             return nd.Gradient(meanlogZ)(x)
         
         def quenched(x,rho,beta,num_samples=1):
-            g = np.array([0,])
+            g = np.zeros_like(x)
             for r in range(0,num_samples):
                 lxplus = eigvalsh(graph_laplacian(self.samplingfun(x+0.01)))
                 lx = eigvalsh(graph_laplacian(self.samplingfun(x)))
-                g[0] += (logsumexp(lxplus)-logsumexp(lx))*100
+                g += (logsumexp(lxplus)-logsumexp(lx))*100
             return g/num_samples
             
         gradlogtrace = annealed_log_partition_gradient(x,rho,beta,num_samples)
@@ -481,11 +481,11 @@ class StochasticGradientDescent(StochasticOptimizer):
                     converged, opt_message = True, 'gradient tolerance exceeded'
                 if t > max_iters:
                     converged, opt_message = True, 'max_iters_exceed'
-                if x[0]<0:
-                    converged, opt_message = True, 'bounds_exceeded'
+                #if x[0]<0:
+                #    converged, opt_message = True, 'bounds_exceeded'
                 x_old = x.copy()
                 x -= eta*grad_t
-                print('\rbeta=',beta, 'grad=',grad_t[0], 'x=', x, end='')
+                print('\rbeta=',beta, '|grad|=',np.linalg.norm(grad_t), 'x=', np.linalg.norm(x), ' m=',self.modelfun(x).sum()/2,  end='')
                 if self.step_callback is not None:
                     self.step_callback(beta,x)
 
@@ -500,7 +500,7 @@ class StochasticGradientDescent(StochasticOptimizer):
                 rho = VonNeumannDensity(A=None, L=self.L, beta=beta).density
                 sigma = VonNeumannDensity(A=None, L=Lmodel, beta=beta).density
                 sol[-1]['<DeltaL>'] = np.trace(np.dot(rho,Lmodel)) - np.trace(np.dot(sigma,Lmodel))
-            sol[-1]['T'] = 1/beta
+            sol[-1]['T'] = 1 / beta
             sol[-1]['beta'] = beta
             sol[-1]['loglike'] = spect_div.loglike
             sol[-1]['rel_entropy'] = spect_div.rel_entropy
