@@ -35,8 +35,9 @@ Finally, the `MLEOptimizer` maximizes the standard likelihood of a model and it 
 #    BSD license.
 
 from abc import ABC, abstractmethod
-import numpy as np
-from numpy import triu, nan_to_num, log, inf
+#import numpy as np
+import autograd.numpy as np
+from autograd.numpy import triu, nan_to_num, log, inf
 from scipy.linalg import expm, logm, eigvalsh
 from scipy.optimize import minimize, least_squares, fsolve
 from networkqit.infotheory.density import VonNeumannDensity, SpectralDivergence, compute_vonneuman_density
@@ -511,6 +512,88 @@ class StochasticGradientDescent(StochasticOptimizer):
         self.sol = sol
         return sol
 
+############################################################
+############################################################
+############################################################
+class AutoGradOptimize(StochasticOptimizer):
+    import autograd.numpy as np
+    """
+    Implements the ADAM stochastic gradient descent.
+    """
+    
+    def __init__(self, A, x0, beta_range, **kwargs):
+        self.A = A
+        self.L = graph_laplacian(self.A)
+        self.x0 = x0
+        self.beta_range = beta_range
+
+
+    def run(self,**kwargs):
+        x = self.x0
+        num_samples = kwargs.get('num_samples',1)
+        clip_gradients = kwargs.get('clip_gradients',None)
+        max_iters = kwargs.get('max_iters',1000)       
+        eta = kwargs.get('eta',1E-3)
+        gtol = kwargs.get('gtol',1E-5)
+        xtol = kwargs.get('xtol',1E-3)
+        # Populate the solution list as function of beta
+        # the list sol contains all optimization points
+        sol = []
+        # Iterate over all beta provided by the user
+        for beta in self.beta_range:
+            x = np.random.random(self.x0.shape)
+            rho = VonNeumannDensity(A=None, L=self.L, beta=beta).density
+            converged = False
+            opt_message = ''
+            t = 0
+            from autograd import grad as autograd_grad
+            while not converged:
+                t += 1
+                def cost(z):
+                    return SpectralDivergence(Lobs=self.L, Lmodel=graph_laplacian(self.samplingfun(z)), beta=beta).rel_entropy
+                grad_t = autograd_grad(cost)
+                grad_t = grad_t(x)
+
+                #if clip_gradients is None:
+                #    grad_t = self.gradient(x,rho,beta)
+                #else:
+                #    grad_t = np.clip(self.gradient(x,rho,beta),clip_gradients[0],clip_gradients[1]) # clip the gradients
+                # Convergence status
+                
+                #if np.linalg.norm(grad_t) < gtol:
+                #    converged, opt_message = True, 'gradient tolerance exceeded'
+                if t > max_iters:
+                    converged, opt_message = True, 'max_iters_exceed'
+                #if x[0]<0:
+                #    converged, opt_message = True, 'bounds_exceeded'
+                x_old = x.copy()
+                x -= eta*grad_t
+                print('\rbeta=',beta, '|grad|=',np.linalg.norm(grad_t), 'x=', np.linalg.norm(x), ' m=',self.modelfun(x).sum()/2,  end='')
+                if self.step_callback is not None:
+                    self.step_callback(beta,x)
+            print(opt_message,t)
+
+
+            sol.append({'x':x})
+            # Here creates the output data structure as a dictionary of the optimization parameters and variables
+            sol[-1]['opt_message'] = opt_message
+            spect_div = SpectralDivergence(Lobs=self.L, Lmodel=graph_laplacian(self.samplingfun(sol[-1]['x'])), beta=beta)
+            sol[-1]['DeltaL'] = (np.trace(self.L) - np.trace(graph_laplacian(self.samplingfun(sol[-1]['x']))))/2
+            if kwargs.get('compute_sigma',False):
+                Lmodel = graph_laplacian(self.modelfun(sol[-1]['x']))
+                rho = VonNeumannDensity(A=None, L=self.L, beta=beta).density
+                sigma = VonNeumannDensity(A=None, L=Lmodel, beta=beta).density
+                sol[-1]['<DeltaL>'] = np.trace(np.dot(rho,Lmodel)) - np.trace(np.dot(sigma,Lmodel))
+            sol[-1]['T'] = 1 / beta
+            sol[-1]['beta'] = beta
+            sol[-1]['loglike'] = spect_div.loglike
+            sol[-1]['rel_entropy'] = spect_div.rel_entropy
+            sol[-1]['entropy'] = spect_div.entropy
+            sol[-1]['AIC'] = 2 * len(self.modelfun.args_mapping) - 2 * sol[-1]['loglike']
+            #for i in range(0, len(self.modelfun.args_mapping)):
+            #    sol[-1][self.modelfun.args_mapping[i]] = sol[-1]['x'][i]
+        self.sol = sol
+        return sol
 
 class Adam(StochasticOptimizer):
     """
