@@ -74,7 +74,7 @@ B_{ij} = \arctanh\left( \corr(X_i, X_j) \right)
 By appropriately tuning the local noise and global noise parameters, it is possible to best reflect the properties of the Crossley network.
 I have shown that the histogram of the edge weights of the Fisher transformed correlation matrix from these benchmark networks, reflects pretty well the distribution of the Fisher z-values of the original Crossley matrix, when the model parameters are tuned to $T=200$ time points, local noise $\eta=2.5$, global noise $\mu=1.5$, soft-threshold coefficient $\gamma=1$ and multiplicative factor $q=0.8$
 \begin{figure}
-\includegraphics[width=1.0\textwidth]{../crossley_vs_synthetic.pdf}
+%\includegraphics[width=1.0\textwidth]{../crossley_vs_synthetic.pdf}
 \caption{Comparison between the crossley z matrix and the synthetic one, with $T=200$ time points, local noise $\eta=2.5$, global noise $\mu=1.5$, soft-threshold coefficient $\gamma=1$ and multiplicative factor $q=0.8$.}
 \label{fig:benchmark_network}
 \end{figure}
@@ -86,10 +86,22 @@ The effect of the global noise parameter is to introduce correlation between all
 Here we try to hypothesize the following phenomenon. As an effect of global correlation increase, with increasing edge weights, the diffusion properties of the network are changing. In particular, with higher ``flux'' on the edges, the diffusion is faster, hence higher entropy is reached at smaller $\beta$.
 
 \begin{figure}
-\includegraphics[width=1.0\textwidth]{../spectral_entropy_synthetic_global_noise.pdf}
+%\includegraphics[width=1.0\textwidth]{../spectral_entropy_synthetic_global_noise.pdf}
 \caption{Increase in the global noise. The increase of the intermodule links weights, modifies the spectral entropy, inducing lower entropy at all scales.}
 \label{fig:benchmark_network}
 \end{figure}
+The hypothesis seems to be confirmed by experimental data.
 
+\subsection{Edge removal effect}
+In this experiment we studied the effect on the transition with respect to $\beta$ of the spectral entropy as a function of the percentage of the edges removed from a fully connected graph.
+The close a network becomes to the fully connected uniform topology, the steeper is the entropy difference in a small range of $\beta$, a quantity that can be measured by the width of the peak in the derivative of the entropy with respect to $\beta$ as shown in Figure~\ref{fig:beta_deriv_clique_removal}:
+\begin{figure}
+\centering
+\includegraphics[width=0.8\textwidth]{entropy_derivative_er.pdf}
+\caption{Effect of link removal on the FWHM of the quantity $dS/d\beta$. At full densities (yellow curves) the entropy derivative is steeper, hence the peak is higher. Empty networks have a slower rate of diffusion. }
+\label{fig:beta_deriv_clique_removal}
+\end{figure}
+
+We replicate the same experiment in the case of weighted correlation networks
 
 \end{document}
