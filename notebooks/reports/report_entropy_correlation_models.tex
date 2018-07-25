@@ -65,16 +65,16 @@ This resulted in a set $\{y_1,\dots,y_n\}$ of $n$ time series with values:
 y_i(t)= \gamma_A(t) + \nu\cdot \beta_i(t) + \mu\cdot \alpha(t) \quad i\in A, \quad A=1,\ldots,c
 \label{eq:bench}
 \end{equation}
-The time series $\{Y_1,\dots,Y_N\}$ are further \emph{standardized} to obtain a final set $\{X_1,\dots,X_N\}$ of $n$ time series, each with zero mean and unit variance.
+The time series $\{y_1,\dots,y_n\}$ are further \emph{standardized} to obtain a final set $\{x_1,\dots,x_n\}$ of $n$ time series, each with zero mean and unit variance.
 The obtained z-transformed correlation matrix of the factor model can be written as:
 \begin{equation}
 B_{ij} = \arctanh\left( \corr(X_i, X_j) \right)
 \end{equation}
-
+and is the basis of our analysis, as it becomes a benchmark network to test the value of the spectral entropies appproach.
 By appropriately tuning the local noise and global noise parameters, it is possible to best reflect the properties of the Crossley network.
 I have shown that the histogram of the edge weights of the Fisher transformed correlation matrix from these benchmark networks, reflects pretty well the distribution of the Fisher z-values of the original Crossley matrix, when the model parameters are tuned to $T=200$ time points, local noise $\eta=2.5$, global noise $\mu=1.5$, soft-threshold coefficient $\gamma=1$ and multiplicative factor $q=0.8$
 \begin{figure}
-\includegraphics[width=1.0\textwidth]{../crossley_vs_synthetic.pdf}
+%\includegraphics[width=1.0\textwidth]{../crossley_vs_synthetic.pdf}
 \caption{Comparison between the crossley z matrix and the synthetic one, with $T=200$ time points, local noise $\eta=2.5$, global noise $\mu=1.5$, soft-threshold coefficient $\gamma=1$ and multiplicative factor $q=0.8$.}
 \label{fig:benchmark_network}
 \end{figure}
@@ -86,7 +86,7 @@ The effect of the global noise parameter is to introduce correlation between all
 Here we try to hypothesize the following phenomenon. As an effect of global correlation increase, with increasing edge weights, the diffusion properties of the network are changing. In particular, with higher ``flux'' on the edges, the diffusion is faster, hence higher entropy is reached at smaller $\beta$.
 
 \begin{figure}
-\includegraphics[width=1.0\textwidth]{../spectral_entropy_synthetic_global_noise.pdf}
+%\includegraphics[width=1.0\textwidth]{../spectral_entropy_synthetic_global_noise.pdf}
 \caption{Increase in the global noise. The increase of the intermodule links weights, modifies the spectral entropy, inducing lower entropy at all scales.}
 \label{fig:benchmark_network}
 \end{figure}
