@@ -90,6 +90,18 @@ Here we try to hypothesize the following phenomenon. As an effect of global corr
 \caption{Increase in the global noise. The increase of the intermodule links weights, modifies the spectral entropy, inducing lower entropy at all scales.}
 \label{fig:benchmark_network}
 \end{figure}
+The hypothesis seems to be confirmed by experimental data.
 
+\subsection{Edge removal effect}
+In this experiment we studied the effect on the transition with respect to $\beta$ of the spectral entropy as a function of the percentage of the edges removed from a fully connected graph.
+The close a network becomes to the fully connected uniform topology, the steeper is the entropy difference in a small range of $\beta$, a quantity that can be measured by the width of the peak in the derivative of the entropy with respect to $\beta$ as shown in Figure~\ref{fig:beta_deriv_clique_removal}:
+\begin{figure}
+\centering
+\includegraphics[width=0.8\textwidth]{entropy_derivative_er.pdf}
+\caption{Effect of link removal on the FWHM of the quantity $dS/d\beta$. At full densities (yellow curves) the entropy derivative is steeper, hence the peak is higher. Empty networks have a slower rate of diffusion. }
+\label{fig:beta_deriv_clique_removal}
+\end{figure}
+
+We replicate the same experiment in the case of weighted correlation networks
 
 \end{document}
