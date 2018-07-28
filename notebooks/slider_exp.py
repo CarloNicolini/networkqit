@@ -33,15 +33,16 @@ def vonneuman_density(L, beta):
     rho = expm(-beta*L)
     return rho / np.trace(rho)
 
-fig, ax = plt.subplots(ncols=4,nrows=1,figsize=(36,12))
+fig, ax = plt.subplots(ncols=5,nrows=1,figsize=(36,12))
 
 # Adjust the subplots region to leave some space for the sliders and buttons
 fig.subplots_adjust(left=0.25, bottom=0.35)
 
-G = nx.planted_partition_graph(2,20,0.8,0.05)
+G = nx.planted_partition_graph(2,50,0.8,0.001)
 #G = nx.karate_club_graph()
 A = nx.to_numpy_array(G)
 L = nq.graph_laplacian(A)
+l,Q = np.linalg.eigh(L)
 l = np.linalg.eigvalsh(L)
 
 min_beta = -3
@@ -75,6 +76,8 @@ ax[3].grid(False)
 # Define an axes area and draw a slider in it
 exp_slider_ax  = fig.add_axes([0.25, 0.15, 0.65, 0.03])
 exp_slider = Slider(exp_slider_ax, '$\\log_{10}(\\beta)$', min_beta, max_beta, valinit=beta_0)
+
+nx.draw_networkx_nodes(G=G, pos=nx.spring_layout(G),ax=ax[4],node_color=Q[2,:], node_size=8)
 
 # Define an action for modifying the line when any slider's value changes
 def sliders_on_changed(val):
