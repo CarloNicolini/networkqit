@@ -42,6 +42,7 @@ from scipy.linalg import expm, logm, eigvalsh
 from scipy.optimize import minimize, least_squares, fsolve
 from networkqit.infotheory.density import VonNeumannDensity, SpectralDivergence, compute_vonneuman_density
 from networkqit.graphtheory import graph_laplacian as graph_laplacian
+from networkqit.graphtheory import UBCM, UWCM, UECM
 from scipy.misc import logsumexp
 import numdifftools as nd
 
@@ -289,7 +290,7 @@ class ExpectedModelOptimizer(ModelOptimizer):
                 sol.append( least_squares(lambda x : self.gradient(x,rho,beta), x0=self.x0, bounds=kwargs.get('bounds',(0,np.inf)),
                                       loss=kwargs.get('loss','soft_l1'), # robust choice for the loss function of the residuals
                                       xtol = kwargs.get('xtol',1E-9),
-                                      gtol = kwargs.get('gtol',1E-10)))
+                                      gtol = kwargs.get('gtol',1E-12)))
             else: # otherwise directly minimize the relative entropy function
                 sol.append(minimize(fun=self.rel_entropy_fun,
                                     x0=self.x0,

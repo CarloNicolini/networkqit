@@ -94,7 +94,7 @@ class SpectralDivergence(object):
         else:  # otherwise use correct version, slower for large graphs
             self.Em = np.trace(np.dot(Lmodel, self.rho))
             self.Eo = np.trace(np.dot(Lobs,   self.rho))
-
+        self.deltaE = self.Em -  self.Eo
         # Computation of partition functions
         if self.fast_mode:  # prefer faster implementation based on eigenvalues
             lm = eigvalsh(Lmodel)
@@ -108,7 +108,7 @@ class SpectralDivergence(object):
         # Computation of free energies from partition functions
         self.Fm = -np.log(self.Zm)/beta
         self.Fo = -np.log(self.Zo)/beta
-        
+        self.deltaF = self.Fm - self.Fo
         # Loglikelihood betweeen rho (obs) and sigma (model)
         self.loglike = beta*(-self.Fm + self.Em)
         

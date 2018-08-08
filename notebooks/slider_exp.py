@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.linalg import expm
-import matplotlib.pyplot as plt, mpld3
+import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider, Button, RadioButtons
 plt.style.use('ggplot')
 
@@ -77,8 +77,8 @@ ax[0,2].set_title('eigs $\\rho$')
 ax[0,2].set_ylabel('$\lambda(\\rho)$')
 ax[0,2].set_xlabel('index')
 
-ax[0,3].set_title('Laplacian spectrum')
 ax[0,3].plot(np.kron(np.ones([2,1]),signal(beta_0)))
+ax[0,3].set_title('Laplacian spectrum')
 
 
 # Spectral entropy plot
@@ -121,7 +121,6 @@ def sliders_on_changed(val):
     freq, edges = histogram(exp_slider.val)
     line.set_ydata(v)
     ax[0,0].set_ylim([0,np.max(v)*1.1])
-
     hist_lines.set_ydata(freq)
     #hist_lines.set_xdata(edges[:-1])
     #ax[0,1].set_ylim([0,1.05*len(A)])
@@ -129,8 +128,10 @@ def sliders_on_changed(val):
 
     rholines.set_ydata(v)
     ax[0,2].set_ylim([0,np.max(v)*1.1])
+
     ax[0,3].cla()
     ax[0,3].plot(np.kron(np.ones([2,1]),v))
+    ax[0,3].set_title('Density spectrum')
     entropy_lines.set_xdata([10**exp_slider.val])
     entropy_lines.set_ydata(von_neumann_entropy(10**exp_slider.val))
 
@@ -140,8 +141,8 @@ def sliders_on_changed(val):
     nx.draw_networkx_edges (G=G, pos=pos, ax=ax[1,2], edge_color=e,edge_vmin=0,edge_vmax=1/len(A),alpha=0.1)
 
     #nx.draw_networkx_edges (G=GG, pos=XYZ[:,1:], ax=ax[1,3], edge_color=e,edge_vmin=0,edge_vmax=1/len(A))
-    ax[1,1].cla()
-    image.set_array(von_neumann_density(L,10**exp_slider.val))
+    #ax[1,1].cla()
+    image.set_array(rho)
     fig.canvas.draw_idle()
 
 sliders_on_changed(beta_0)
