@@ -74,7 +74,7 @@ and is the basis of our analysis, as it becomes a benchmark network to test the 
 By appropriately tuning the local noise and global noise parameters, it is possible to best reflect the properties of the Crossley network.
 I have shown that the histogram of the edge weights of the Fisher transformed correlation matrix from these benchmark networks, reflects pretty well the distribution of the Fisher z-values of the original Crossley matrix, when the model parameters are tuned to $T=200$ time points, local noise $\eta=2.5$, global noise $\mu=1.5$, soft-threshold coefficient $\gamma=1$ and multiplicative factor $q=0.8$
 \begin{figure}
-%\includegraphics[width=1.0\textwidth]{../crossley_vs_synthetic.pdf}
+\includegraphics[width=1.0\textwidth]{../crossley_vs_synthetic.pdf}
 \caption{Comparison between the crossley z matrix and the synthetic one, with $T=200$ time points, local noise $\eta=2.5$, global noise $\mu=1.5$, soft-threshold coefficient $\gamma=1$ and multiplicative factor $q=0.8$.}
 \label{fig:benchmark_network}
 \end{figure}
@@ -86,16 +86,17 @@ The effect of the global noise parameter is to introduce correlation between all
 Here we try to hypothesize the following phenomenon. As an effect of global correlation increase, with increasing edge weights, the diffusion properties of the network are changing. In particular, with higher ``flux'' on the edges, the diffusion is faster, hence higher entropy is reached at smaller $\beta$.
 
 \begin{figure}
-%\includegraphics[width=1.0\textwidth]{../spectral_entropy_synthetic_global_noise.pdf}
+\includegraphics[width=1.0\textwidth]{../spectral_entropy_synthetic_global_noise.pdf}
 \caption{Increase in the global noise. The increase of the intermodule links weights, modifies the spectral entropy, inducing lower entropy at all scales.}
 \label{fig:benchmark_network}
 \end{figure}
 The hypothesis seems to be confirmed by experimental data.
 
+\newpage
 \subsection{Edge removal effect}
 In this experiment we studied the effect on the transition with respect to $\beta$ of the spectral entropy as a function of the percentage of the edges removed from a fully connected graph.
 The close a network becomes to the fully connected uniform topology, the steeper is the entropy difference in a small range of $\beta$, a quantity that can be measured by the width of the peak in the derivative of the entropy with respect to $\beta$ as shown in Figure~\ref{fig:beta_deriv_clique_removal}:
-\begin{figure}
+\begin{figure}[htb]
 \centering
 \includegraphics[width=0.8\textwidth]{entropy_derivative_er.pdf}
 \caption{Effect of link removal on the FWHM of the quantity $dS/d\beta$. At full densities (yellow curves) the entropy derivative is steeper, hence the peak is higher. Empty networks have a slower rate of diffusion. }
@@ -104,4 +105,32 @@ The close a network becomes to the fully connected uniform topology, the steeper
 
 We replicate the same experiment in the case of weighted correlation networks
 
+\newpage
+\section{A push-pull effect on spectral entropies}
+A nice interpretation of the curves of spectral entropies are the following.
+We have observed that increasing the global number of links, for example by multiplying the whole network by a factor then, returns that same entropy for a $\beta$ factor of the same inverse factor.
+For example, if for a network $\bA^*$ and $\beta^*$ we have entropy $S(\bA^*, \beta^*)$, we can get the same entropy if we multiply (or divide) the network by a constant factor $\gamma$ and divide (or multiply) the same network for the same factor: $S(\bA^*, \beta^*) = S(\gamma \bA^*, \beta^* \gamma^{-1})$. This effect is due to the multiplicative effect over every eigenvalue.
+
+\begin{figure}[htb]
+\centering
+\includegraphics[width=0.8\textwidth]{multiplier_effect.pdf}
+\caption{Effect of global multiplication of link weight in the spectral entropy curves for the karate club graph. On x-axis is $\beta$. An increase in the multiplicative factor has the effect of shifting the entropy curves to the left, in areas of smaller $\beta$.}
+\label{fig:entropy_curves_unnormalized}
+\end{figure}
+This overall multiplication corresponds to increasing the flow over the links of the network by the same factor, or in visual terms, by shifting the entropy.
+With this in mind, we can try to increase the weight of all links in a subset of nodes of a complete graph, an operation that should look similar to an artificial increase of the modularity of a subset of nodes.
+
+\subsection{Comparison of different networks}
+This observation makes evident that in order to compare two networks with a different number of nodes, in terms of their spectral entropies, one has to normalize the adjacency matrix by the total number of links. With this normalization, the curves in~\ref{fig:entropy_curves_unnormalized} are translated within a smaller range.
+
+\begin{figure}[htb]
+\centering
+%\includegraphics[width=0.8\textwidth]{}
+\caption{xxx}
+\label{fig:entropy_curves_normalized}
+\end{figure}
+
+\begin{figure}
+\input{example_sigmoid.tex}
+\end{figure}
 \end{document}
