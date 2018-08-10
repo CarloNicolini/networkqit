@@ -300,8 +300,8 @@ class ExpectedModelOptimizer(ModelOptimizer):
                                         'disp', False), 'gtol': kwargs.get('gtol', 1E-12)},
                                     bounds=self.bounds))
             
-            # important to reinitialize from the last solution
-            if kwargs.get('reinitialize',False):
+            # important to reinitialize from the last solution, solution is restarted at every step otherwise
+            if kwargs.get('reinitialize',True):
                 self.x0 = sol[-1].x
             # Call the step_callback function to print or display current solution
             if self.step_callback is not None:
