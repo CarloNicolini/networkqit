@@ -252,6 +252,13 @@ class ExpectedModelOptimizer(ModelOptimizer):
         method: 'BFGS'
         if the optimization problem is bounded, instead use one of the scipy constrained optimizer,
         which are 'L-BFGS-B', 'TNC', 'SLSQP' or 'least_squares'
+        
+        **kwargs:
+            gtol: gradient tolerance to be used in optimization (default 1E-12)
+            maxfun: maximum number of function evaluations
+            maxiter: maximum number of iterations of gradient descent
+            xtol: tolerance in the change of variables theta
+            
         """
         self.method = kwargs.get('method', 'BFGS')
         if self.bounds is not None and self.method not in ['L-BFGS-B', 'TNC', 'SLSQP', 'least_squares']:
@@ -291,13 +298,15 @@ class ExpectedModelOptimizer(ModelOptimizer):
                                       loss=kwargs.get('loss','soft_l1'), # robust choice for the loss function of the residuals
                                       xtol = kwargs.get('xtol',1E-9),
                                       gtol = kwargs.get('gtol',1E-12)))
-            else: # otherwise directly minimize the relative entropy function
+            else: # otherwise directly minimize the relative entropy function (change the default arguments)
                 sol.append(minimize(fun=self.rel_entropy_fun,
                                     x0=self.x0,
                                     jac=fgrad,
                                     method=self.method,
-                                    options={'disp': kwargs.get(
-                                        'disp', False), 'gtol': kwargs.get('gtol', 1E-12)},
+                                    options={'disp': kwargs.get('disp', False),
+                                             'gtol': kwargs.get('gtol', 1E-12),
+                                             'maxiter': kwargs.get('maxiter',5E4),
+                                             'maxfun': kwargs.get('maxfun',5E4)},
                                     bounds=self.bounds))
             
             # important to reinitialize from the last solution, solution is restarted at every step otherwise
