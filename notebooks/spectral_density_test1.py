@@ -125,23 +125,23 @@ def compute_rho(allz, M, nr, matrix, eps=1E-12, maxsteps=150, include_isolated=F
 
 if __name__=='__main__':
     b = 2
-    nr = [ 100 ] * b
-    pin, pout = 1.0, 0.2
+    nr = [ 1000 ] * b
+    pin, pout = 0.8, 0.2
 
     M = pout*(np.ones(b)-np.eye(b)) + pin*np.eye(b)
     
     eigs_l,eigs_a = [], []
-    for i in range(0,50):
+    for i in range(0,5):
         print('\r',i,end='')
-        A = planted_partition_graph(np.sum(nr),b,pout,pin)
+        A = planted_partition_graph(np.sum(nr),b,pin,pout)
         L=np.diag(A.sum(axis=0))-A
         eigs_a.append(scipy.linalg.eigvalsh(A))
         eigs_l.append(scipy.linalg.eigvalsh(L))
     eigs_a = np.array(eigs_a).flatten()
     eigs_l = np.array(eigs_l).flatten()
 
-    allz, rho = compute_rho(np.linspace(-30,30,200), M, nr, 'adjacency', eps=1E-12, maxsteps=50)
-    
-    plt.hist(eigs_a,200)
+    allz, rho = compute_rho(np.linspace(-100,100,100), M, nr, 'adjacency', eps=1E-12, maxsteps=10)
+    print('')
+    plt.hist(eigs_a,density=True,bins=200)
     plt.plot(allz,rho)
     plt.show()
