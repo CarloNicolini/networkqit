@@ -28,7 +28,7 @@ def normalized_graph_laplacian(A):
     Get the normalized graph laplacian 
     :math:`\\mathcal{L}=I - D^{-1/2} A D^{-1/2}`
     """
-    D = np.zeros_like(A)
-    np.fill_diagonal(D,1/np.sqrt(np.sum(A,1)))
-    return np.eye(A.shape[0]) - D*A*D
+    invSqrtT = np.diag(1.0/np.sqrt(A.sum(axis=0)))
+    
+    return np.eye(A.shape[0]) - invSqrtT@A@invSqrtT
     
