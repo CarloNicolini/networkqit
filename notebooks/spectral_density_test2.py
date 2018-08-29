@@ -88,7 +88,7 @@ def compute_tr(z, t0, ers, nr, matrix, tol=1E-9, maxsteps=50000):
     # Define the intrablock average degrees dr
     # since we work with undirected graphs
     dr = er/np.array(nr)
-    print(dr)
+
     Eq2 = [None] * b
 
     # This is the supercomplicated way to avoid shallow copy of lambda
@@ -113,21 +113,27 @@ def compute_tr(z, t0, ers, nr, matrix, tol=1E-9, maxsteps=50000):
 ############################################################
 
 
-def compute_detached_tr(sigma2rs, z0, t0, nr, matrix, eps=1E-12, maxsteps=100):
-    b = sigma2rs.shape[0]
+def compute_detached_tr(ers, z0, t0, nr, matrix, eps=1E-7, maxsteps=50000):
+    b = ers.shape[0]
+    sigma2rs, M = None, None
+
+    nrns = np.reshape(np.kron(nr,nr),[b,b])
+    er = ers.sum(axis=1)
     if matrix is 'laplacian':
+        sigma2rs = ers/nrns
         M = -sigma2rs
     elif matrix is 'adjacency':
+        sigma2rs = ers/nrns
         M = sigma2rs
     elif matrix is 'norm_laplacian':
-        M = sigma2rs  # approximately
-    if len(nr) != b:
-        raise 'Incompatible size of matrix M and total number of blocks'
+        sigma2rs = ers/np.reshape(np.kron(er,er),[b,b])
+        M = -ers/np.sqrt(np.multiply(nrns,ers))
+
     IB = sp.eye(b)
     NB = sp.diag(*nr)
 
     def TzB(z):
-        val = sp.diag(*compute_tr(z + eps * 1j, t0, M, nr, matrix))
+        val = sp.diag(*compute_tr(z + eps * 1j, t0, ers, nr, matrix))
         return val
 
     def eq4(z):  # Equation 4 of Peixoto paper
@@ -135,14 +141,13 @@ def compute_detached_tr(sigma2rs, z0, t0, nr, matrix, eps=1E-12, maxsteps=100):
         return mp.mpc(det)
 
     def trsum(z):
-        tr = compute_tr(z + eps * 1j, t0, M, nr,
-                        [sp.KroneckerDelta(sp.Symbol('c_', integer=True), 0)] * b)
+        tr = compute_tr(z + eps * 1j, t0, ers, nr, [sp.KroneckerDelta(sp.Symbol('c_', integer=True), 0)] * b)
         return np.sum([t.imag for t in tr])
-    z_detached = mp.findroot(eq4, x0=mp.mpc(z0), solver='muller', maxsteps=maxsteps)
-    return z_detached
+    z_detached = mp.findroot(eq4, x0=mp.mpc(z0), tol=1E-9, solver='muller', maxsteps=maxsteps)
+    return z_detached.real
 
 
-def compute_rho(allz, ers, nr, matrix, eps=1E-12, maxsteps=150, include_isolated=False, t0=None):
+def compute_rho(allz, ers, nr, matrix, eps=1E-7, maxsteps=150, include_isolated=False, t0=None):
 
     N = np.sum(nr)  # total number of nodes
 
@@ -174,10 +179,10 @@ def compute_rho(allz, ers, nr, matrix, eps=1E-12, maxsteps=150, include_isolated
         rholist = rho.tolist()
         print('\nDiscrete band')
         zi = 0
-        for z in allz:
-            if zi <= z:
+        for z in reversed(allz):
+            if zi >= z:
                 lastzi = zi
-                zi = compute_detached_tr(sigma2rs, z, t0, nr, matrix, maxsteps=maxsteps)
+                zi = compute_detached_tr(ers, z, t0, nr, matrix, maxsteps=maxsteps)
                 if np.abs(mp.re(lastzi) - mp.re(zi)) > eps:
                     allzlist.append(mp.re(zi))
                     # to avoid considering same solution twice
@@ -222,13 +227,13 @@ def compute_rho(allz, ers, nr, matrix, eps=1E-12, maxsteps=150, include_isolated
 
 
 def test2(matrix):
-    ers = np.array([[5000, 25000], [25000, 5000]])
+    ers = np.array([[5000, 25000], [25000, 5000]])*5
     #ers = np.kron(ers,np.array([[0.5,0.3],[0.8,0.2]]))
     print(ers)
-    nr = [750, 500]
+    nr = [512, 256]
     b = len(nr)
     nrns = np.reshape(np.kron(nr, nr), [b, b])
-    reps = 200
+    reps = 500
     print(ers/nrns)
     if matrix is 'laplacian':
         eigs = np.array([scipy.linalg.eigvalsh(GL(hierarchical_random_graph2(ers, nr))) for i in range(0, reps)]).flatten()
@@ -242,7 +247,6 @@ def test2(matrix):
         zmax = -zmin
         zmin = 0
 
-    print(zmin, zmax)
     plt.subplot(1, 3, 1)
     plt.imshow(hierarchical_random_graph2(ers, nr))
     plt.grid(False)
@@ -253,14 +257,14 @@ def test2(matrix):
     plt.hist(eigs, density=1, bins=500)
     
     plt.show()
-    allz, rho = compute_rho(np.linspace(0, 100, 5000), ers, nr, matrix, eps=mp.mpf(1E-7), t0=[mp.mpc('0')] * len(nr))
-    # save for further analyses
     np.savetxt('ers.dat',ers)
     np.savetxt('nrns.dat',nrns)
+    np.savetxt('eigs.dat',eigs)
+    allz, rho = compute_rho(np.linspace(0, 200, 10000), ers, nr, matrix, eps=mp.mpf(1E-7), t0=[mp.mpc('0')] * len(nr), include_isolated=False)
+    # save for further analyses
     np.savetxt('allz.dat',allz)
     np.savetxt('rho.dat',rho)
-    np.savetxt('eigs.dat',eigs)
-    plt.hist(eigs, density=1, bins=500)
+    plt.hist(eigs, density=1, bins=2000)
     #plt.vlines(x=zmin, ymin=0, ymax=0.05, color='b')
     #plt.vlines(x=zmax, ymin=0, ymax=0.05, color='b')
     plt.plot(allz, np.abs(rho))

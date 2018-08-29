@@ -17,7 +17,7 @@ import numpy as np
 def graph_laplacian(A):
     """
     Get the graph Laplacian from the adjacency matrix
-    :math:`L=D-A`
+    :math:`\\mathbf{L} = \\mathbf{D} - \\mathbf{A}`
     """
     D = np.zeros(A.shape)
     np.fill_diagonal(D,A.sum(axis=0))
@@ -30,4 +30,11 @@ def normalized_graph_laplacian(A):
     """
     invSqrtT = np.diag(1.0/np.sqrt(A.sum(axis=0)))
     return np.eye(A.shape[0]) - invSqrtT@A@invSqrtT
-    
+
+def modularity_matrix(A):
+    """
+    Returns the modularity matrix
+    :math:`\\mathbf{B} = \\mathbf{A} - \\frac{\\mathbf{k} \\mathbf{k}^T}{2m}`
+    """
+    k = A.sum(axis=0)
+    return A - np.outer(k,k)/A.sum()
