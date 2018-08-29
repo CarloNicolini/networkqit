@@ -45,31 +45,26 @@ def Gamma(a, z0, z1): # this version of Gamma does not have infinite recursion p
     return mp.gammainc(a, z0) - mp.gammainc(a, z1)
 
 
-def compute_tr(z, t0, sigma2, nr, matrix, tol=1E-16, maxsteps=100):
-    b = sigma2.shape[0]
+def compute_tr(z, t0, sigma2rs, nr, matrix, tol=1E-16, maxsteps=1000):
+    b = sigma2rs.shape[0]
     if len(nr) != b:
         raise 'sigma2rs and nr must have same dimensions'
 
-    # Define the variables $t_r(z)$ which are the Stieltjes transforms to look for
-    #tr = [sp.symbols('t'+str(i), complex=True) for i in range(0, b)]
-    
-    # nrns = np.array([[(nr[r]*(nr[s]-1)) if r == s else nr[r]*nr[s] for s in range(0, b)] for r in range(0, b)])
-    # ers = np.multiply(M, nrns)  # elementwise multiplication
     # Define the intrablock average degrees dr
-    dr = np.diagonal(np.diag(nr)*sigma2)
+    dr = np.diagonal(np.diag(nr)*sigma2rs) # since we work with undirected graphs
 
     Eq2 = [None] * b
     
     # This is the supercomplicated way to avoid shallow copy of lambda functions around
     for r in range(0, b):
         if matrix is 'laplacian':
-            Eq2[r] = lambda rr,T : ( mp.power(dr[rr],(z-np.sum([sigma2[r, ss]*nr[ss]*T[ss] for ss in range(0, b)])))*Gamma(np.sum([sigma2[r, ss]*nr[ss]*T[ss] for ss in range(0, b)])-z,0,-dr[rr])+T[rr]*mp.exp(dr[rr]+1j*mp.pi*(np.sum([sigma2[r, ss]*nr[ss]*T[ss] for ss in range(0, b)])-z)))*mp.exp(-dr[rr]-1j*mp.pi*(np.sum([sigma2[r, ss]*nr[ss]*T[ss] for ss in range(0, b)])-z))
+            Eq2[r] = lambda rr,T : ( mp.power(dr[rr],(z-np.sum([sigma2rs[rr, ss]*nr[ss]*T[ss] for ss in range(0, b)])))*Gamma(np.sum([sigma2rs[rr, ss]*nr[ss]*T[ss] for ss in range(0, b)])-z,0,-dr[rr])+T[rr]*mp.exp(dr[rr]+1j*mp.pi*(np.sum([sigma2rs[rr, ss]*nr[ss]*T[ss] for ss in range(0, b)])-z)))*mp.exp(-dr[rr]-1j*mp.pi*(np.sum([sigma2rs[rr, ss]*nr[ss]*T[ss] for ss in range(0, b)])-z))
         elif matrix is 'adjacency':
-            Eq2[r] = lambda rr,T : T[rr] + 1/(np.sum([sigma2[r, ss]*nr[ss]*T[ss] for ss in range(0, b)])-z)
+            Eq2[r] = lambda rr,T : T[rr] + 1/(np.sum([sigma2rs[rr, ss]*nr[ss]*T[ss] for ss in range(0, b)])-z)
         elif matrix is 'norm_laplacian':
-            Eq2[r] = lambda rr,T : T[rr] + 1/(np.sum([sigma2[r, ss]*nr[ss]*T[ss] for ss in range(0, b)])-z+1)
+            Eq2[r] = lambda rr,T : T[rr] + 1/(np.sum([sigma2rs[rr, ss]*nr[ss]*T[ss] for ss in range(0, b)])-z+1)
             
-    trsol = mp.findroot(lambda *t : [Eq2[r](r,[*t]) for r in range(0,b)],x0=t0,solver='muller', tol=tol, maxsteps=maxsteps)
+    trsol = mp.findroot(lambda *t : [Eq2[r](r,[*t]) for r in range(0,b)],x0=t0,solver='anewton', tol=tol, maxsteps=maxsteps)
     return [trsol[r] for r in range(0, b)]
     
 ############################################################
@@ -109,7 +104,7 @@ def compute_rho(allz, M, nr, matrix, eps=1E-12, maxsteps=150, include_isolated=F
     b = M.shape[0]
     if t0 is None:
         # use a default initial value for the stieltjes transform tr
-        t0 = [0 + 0.001j] * b
+        t0 = [0 + 1E-6j] * b
     
     print('Continuos band')
     for i, z in enumerate(allz):
@@ -142,27 +137,35 @@ def compute_rho(allz, M, nr, matrix, eps=1E-12, maxsteps=150, include_isolated=F
 def poisspdf(k,l):
     return sp.exp(-l)*(k**l)/sp.factorial(l)
     
-def test1():
+def test1(matrix):
     b0 = 2
     pin, pout = 0.8, 0.2
 
     M0 = pout*(np.ones(b0)-np.eye(b0)) + pin*np.eye(b0)
     #M0 = np.array([[0.8,0.2],[0.3,0.5]])
-    M = M0 #np.kron(M0, M0)
-    nr = [100, 100]
+    M = M0#np.kron(M0, M0)
+    nr = [100]*M.shape[0]
     #b = len(nr)
-    reps = 50
-
-    eigs_a = np.array([scipy.linalg.eigvalsh(hierarchical_random_graph(M, nr)) for i in range(0, reps)]).flatten()
-    eigs_l = np.array([scipy.linalg.eigvalsh(GL(hierarchical_random_graph(M, nr))) for i in range(0, reps)]).flatten()
-    eigs_nl = np.array([scipy.linalg.eigvalsh(NGL(hierarchical_random_graph(M, nr))) for i in range(0, reps)]).flatten()
+    reps = 500
     
-    allz, rho = compute_rho(np.linspace(0.5, 200, 1500), M, nr, 'laplacian', eps=1E-18, maxsteps=2000,t0=[1E-8j]*2)
-    #plt.hist(eigs_nl, density=1, bins=200)
-    plt.plot(allz, np.abs(rho))
-    #print(np.sum((allz[1]-allz[0])*rho))
+    if matrix is 'laplacian':
+        eigs = np.array([scipy.linalg.eigvalsh(GL(hierarchical_random_graph(M, nr))) for i in range(0, reps)]).flatten()
+    elif matrix is 'adjacency':
+        eigs = np.array([scipy.linalg.eigvalsh(hierarchical_random_graph(M, nr)) for i in range(0, reps)]).flatten()
+    elif matrix is 'norm_laplacian':
+        eigs = np.array([scipy.linalg.eigvalsh(NGL(hierarchical_random_graph(M, nr))) for i in range(0, reps)]).flatten()
+    
+    allz, rho = compute_rho(np.linspace(0, 150, 2000), M, nr, matrix, eps=1E-30, t0=[1E-8j]*M.shape[0])
+    plt.figure()
+    plt.hist(eigs, bins=200)
+    #plt.figure()
+    #plt.plot(allz, rho)
+    
+    plt.figure()
+    #plt.hist(eigs, density=1)
+    plt.plot(allz, rho)
     plt.show()
 
 
 if __name__ == '__main__':
-    test1()
+    test1('laplacian')
