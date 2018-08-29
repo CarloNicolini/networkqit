@@ -29,6 +29,5 @@ def normalized_graph_laplacian(A):
     :math:`\\mathcal{L}=I - D^{-1/2} A D^{-1/2}`
     """
     invSqrtT = np.diag(1.0/np.sqrt(A.sum(axis=0)))
-    
     return np.eye(A.shape[0]) - invSqrtT@A@invSqrtT
     

@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+
 import sys
 sys.path.append('..')
 import numpy as np
@@ -43,8 +44,9 @@ def hierarchical_random_graph(sigma2rs, nr):
 def Gamma(a, z0, z1): # this version of Gamma does not have infinite recursion problems
     return mp.gammainc(a, z0) - mp.gammainc(a, z1)
 
+
 def compute_tr(z, t0, sigma2, nr, matrix, tol=1E-16, maxsteps=100):
-    b = len(sigma2)
+    b = sigma2.shape[0]
     if len(nr) != b:
         raise 'sigma2rs and nr must have same dimensions'
 
@@ -55,32 +57,21 @@ def compute_tr(z, t0, sigma2, nr, matrix, tol=1E-16, maxsteps=100):
     # ers = np.multiply(M, nrns)  # elementwise multiplication
     # Define the intrablock average degrees dr
     dr = np.diagonal(np.diag(nr)*sigma2)
-    def S(r, T):
-        val = np.sum([sigma2[r, s]*nr[s]*T[s] for s in range(0, b)])
-        return mp.mpc(val)
-    Eq2 = []
-    for r in range(0, b):
-        #S = mp.mpfnp.sum([sigma2[r, s]*nr[s]*tr[s] for s in range(0, b)])
-        fund_eq = None # initialize to none
-        #S = lambda *T : mp.mpc(np.sum([sigma2[r, s]*nr[s]*T[s] for s in range(0, b)])) # convert to mpmath
-        if matrix is 'laplacian':
-            def fund_eq(r,T):
-                return ( mp.power(dr[r],(z-S(r,T)))*Gamma(S(r,T)-z,0,-dr[r])+T[r]*mp.exp(dr[r]+1j*mp.pi*(S(r,T)-z)))*mp.exp(-dr[r]-1j*mp.pi*(S(r,T)-z))
-            #fund_eq = lambda *T : ( mp.power(dr[r],(z-S(r,T)))*Gamma(S(r,T)-z,0,-dr[r])+T[r]*mp.exp(dr[r]+1j*mp.pi*(S(r,T)-z)))*mp.exp(-dr[r]-1j*mp.pi*(S(r,T)-z))
-        elif matrix is 'adjacency':
-            #fund_eq = tr[r] + 1/(S-z)
-            fund_eq = lambda T : T[r]+mp.mpc(1/(S(r,T)-z))
-        elif matrix is 'norm_laplacian':
-            fund_eq = lambda *T : T[r]+mp.mpc(1/(S(*T)-z+1))
-        # Append in the list of equations to be solved simulateously
-        Eq2.append(fund_eq)
-        
-    print(Eq2[0](mp.mpc(1j),mp.mpc(1j)))
-    print(mp.findroot(lambda x,y : [ Eq2[0](x,y),Eq2[1](x,y) ],x0=[1,2] ))
-    # Now look for the solutions with respect to [t0,t1,...,tb] at this given z
-    #trsol = mp.findroot(Eq2, x0=[mp.mpc(tr) for tr in t0], solver='muller', tol=tol, maxsteps=maxsteps)
-    #return [trsol[r] for r in range(0, b)]
 
+    Eq2 = [None] * b
+    
+    # This is the supercomplicated way to avoid shallow copy of lambda functions around
+    for r in range(0, b):
+        if matrix is 'laplacian':
+            Eq2[r] = lambda rr,T : ( mp.power(dr[rr],(z-np.sum([sigma2[r, ss]*nr[ss]*T[ss] for ss in range(0, b)])))*Gamma(np.sum([sigma2[r, ss]*nr[ss]*T[ss] for ss in range(0, b)])-z,0,-dr[rr])+T[rr]*mp.exp(dr[rr]+1j*mp.pi*(np.sum([sigma2[r, ss]*nr[ss]*T[ss] for ss in range(0, b)])-z)))*mp.exp(-dr[rr]-1j*mp.pi*(np.sum([sigma2[r, ss]*nr[ss]*T[ss] for ss in range(0, b)])-z))
+        elif matrix is 'adjacency':
+            Eq2[r] = lambda rr,T : T[rr] + 1/(np.sum([sigma2[r, ss]*nr[ss]*T[ss] for ss in range(0, b)])-z)
+        elif matrix is 'norm_laplacian':
+            Eq2[r] = lambda rr,T : T[rr] + 1/(np.sum([sigma2[r, ss]*nr[ss]*T[ss] for ss in range(0, b)])-z+1)
+            
+    trsol = mp.findroot(lambda *t : [Eq2[r](r,[*t]) for r in range(0,b)],x0=t0,solver='muller', tol=tol, maxsteps=maxsteps)
+    return [trsol[r] for r in range(0, b)]
+    
 ############################################################
 ############################################################
 def compute_detached_tr(M, z0, t0, nr, matrix, eps=1E-12, maxsteps=100):
@@ -119,13 +110,10 @@ def compute_rho(allz, M, nr, matrix, eps=1E-12, maxsteps=150, include_isolated=F
     if t0 is None:
         # use a default initial value for the stieltjes transform tr
         t0 = [0 + 0.001j] * b
-
-    # symbolic variable to sum over in the fundamental equation
     
     print('Continuos band')
     for i, z in enumerate(allz):
         bar.numerator = i + 1
-        # print('\r',bar,end='')
         t = compute_tr(z + eps*1j, t0, M, nr, matrix)
         t0 = t
         rho[i] = -(1.0 / (N*np.pi)) * np.sum([nr[r]*(t[r].imag) for r in range(0, b)])
@@ -165,19 +153,16 @@ def test1():
     #b = len(nr)
     reps = 50
 
-    #eigs_a = np.array([scipy.linalg.eigvalsh(hierarchical_random_graph(M, nr)) for i in range(0, reps)]).flatten()
+    eigs_a = np.array([scipy.linalg.eigvalsh(hierarchical_random_graph(M, nr)) for i in range(0, reps)]).flatten()
     eigs_l = np.array([scipy.linalg.eigvalsh(GL(hierarchical_random_graph(M, nr))) for i in range(0, reps)]).flatten()
-    #eigs_nl = np.array([scipy.linalg.eigvalsh(NGL(hierarchical_random_graph(M, nr))) for i in range(0, reps)]).flatten()
-    plt.hist(eigs_l, density=1, bins=200)
+    eigs_nl = np.array([scipy.linalg.eigvalsh(NGL(hierarchical_random_graph(M, nr))) for i in range(0, reps)]).flatten()
+    
+    allz, rho = compute_rho(np.linspace(0.5, 200, 1500), M, nr, 'laplacian', eps=1E-18, maxsteps=2000,t0=[1E-8j]*2)
+    #plt.hist(eigs_nl, density=1, bins=200)
+    plt.plot(allz, np.abs(rho))
+    #print(np.sum((allz[1]-allz[0])*rho))
     plt.show()
-    #allz, rho = compute_rho(np.linspace(0, 110, 10), M, nr, 'laplacian', eps=1E-12, maxsteps=2000)
-    #print('')
-    #plt.hist(eigs_l, density=1, bins=200)
-    #plt.plot(allz, rho)
-    #plt.show()
 
 
 if __name__ == '__main__':
-    #print('done')
-    compute_tr(100,[1+0.01j]*2,np.array([[0.8,0.2],[0.2,0.8]]),[100,100],'laplacian')
-    #test1()
+    test1()
