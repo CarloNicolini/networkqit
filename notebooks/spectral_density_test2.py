@@ -25,6 +25,26 @@ def planted_partition_graph(n, b, pin, pout):
     A = A+A.T
     return A
 
+def hierarchical_random_graph2(ers, nr):
+    N = np.sum(nr)
+    b = len(ers)
+    nrns = np.reshape(np.kron(nr,nr),[b,b])
+    M = ers/nrns
+    A = np.zeros([N, N])
+    idx = np.cumsum([0]+nr)
+    for i in range(0, b):
+        ri = np.array(range(idx[i], idx[i+1]+1))
+        for j in range(0, b):
+            rj = np.array(range(idx[j], idx[j+1]+1))
+            R = np.random.random([len(ri)-1, len(rj)-1])
+            #R = np.triu(R)
+            #R += R.T
+            #print('===========',A[ri.min():ri.max(), rj.min():rj.max()].shape,R.shape)
+            A[ri.min():ri.max(), rj.min():rj.max()] =  (nrns[i,j] * R) < ers[i,j]
+    A = np.triu(A, 1)
+    A += A.T
+    return A
+
 
 def hierarchical_random_graph(sigma2rs, nr):
     N = np.sum(nr)
@@ -35,8 +55,8 @@ def hierarchical_random_graph(sigma2rs, nr):
         ri = np.array(range(idx[i], idx[i+1]+1))
         for j in range(0, b):
             rj = np.array(range(idx[j], idx[j+1]+1))
-            A[ri.min():ri.max(), rj.min():rj.max()] = np.random.random(
-                [len(ri)-1, len(rj)-1]) < sigma2rs[i, j]
+            R = np.random.random([len(ri)-1, len(rj)-1])
+            A[ri.min():ri.max(), rj.min():rj.max()] =  R < sigma2rs[i, j]
     A = np.triu(A, 1)
     A += A.T
     return A
@@ -45,7 +65,7 @@ def Gamma(a, z0, z1): # this version of Gamma does not have infinite recursion p
     return mp.gammainc(a, z0) - mp.gammainc(a, z1)
 
 
-def compute_tr(z, t0, sigma2rs, nr, matrix, tol=1E-16, maxsteps=1000):
+def compute_tr(z, t0, sigma2rs, nr, matrix, tol=1E-9, maxsteps=5000):
     b = sigma2rs.shape[0]
     if len(nr) != b:
         raise 'sigma2rs and nr must have same dimensions'
@@ -140,14 +160,45 @@ def poisspdf(k,l):
 def test1(matrix):
     b0 = 2
     pin, pout = 0.8, 0.2
-
-    M0 = pout*(np.ones(b0)-np.eye(b0)) + pin*np.eye(b0)
+    sigma2rs = pout*(np.ones(b0)-np.eye(b0)) + pin*np.eye(b0)
     #M0 = np.array([[0.8,0.2],[0.3,0.5]])
-    M = M0#np.kron(M0, M0)
-    nr = [100]*M.shape[0]
-    #b = len(nr)
-    reps = 500
+    #sigma2rs = sigma2rs#np.kron(M0, M0)
+
+    nr = [100,50]
+    b = len(nr)
+    nrns = np.reshape(np.kron(nr,nr),[b,b])
+    ers = np.multiply(sigma2rs,nrns)
+
+    # Empirical eigenvalues
+    reps = 50
+    if matrix is 'laplacian':
+        eigs = np.array([scipy.linalg.eigvalsh(GL(hierarchical_random_graph2(ers, nr))) for i in range(0, reps)]).flatten()
+    elif matrix is 'adjacency':
+        eigs = np.array([scipy.linalg.eigvalsh(hierarchical_random_graph(ers, nr)) for i in range(0, reps)]).flatten()
+    elif matrix is 'norm_laplacian':
+        eigs = np.array([scipy.linalg.eigvalsh(NGL(hierarchical_random_graph(ers, nr))) for i in range(0, reps)]).flatten()
     
+    allz, rho = compute_rho(np.linspace(-30, 30, 200), sigma2rs, nr, matrix, eps=1E-12, t0=[1E-5j]*ers.shape[0])
+    #plt.figure()
+    #plt.hist(eigs, bins=200)
+    #plt.figure()
+    #plt.plot(allz, rho)
+    
+    plt.figure()
+    plt.hist(eigs, density=1,bins=200)
+    plt.plot(allz, rho)
+    plt.show()
+
+def test2(matrix):
+    ers = np.array([[5000,500],[2500,2000]])
+    nr = [500,500]
+    b = len(nr)
+    nrns = np.reshape(np.kron(nr,nr),[b,b])
+    #nrns -= np.diag(nr)
+    M = ers/nrns
+    reps = 50
+    print(M)
+
     if matrix is 'laplacian':
         eigs = np.array([scipy.linalg.eigvalsh(GL(hierarchical_random_graph(M, nr))) for i in range(0, reps)]).flatten()
     elif matrix is 'adjacency':
@@ -155,17 +206,12 @@ def test1(matrix):
     elif matrix is 'norm_laplacian':
         eigs = np.array([scipy.linalg.eigvalsh(NGL(hierarchical_random_graph(M, nr))) for i in range(0, reps)]).flatten()
     
-    allz, rho = compute_rho(np.linspace(0, 150, 2000), M, nr, matrix, eps=1E-30, t0=[1E-8j]*M.shape[0])
-    plt.figure()
-    plt.hist(eigs, bins=200)
-    #plt.figure()
-    #plt.plot(allz, rho)
+    allz, rho = compute_rho(np.linspace(-20, 20, 200), M, nr, matrix, eps=1E-9, t0=[1E-9j]*M.shape[0])
     
-    plt.figure()
-    #plt.hist(eigs, density=1)
-    plt.plot(allz, rho)
+    plt.hist(eigs,density=1,bins=200)
+    plt.plot(allz, np.abs(rho))
     plt.show()
-
-
+    
 if __name__ == '__main__':
-    test1('laplacian')
+    #test2()
+    test2('adjacency')
