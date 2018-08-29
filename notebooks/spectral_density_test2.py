@@ -228,7 +228,7 @@ def test2(matrix):
     nr = [750, 500]
     b = len(nr)
     nrns = np.reshape(np.kron(nr, nr), [b, b])
-    reps = 10
+    reps = 5
     print(ers/nrns)
     if matrix is 'laplacian':
         eigs = np.array([scipy.linalg.eigvalsh(GL(hierarchical_random_graph2(ers, nr))) for i in range(0, reps)]).flatten()
@@ -253,12 +253,12 @@ def test2(matrix):
     plt.hist(eigs, density=1, bins=500)
     
     plt.show()
-    allz, rho = compute_rho(np.linspace(0, 100, 500), ers, nr, matrix, eps=mp.mpf(1E-6), t0=[mp.mpc('0')] * len(nr))
+    allz, rho = compute_rho(np.linspace(-30, 100, 500), ers, nr, matrix, eps=mp.mpf(1E-7), t0=[mp.mpc('0')] * len(nr))
 
     plt.hist(eigs, density=1, bins=500)
     #plt.vlines(x=zmin, ymin=0, ymax=0.05, color='b')
     #plt.vlines(x=zmax, ymin=0, ymax=0.05, color='b')
-    plt.plot(allz, rho)
+    plt.plot(allz, np.abs(rho))
     plt.show()
     print()
     A=np.loadtxt('data.dat')
@@ -268,4 +268,4 @@ def test2(matrix):
 
 
 if __name__ == '__main__':
-    test2('laplacian')
+    test2('adjacency')
