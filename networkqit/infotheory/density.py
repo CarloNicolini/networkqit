@@ -37,6 +37,20 @@ def compute_vonneumann_entropy(**kwargs):
     elif 'L' in kwargs.keys() and 'beta' in kwargs.keys():
         return S(kwargs['L'], kwargs['beta'])
 
+def batch_compute_vonneumann_entropy(L, beta_range):
+    """
+    This function computes spectral entropy over a range of beta, given that L remains the same
+    """
+    l = eigvalsh(L)
+    S = []
+    for b in beta_range:
+        lrho = np.exp(-b*l)
+        Z = lrho.sum()
+        S.append( np.log(Z) + b * (l*lrho).sum()/Z )
+    S = np.array(S)
+    S[np.isnan(S)] = 0
+    return np.array(S)
+
 def compute_vonneumann_entropy_beta_deriv(**kwargs):
     """
     Get the derivative of entropy with respect to inverse temperature :math:`\\frac{\\partial S(\\rho)}{\\partial \\beta}`
