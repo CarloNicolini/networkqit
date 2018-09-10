@@ -3,8 +3,9 @@ from scipy.linalg import expm, logm
 #from networkqit.utils.matfun import expm
 from scipy.linalg import eigvalsh
 from scipy.stats import entropy
+from scipy.optimize import root
 from networkqit.graphtheory.matrices import graph_laplacian
-
+import numdifftools as nd
 
 def compute_vonneuman_density(L, beta):
     """ Get the von neumann density matrix :math:`\\frac{e^{-\\beta L}}{\\mathrm{Tr}[e^{-\\beta L}]}` """
@@ -51,6 +52,8 @@ def batch_compute_vonneumann_entropy(L, beta_range):
     S[np.isnan(S)] = 0
     return np.array(S)
 
+
+
 def compute_vonneumann_entropy_beta_deriv(**kwargs):
     """
     Get the derivative of entropy with respect to inverse temperature :math:`\\frac{\\partial S(\\rho)}{\\partial \\beta}`
@@ -67,7 +70,25 @@ def compute_vonneumann_entropy_beta_deriv(**kwargs):
         L=kwargs['L']
         rho = compute_vonneuman_density(L, kwargs['beta'])
         return np.trace(L@rho@logm(rho)) - np.trace(rho@logm(rho))*np.trace(L@rho)
-    
+
+def batch_compute_vonneumann_entropy_beta_deriv(L, beta_range):
+    l = eigvalsh(L)
+    def s(b):
+        lrho = np.exp(-b*l)
+        Z = lrho.sum()
+        return np.log(Z) + b * (l*lrho).sum()/Z
+    dsdb = nd.Derivative(lambda y: s(y), n=1)
+    return np.array([dsdb(x) for x in beta_range])
+
+
+def find_beta_logc(L,c):
+    l = eigvalsh(L)
+    def s(b,l):
+        lrho = np.exp(-b*l)
+        Z = lrho.sum()
+        return np.log(Z) + b * (l*lrho).sum()/Z
+    return root(lambda x : s(x,l)-np.log(c),x0=1).x
+
 class VonNeumannDensity(object):
     def __init__(self, A, L, beta, **kwargs):
         self.L = L
