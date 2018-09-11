@@ -11,57 +11,7 @@ plt.style.use('ggplot')
 import sympy as sp
 import mpmath as mp
 from etaprogress.progress import ProgressBar
-
-
-def planted_partition_graph(n, b, pin, pout):
-    nb = int(n / b)
-    A = (np.random.random((n, n)) < pout).astype(float)
-    for i in range(0, b):
-        T = np.triu((np.random.random((nb, nb)) < pin).astype(float))
-        T = T + T.T
-        A[i * nb:(i + 1) * nb, i * nb:(i + 1) * nb] = T
-
-    np.fill_diagonal(A, 0)
-    A = np.triu(A)
-    A = A + A.T
-    return A
-
-
-def hierarchical_random_graph2(ers, nr):
-    N = np.sum(nr)
-    b = len(ers)
-    nrns = np.reshape(np.kron(nr, nr), [b, b])
-    M = ers / nrns
-    A = np.zeros([N, N])
-    idx = np.cumsum([0] + nr)
-    for i in range(0, b):
-        ri = np.array(range(idx[i], idx[i + 1] + 1))
-        for j in range(0, b):
-            rj = np.array(range(idx[j], idx[j + 1] + 1))
-            R = np.random.random([len(ri) - 1, len(rj) - 1])
-            #R = np.triu(R)
-            #R += R.T
-            A[ri.min():ri.max(), rj.min():rj.max()] = (nrns[i, j] * R) < ers[i, j]
-    A = np.triu(A, 1)
-    A += A.T
-    return A
-
-
-def hierarchical_random_graph(sigma2rs, nr):
-    N = np.sum(nr)
-    A = np.zeros([N, N])
-    b = len(sigma2rs)
-    idx = np.cumsum([0] + nr)
-    for i in range(0, b):
-        ri = np.array(range(idx[i], idx[i + 1] + 1))
-        for j in range(0, b):
-            rj = np.array(range(idx[j], idx[j + 1] + 1))
-            R = np.random.random([len(ri) - 1, len(rj) - 1])
-            A[ri.min():ri.max(), rj.min():rj.max()] = R < sigma2rs[i, j]
-    A = np.triu(A, 1)
-    A += A.T
-    return A
-
+from networkqit import hierarchical_random_graph
 
 def gammadiff(a, z0, z1):  # this version of Gamma does not have infinite recursion problems
     return mp.gammainc(a, z0) - mp.gammainc(a, z1)
@@ -225,7 +175,7 @@ def adiabatic_rho(z,ers,nr,matrix,eps):
 def expected_partition_function(ers,nr,beta,reps):
     Z = 0
     for i in range(0,reps):
-        L = GL(hierarchical_random_graph2(ers, nr))
+        L = GL(hierarchical_random_graph(ers, nr))
         Z += np.exp(-beta*scipy.linalg.eigvalsh(L)).sum()
     Z /= reps
     return Z
@@ -245,11 +195,11 @@ def benchmark(matrix):
     reps = 5
     
     if matrix is 'laplacian':
-        eigs = np.array([scipy.linalg.eigvalsh(GL(hierarchical_random_graph2(ers, nr))) for i in range(0, reps)]).flatten()
+        eigs = np.array([scipy.linalg.eigvalsh(GL(hierarchical_random_graph(ers, nr))) for i in range(0, reps)]).flatten()
     elif matrix is 'adjacency':
-        eigs = np.array([scipy.linalg.eigvalsh(hierarchical_random_graph2(ers, nr)) for i in range(0, reps)]).flatten()
+        eigs = np.array([scipy.linalg.eigvalsh(hierarchical_random_graph(ers, nr)) for i in range(0, reps)]).flatten()
     elif matrix is 'norm_laplacian':
-        eigs = np.array([scipy.linalg.eigvalsh(NGL(hierarchical_random_graph2(ers, nr))) for i in range(0, reps)]).flatten()
+        eigs = np.array([scipy.linalg.eigvalsh(NGL(hierarchical_random_graph(ers, nr))) for i in range(0, reps)]).flatten()
     return eigs, ers,nr,nrns
 
 
@@ -257,7 +207,7 @@ def test2(matrix):
     eigs, ers, nr, nrns = benchmark(matrix)
 
 #    plt.subplot(1, 3, 1)
-#    plt.imshow(hierarchical_random_graph2(ers, nr))
+#    plt.imshow(hierarchical_random_graph(ers, nr))
 #    plt.grid(False)
 #    plt.subplot(1, 3, 2)
 #    plt.imshow(ers)
