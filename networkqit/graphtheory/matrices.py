@@ -58,7 +58,7 @@ def hierarchical_random_graph(ers, nr):
     nrns = np.reshape(np.kron(nr, nr), [b, b])
     M = ers / nrns
     A = np.zeros([N, N])
-    idx = np.cumsum([0] + nr)
+    idx = np.cumsum([0] + nr) # it only works for lists!
     for i in range(0, b):
         ri = np.array(range(idx[i], idx[i + 1] + 1))
         for j in range(0, b):
