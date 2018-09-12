@@ -52,7 +52,7 @@ def planted_partition_graph(n, b, pin, pout):
     A = A + A.T
     return A
 
-def hierarchical_random_graph(ers, nr):
+def sbm(ers, nr):
     N = np.sum(nr) # total number of nodes
     b = len(ers) # number of blocks
     nrns = np.reshape(np.kron(nr, nr), [b, b])
@@ -64,12 +64,54 @@ def hierarchical_random_graph(ers, nr):
         for j in range(0, b):
             rj = np.array(range(idx[j], idx[j + 1] + 1))
             R = np.random.random([len(ri) - 1, len(rj) - 1])
-            A[ri.min():ri.max(), rj.min():rj.max()] = (nrns[i, j] * R) < ers[i, j]
+            A[ri.min():ri.max(), rj.min():rj.max()] = R < ers[i, j]/nrns[i, j] # like a bernoulli rv with average ers[i,j]/nrns
     A = np.triu(A, 1)
     A += A.T
     return A
 
-def hierarchical_random_graph_p(sigma2rs, nr):
+def dcsbm(ers, nr, ki):
+    N = np.sum(nr) # total number of nodes
+    L = np.sum(ki)
+    b = len(ers) # number of blocks
+    nrns = np.reshape(np.kron(nr, nr), [b, b])
+    M = ers / nrns
+    A = np.zeros([N, N])
+    idx = np.cumsum([0] + nr) # it only works for lists!
+    for i in range(0, b):
+        ri = np.array(range(idx[i], idx[i + 1] + 1))
+        kr = ki[ri.min():ri.max()]
+        print(kr.sum())
+        for j in range(0, b):
+            rj = np.array(range(idx[j], idx[j + 1] + 1))
+            R = np.random.random([len(ri) - 1, len(rj) - 1])
+            ks = ki[rj.min():rj.max()]
+            A[ri.min():ri.max(), rj.min():rj.max()] = kr.sum()*ks.sum() > ers[i,j]
+    A = np.triu(A, 1)
+    A += A.T
+    return A
+
+def sbm_p(sigma2rs, nr):
     b = len(ers) # number of blocks
     nrns = np.reshape(np.kron(nr, nr), [b, b])
     return hierarchical_random_graph2(sigma2rs * nrns, nr)
+
+def wsbm(ers,nr,dist):
+    # Weighted stochastic block model, where dist is a random variable sampling function taking one parameter
+    N = np.sum(nr) # total number of nodes
+    b = len(ers) # number of blocks
+    nrns = np.reshape(np.kron(nr, nr), [b, b])
+    #np.fill_diagonal(nrns,nrns.diagonal()/2)
+    #print(nrns)
+    M = ers / nrns
+    A = np.zeros([N, N])
+    idx = np.cumsum([0] + nr) # it only works for lists!
+    for i in range(0, b):
+        ri = np.array(range(idx[i], idx[i + 1] + 1))
+        for j in range(0, b):
+            rj = np.array(range(idx[j], idx[j + 1] + 1))
+            R = np.random.random([len(ri) - 1, len(rj) - 1])
+            V = dist(M[i,j],size=R.shape[0]*R.shape[1])
+            A[ri.min():ri.max(), rj.min():rj.max()] = np.reshape(V,R.shape)
+    A = np.triu(A, 1)
+    A += A.T
+    return A
