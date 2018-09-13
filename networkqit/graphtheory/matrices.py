@@ -39,6 +39,16 @@ def modularity_matrix(A):
     k = A.sum(axis=0)
     return A - np.outer(k,k)/A.sum()
 
+def signed_laplacian(A):
+    """
+    Returns the signed Laplacian as defined in https://arxiv.org/pdf/1701.01394.pdf
+    :math:`\\mathbf{\\bar{L}} = \\mathbf{\\bar{D}} - \\mathbf{A}
+    where the diagonal matrix D is made of the absolute value of the row-sum of A.
+    """
+    D = np.diag(np.abs(A.sum(axis=0)))
+    L = D - A
+    return L
+
 def planted_partition_graph(n, b, pin, pout):
     nb = int(n / b)
     A = (np.random.random((n, n)) < pout).astype(float)
