@@ -69,23 +69,27 @@ def sbm(ers, nr):
     A += A.T
     return A
 
-def dcsbm(ers, nr, ki):
+# not sure if this function is correct!!!
+def dcsbm(ers, nr):
+    #import warning
+    #warning.warning('This function is not correct')
     N = np.sum(nr) # total number of nodes
-    L = np.sum(ki)
+    
     b = len(ers) # number of blocks
     nrns = np.reshape(np.kron(nr, nr), [b, b])
     M = ers / nrns
     A = np.zeros([N, N])
     idx = np.cumsum([0] + nr) # it only works for lists!
-    for i in range(0, b):
-        ri = np.array(range(idx[i], idx[i + 1] + 1))
-        kr = ki[ri.min():ri.max()]
-        print(kr.sum())
-        for j in range(0, b):
-            rj = np.array(range(idx[j], idx[j + 1] + 1))
-            R = np.random.random([len(ri) - 1, len(rj) - 1])
-            ks = ki[rj.min():rj.max()]
-            A[ri.min():ri.max(), rj.min():rj.max()] = kr.sum()*ks.sum() > ers[i,j]
+    ki = ers.sum(axis=0)
+    K = np.outer(ki,ki)/(np.sum(ki)**2)
+    for r in range(0, b):
+        idr = np.array(range(idx[r], idx[r + 1] + 1))
+        #kr = ki[idr.min():idr.max()]
+        for s in range(0, b):
+            ids = np.array(range(idx[s], idx[s + 1] + 1))
+            #ks = ki[ids.min():ids.max()]
+            V = np.random.poisson(M[r,s],size=(len(idr) - 1)*(len(ids) - 1))
+            A[idr.min():idr.max(), ids.min():ids.max()] = np.reshape(V,[(len(idr) - 1),(len(ids) - 1)])
     A = np.triu(A, 1)
     A += A.T
     return A
