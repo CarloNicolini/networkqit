@@ -35,10 +35,9 @@ Finally, the `MLEOptimizer` maximizes the standard likelihood of a model and it 
 #    BSD license.
 
 from abc import ABC, abstractmethod
-#import numpy as np
-import autograd.numpy as np
-from autograd.numpy import triu, nan_to_num, log, inf
-from scipy.linalg import expm, logm, eigvalsh
+import numpy as np
+from numpy import triu, log, inf
+from scipy.linalg import eigvalsh
 from scipy.optimize import minimize, least_squares, fsolve
 from networkqit.infotheory.density import VonNeumannDensity, SpectralDivergence, compute_vonneuman_density
 from networkqit.graphtheory import graph_laplacian as graph_laplacian
@@ -116,14 +115,15 @@ class MLEOptimizer(ModelOptimizer):
         """
         Optimize the likelihood of the model given the observation A. 
         """
-        n = len(self.x0) #  number of parameters of the model is recovered by the size of x0
+        n = len(self.x0)  # number of parameters of the model is recovered by the size of x0
         eps = np.finfo(float).eps
         bounds = ((0) * len(self.A), (inf) * len(self.x0))
-        A = (self.A > 0).astype(float) # binarize the input adjacency matrix
+        A = (self.A > 0).astype(float)  # binarize the input adjacency matrix
         W = self.A
         
         # See the definition here:
-        # Garlaschelli, D., & Loffredo, M. I. (2008). Maximum likelihood: Extracting unbiased information from complex networks. 
+        # Garlaschelli, D., & Loffredo, M. I. (2008).
+        # Maximum likelihood: Extracting unbiased information from complex networks.
         # PRE 78(1), 1–4. https://doi.org/10.1103/PhysRevE.78.015101
         def likelihood(x):
             pijx = model(x)
