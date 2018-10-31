@@ -5,12 +5,13 @@
 """
 Method and functions based on the information theory of networks
 """
+import numdifftools as nd
 import numpy as np
 from scipy.linalg import expm, logm, eigvalsh
-from scipy.stats import entropy
 from scipy.optimize import root
+from scipy.stats import entropy
+
 from networkqit.graphtheory.matrices import graph_laplacian
-import numdifftools as nd
 
 
 def compute_vonneuman_density(L, beta):
