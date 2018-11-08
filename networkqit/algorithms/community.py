@@ -40,6 +40,26 @@ def comm_mat(adj, memb):
     Bnorm = B / blockpairs
     return B, Bnorm
 
+def comm_assortativity(A, memb):
+    """
+    This function computes the modular group assortativity and the newman modularity as from Eq.18-19
+    of the Peixoto paper "Nonparametric weighted stochastic block models"
+    https://arxiv.org/pdf/1708.01432.pdf
+
+    Input:
+        A (np.array): the (weighted) adjacency matrix
+        memb (list): the node block membership 
+    Output:
+        qr: the group modular assortativity
+        Q: the Newman modularity
+    """
+    ncomms = len(np.unique(memb))
+    e = np.triu(A,1).sum()
+    ers = comm_mat(A, memb)
+    qr = ncomms/(2*e)*(np.diagonal(ers) - ((np.sum(ers,axis=0))**2)/(2*e))
+    Q = ncomms/(2*e)*np.sum(qr) # newman modularity
+    return qr, q
+
 
 def reindex_membership(memb, key='community_size', compress_singletons=False, adj=None):
     """
