@@ -16,7 +16,7 @@ Spectral Entropies as Information-Theoretic Tools for Complex Network Comparison
 
 This toolbox is among the first implementations of the spectral entropy framework.
 It entails both computation of the density matrices, as well as number of methods of model fitting methods.
-If you are using `networkqit` please cite the following paper:
+If you are using **networkqit** please cite the following paper:
 
 Thermodynamics of network model fitting with spectral entropies
 Carlo Nicolini, Vladimir Vlasov, Angelo Bifone

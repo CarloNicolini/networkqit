@@ -1,11 +1,22 @@
-#!/usr/bin/env python
-"""
-Community detection related utility functions.
-"""
-#    Copyright (C) 2018 by
-#    Carlo Nicolini <carlo.nicolini@iit.it>
-#    All rights reserved.
-#    BSD license.
+#! /usr/bin/env python
+# -*- coding: utf-8 -*-
+#
+# networkqit -- a python module for manipulations of spectral entropies framework
+#
+# Copyright (C) 2017-2018 Carlo Nicolini <carlo.nicolini@iit.it>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import numpy as np
 
@@ -14,13 +25,26 @@ def comm_mat(adj, memb):
     """
     Returns multiple community related quantities.
 
-    Input:
-        adj: a possibly weighted n x n adjacency matrix in the form of a numpy array
-        ci: the nodal membership vector, a numpy array or list of integers
+    Input
+    -----
+        adj : :class:`~np.array`: a possibly weighted n x n adjacency matrix in the form of a N x N numpy array
+        memb: :class:`~np.array, list`: the nodal membership vector, a numpy array or list of integers.
 
-    Ouput:
-        B: the CxC block matrix containing in its (r,s) element the number of links from community r to community s
-        Bnorm: the CxC block matrix containing in its (r,s) element the density of links. It is the same as B but divided by the actual number of possible node pairs nr x ns for off-diagonal terms, (nr x (nr-1))/2 for diagonal eleents
+    Ouput
+    -----
+        B: :class`~np.array`: the CxC block matrix containing in its (r,s) element the number of links from community
+        `r` to community `s`.
+        Bnorm: :class`~np.array`: the CxC block matrix containing in its (r,s) element the density of links.
+        It is the same as B but divided by the actual number of possible node pairs nr x ns for off-diagonal terms,
+        `(nr x (nr-1))/2` for diagonal elements.
+
+
+    References
+    ----------
+    .. [holland-stochastic-1983] Paul W. Holland, Kathryn Blackmond Laskey,
+       Samuel Leinhardt, "Stochastic blockmodels: First steps",
+       Carnegie-Mellon University, Pittsburgh, PA 15213, U.S.A.,
+       :doi:`10.1016/0378-8733(83)90021-7`.
     """
     u = np.unique(memb)
     C = np.zeros([len(u), len(memb)])
@@ -52,6 +76,13 @@ def comm_assortativity(A, memb):
     Output:
         qr: the group modular assortativity
         Q: the Newman modularity
+
+
+    References
+    ----------
+    .. [peixoto2017-weighted] Tiago Peixoto, "Non parametric weighted stochastic block model",
+       https://arxiv.org/pdf/1708.01432.pdf
+       :url:`https://arxiv.org/pdf/1708.01432.pdf`.
     """
     ncomms = len(np.unique(memb))
     e = np.triu(A,1).sum()

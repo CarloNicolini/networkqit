@@ -1,4 +1,23 @@
-#!/usr/bin/env python
+#! /usr/bin/env python
+# -*- coding: utf-8 -*-
+#
+# networkqit -- a python module for manipulations of spectral entropies framework
+#
+# Copyright (C) 2017-2018 Carlo Nicolini <carlo.nicolini@iit.it>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 """
 Definition of some utility matrices.
 
@@ -6,11 +25,6 @@ The graph Laplacian is computed from an adjacency matrix as $L=D-A$.
 
 The normalized graph Laplacian is computed as $\\mathcal{L}=I - D^{-1/2} A D^{-1/2}$.
 """
-#    Copyright (C) 2018 by
-#    Carlo Nicolini <carlo.nicolini@iit.it>
-#    All rights reserved.
-#    BSD license.
-
 
 import numpy as np
 
