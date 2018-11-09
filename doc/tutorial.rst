@@ -20,13 +20,12 @@ Let us start by studying the spectral entropy of the Laplacian of the karate clu
    >>> A = nx.to_numpy_array(G)
    >>> import networkqit as nq
    >>> import numpy as np
-   >>> import seaborn as sns
-   >>> sns.set()
-   >>> beta_range = np.logspace(-3,3,20)
-   >>> Sbeta = [nq.compute_vonneumann_entropy(L=nq.graph_laplacian(A),beta=beta) for beta in beta_range]
    >>> import matplotlib.pyplot as plt
-   >>> plt.semilogx(1.0/beta_range,Sbeta)
-   >>> plt.xlabel('$1/\\beta$')
+   >>> plt.style.use('ggplot')
+   >>> beta_range = np.logspace(-3,3,200)
+   >>> Sbeta = nq.batch_compute_vonneumann_entropy(L=nq.graph_laplacian(A),beta_range=beta_range)
+   >>> plt.semilogx(beta_range, Sbeta)
+   >>> plt.xlabel('$\\beta$')
    >>> plt.ylabel('$S$')
    >>> plt.title('Unnormalized spectral entropy')
    >>> plt.show()
@@ -47,8 +46,6 @@ We first create the object ErdosRenyi that describes the expected laplacian, adj
    >>> import networkx as nx
    >>> import networkqit as nq
    >>> import numpy as np
-   >>> import seaborn as sns
-   >>> sns.set()
    >>> G = nx.karate_club_graph()
    >>> A = nx.to_numpy_array(G)
    >>> L = nq.graph_laplacian(A)
