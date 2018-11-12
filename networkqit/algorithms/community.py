@@ -52,7 +52,8 @@ def comm_mat(adj, memb):
         for j in range(0, len(memb)):
             C[i, j] = memb[j] == u[i]
     B = np.dot(np.dot(C, adj), C.T)
-    # K = B.sum(axis=1)
+    K = B.sum(axis=1)
+    #print(K**2)
     np.fill_diagonal(B, B.diagonal()/2)
     # n = len(adj)
     # m = np.triu(W, 1).sum()
@@ -84,12 +85,15 @@ def comm_assortativity(A, memb):
        https://arxiv.org/pdf/1708.01432.pdf
        :url:`https://arxiv.org/pdf/1708.01432.pdf`.
     """
-    ncomms = len(np.unique(memb))
-    e = np.triu(A,1).sum()
-    ers = comm_mat(A, memb)
-    qr = ncomms/(2*e)*(np.diagonal(ers) - ((np.sum(ers,axis=0))**2)/(2*e))
-    Q = ncomms/(2*e)*np.sum(qr) # newman modularity
-    return qr, q
+    B = len(np.unique(memb))
+    E = np.triu(A,1).sum()
+    ers,ersnorm = comm_mat(A, memb)
+    np.fill_diagonal(ers,2*np.diagonal(ers))
+    err = np.diagonal(ers)
+    er2 = np.sum(ers,axis=0)**2
+    qr = B/(2.0*E)*(err-(er2/(2.0*E)))
+    Q = np.mean(qr) # newman modularity
+    return qr, Q
 
 
 def reindex_membership(memb, key='community_size', compress_singletons=False, adj=None):
