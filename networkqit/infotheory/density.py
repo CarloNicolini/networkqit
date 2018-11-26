@@ -106,15 +106,16 @@ def batch_compute_vonneumann_entropy_beta_deriv(L, beta_range):
     return np.array([dsdb(x) for x in beta_range])
 
 
-def find_beta_logc(L, c):
+def find_beta_logc(L, c, a=1E-5, b=1E5):
+    from scipy.optimize import bisect
     l = eigvalsh(L)
 
     def s(b, l):
         lrho = np.exp(-b * l)
         Z = lrho.sum()
         return np.log(Z) + b * (l * lrho).sum() / Z
-
-    return root(lambda x: s(x, l) - np.log(c), x0=1).x
+    
+    return bisect(lambda x: s(x, l) - np.log(c), 1E-5, 1E5)
 
 
 class VonNeumannDensity(object):
