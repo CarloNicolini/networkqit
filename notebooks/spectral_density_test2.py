@@ -10,8 +10,8 @@ import matplotlib.pyplot as plt
 plt.style.use('ggplot')
 import sympy as sp
 import mpmath as mp
-from etaprogress.progress import ProgressBar
-from networkqit import hierarchical_random_graph
+from tqdm import tqdm
+from networkqit import sbm
 
 def gammadiff(a, z0, z1):  # this version of Gamma does not have infinite recursion problems
     return mp.gammainc(a, z0) - mp.gammainc(a, z1)
@@ -101,8 +101,6 @@ def compute_rho(allz, ers, nr, matrix, eps=1E-7, maxsteps=150, include_isolated=
 
     N = np.sum(nr)  # total number of nodes
 
-    bar = ProgressBar(len(allz), max_width=40)
-
     b = ers.shape[0]
     if t0 is None:
         # use a default initial value for the stieltjes transform tr
@@ -112,15 +110,13 @@ def compute_rho(allz, ers, nr, matrix, eps=1E-7, maxsteps=150, include_isolated=
     io = open('allt.dat','w')
     rho = np.zeros_like(allz)  # initialize rho as zeros
 
-    for i, z in enumerate(allz):
-        bar.numerator = i + 1
+    for i, z in tqdm(enumerate(allz)):
         t = compute_tr(z + eps * 1j, t0, ers, nr, matrix)
         for tt in t:
             io.write('%g\t%g\t' % (float(tt.real),float(tt.imag)))
         io.write('\n')
         t0 = t # initialize from previous solution
         rho[i] = -(1.0 / (N * np.pi)) * np.sum([nr[r] * t[r].imag for r in range(0, b)])
-        print('\r', bar, end='')
         #print('\r%s Percent done=%.1f %%\tz=%.2f\trho(z)=%g ' % (bar, float(i+1)/len(allz)*100, z, rho[i]), end='')
     io.close()
 
@@ -175,7 +171,7 @@ def adiabatic_rho(z,ers,nr,matrix,eps):
 def expected_partition_function(ers,nr,beta,reps):
     Z = 0
     for i in range(0,reps):
-        L = GL(hierarchical_random_graph(ers, nr))
+        L = GL(sbm(ers, nr))
         Z += np.exp(-beta*scipy.linalg.eigvalsh(L)).sum()
     Z /= reps
     return Z
@@ -195,11 +191,11 @@ def benchmark(matrix):
     reps = 5
     
     if matrix is 'laplacian':
-        eigs = np.array([scipy.linalg.eigvalsh(GL(hierarchical_random_graph(ers, nr))) for i in range(0, reps)]).flatten()
+        eigs = np.array([scipy.linalg.eigvalsh(GL(sbm(ers, nr))) for i in range(0, reps)]).flatten()
     elif matrix is 'adjacency':
-        eigs = np.array([scipy.linalg.eigvalsh(hierarchical_random_graph(ers, nr)) for i in range(0, reps)]).flatten()
+        eigs = np.array([scipy.linalg.eigvalsh(sbm(ers, nr)) for i in range(0, reps)]).flatten()
     elif matrix is 'norm_laplacian':
-        eigs = np.array([scipy.linalg.eigvalsh(NGL(hierarchical_random_graph(ers, nr))) for i in range(0, reps)]).flatten()
+        eigs = np.array([scipy.linalg.eigvalsh(NGL(sbm(ers, nr))) for i in range(0, reps)]).flatten()
     return eigs, ers,nr,nrns
 
 
@@ -207,7 +203,7 @@ def test2(matrix):
     eigs, ers, nr, nrns = benchmark(matrix)
 
 #    plt.subplot(1, 3, 1)
-#    plt.imshow(hierarchical_random_graph(ers, nr))
+#    plt.imshow(sbm(ers, nr))
 #    plt.grid(False)
 #    plt.subplot(1, 3, 2)
 #    plt.imshow(ers)
@@ -248,5 +244,4 @@ def test3(matrix):
     #print('Integral=', analytical_partition_function(ers,nr,beta))
 
 if __name__ == '__main__':
-    a=1
-    #test2('laplacian')
+    test2('laplacian')
