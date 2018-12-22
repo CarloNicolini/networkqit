@@ -17,31 +17,39 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-"""
 
+"""
 Expected adjacency matrix of various graph models.
-Here are specified many possible models of sparse and dense graphs with continuous dependency on some input parameters.
-Importantly the models defined here are models of **expected** adjacency matrix and Laplacian, so please do not make confusion between
+Here are specified many possible models of sparse and dense graphs with 
+continuous dependency on some input parameters.
+Importantly the models defined here are models of **expected** adjacency 
+matrix and Laplacian, so please do not make confusion between
 random graph models and the expected graph models described here.
-
 """
 
-from networkqit.graphtheory import graph_laplacian as graph_laplacian
 import numpy as np
 import numdifftools as nd
+from networkqit.graphtheory import graph_laplacian as graph_laplacian
+
 
 class ExpectedModel():
     """
-    ExpectedModel is the base class that defines all the operations inherited from models of expected adjacency matrix, expected Laplacian and 
-    gradients of expected laplacian. It defines the behaviour of model operations such as addition or multiplication.
+    ExpectedModel is the base class that defines all the operations inherited 
+    from models of expected adjacency matrix, expected Laplacian and 
+    gradients of expected laplacian. It defines the behaviour of model 
+    operations such as addition or multiplication.
     """
     def __init__(self, **kwargs):
         """
         Optional arguments:
         kwargs:
-            model_type: can be or topological or spatial and it is used when inheriting from this class. In geometrical models, the spatial distance matrix must be specified
-            parameters: contains all the kwargs, used to memorize all the options.
-            bounds: if necessary, provide a bound on the values of the model parameters. Bounds must be provided in the form of list of tuples.
+            model_type: can be or topological or spatial and it is used 
+                when inheriting from this class. In geometrical models, the 
+                spatial distance matrix must be specified parameters: 
+                    contains all the kwargs, used to memorize all the options.
+            bounds: if necessary, provide a bound on the values of the model 
+                    parameters.  Bounds must be provided in the form of list 
+                    of tuples.
         """
         super().__init__()
         self.args_mapping = None
@@ -85,7 +93,6 @@ class ExpectedModel():
         In this base class the expected adjacency is not implemented and has to be implemented by every single inherited class.
         """
         raise NotImplementedError
-        pass
 
     def _expected_laplacian_grad_autodiff(self, *args):
         """
@@ -124,10 +131,12 @@ class ExpectedModel():
         """
         return self._expected_laplacian_grad_autodiff(*x)
 
-    def likelihood(self, G, *args):
+    def loglikelihood(self, G, *args):
         # implement here where G is the adjacency matrix (Weighted or binary)
         raise NotImplementedError
-        pass
+
+    def saddle_point(self, G, *args):
+        raise NotImplementedError
 
     
 class Operator(ExpectedModel):
@@ -191,13 +200,13 @@ class ErdosRenyi(ExpectedModel):
         self.bounds = [(0, None)]
 
     def expected_adjacency(self, *args):
-        P = args[0]*(1-np.eye(self.parameters['N']))
+        P = args[0]*(1-  np.eye(self.parameters['N']))
         return P
     
     def expected_laplacian_grad(self, x):
         N = self.parameters['N']
-        G = np.zeros([N,1,N])
-        G[:,0,:] = (N-1)*np.eye(N) - (1-np.eye(N))
+        G = np.zeros([N, 1, N])
+        G[:,0,:] = (N-1) * np.eye(N) - (1-np.eye(N))
         return G
 
 
@@ -247,8 +256,9 @@ class EdrTruncated(ExpectedModel):
     def expected_adjacency(self, *args):
         c = args[0]
         l = args[1]
+        b = args[2]
         P = args[0] * np.exp(-args[1] * self.parameters['dij'])
-        P = c*np.exp(-dij/l)/(l*(1-np.exp(-b/l)))
+        P = c*np.exp(-self.parameters['dij']/l)/(l*(1-np.exp(-b/l)))
         np.fill_diagonal(P, 0)
         return P
 
@@ -351,7 +361,7 @@ class TopoIdentity(ExpectedModel):
         self.bounds = None
 
     def expected_adjacency(self, *args):
-        return (1-np.eye(self.parameters['num_nodes']))
+        return 1-np.eye(self.parameters['num_nodes'])
 
 
 class HiddenVariables(ExpectedModel):
@@ -362,14 +372,15 @@ class HiddenVariables(ExpectedModel):
         self.model_type = 'topological'
         self.formula = '$1$'
         self.bounds = [(0, None) for i in range(0, kwargs['N'])]
-        if self.parameters.get('powerlaw',False):
+        if self.parameters.get('powerlaw', False):
             self.args_mapping += ['gamma']
-            self.bounds += [(0,None)]
+            self.bounds += [(0, None)]
 
     def expected_adjacency(self, *args):
-        if self.parameters.get('powerlaw',True):
-            return np.outer([*args[0:-1]],[*args[0:-1]])**(-args[-1])        
+        if self.parameters.get('powerlaw', True):
+            return np.outer([*args[0:-1]], [*args[0:-1]])**(-args[-1])
         return np.outer([*args],[*args])
+
         
 class TopoDegreeProd(ExpectedModel):
     """
@@ -432,8 +443,7 @@ class TopoJaccard(ExpectedModel):
     Topological models with probability link given by Jaccard coefficient
     For weighted graphs it automatically uses the Weighted Jaccard similarity.
     If 'normalized' is specified to False this model reproduces the
-    "Economical Preferential Attachment model"
-    
+    "Economical Preferential Attachment model"    
     Here we set the powerlaw exponent to be unbounded
     Reference:
     Vertes et al. Simple models of human brain functional networks. 
@@ -449,8 +459,7 @@ class TopoJaccard(ExpectedModel):
             self.formula = '$c_{jacc} (J_{ij})^{-\mu_{jacc}}$'
         else:
             self.formula = '$c_{commnei} (\sum_l A_{il}A_{lj})^{-\mu_{commnei}}$'
-        self.A = kwargs['A'] # save the adjacency matrix
-        
+        self.A = kwargs['A'] # save the adjacency matrix        
         self.generate_matching() # then generate the matching
         self.bounds = [(0, None), (0, None)]
 

@@ -137,16 +137,16 @@ class MLEOptimizer(ModelOptimizer):
         """
         n = len(self.x0)  # number of parameters of the model is recovered by the size of x0
         eps = np.finfo(float).eps
-        bounds = ((0) * len(self.A), (np.inf) * len(self.x0))
+        bounds = ((eps) * len(self.A), (np.inf) * len(self.x0))
         A = (self.A > 0).astype(float)  # binarize the input adjacency matrix
         W = self.A
 
-        # Use the Trust-Region reflective algorithm to optimize likelihood
-        self.sol = least_squares(fun=lambda z : model.likelihood(A,z), x0=np.squeeze(self.x0),
+        # Use the Trust-Region reflective algorithm to maximize loglikelihood
+        self.sol = least_squares(fun=lambda z : -model.loglikelihood(A,z), x0=np.squeeze(self.x0),
                                  method='dogbox',
                                  bounds=bounds,
-                                 xtol=kwargs.get('xtol', 2E-10),
-                                 gtol=kwargs.get('gtol', 2E-10),
+                                 xtol=kwargs.get('xtol', 1E-12),
+                                 gtol=kwargs.get('gtol', 1E-12),
                                  max_nfev=kwargs.get('max_nfev', len(self.x0) * 100000),
                                  verbose=kwargs.get('verbose', 1))
 
@@ -181,13 +181,13 @@ class MLEOptimizer(ModelOptimizer):
         f = None
         if kwargs['model'] is 'UBCM':
             M = UBCM(N=len(A))
-            f = lambda x: np.abs(kstar - M(x).sum(axis=0))
+            f = lambda x: kstar - M(x).sum(axis=0)
         elif kwargs['model'] is 'UWCM':
             M = UWCM(N=len(self.A))
-            f = lambda x: np.abs(sstar - M(x).sum(axis=0))
+            f = lambda x: sstar - M(x).sum(axis=0)
         elif kwargs['model'] is 'UECM':
             M = UECM(N=len(A))
-            f = lambda x: np.abs( np.hstack([kstar - M.expected_adjacency(*x).sum(axis=0), sstar - M.adjacency_weighted(*x).sum(axis=0)]))
+            f = lambda x: np.hstack([kstar - M.expected_adjacency(*x).sum(axis=0), sstar - M.adjacency_weighted(*x).sum(axis=0)])
         elif kwargs['model'] is 'cWECMt1':
             M = cWECMt1(N=len(A),threshold=kwargs['threshold'])
             f = lambda x : np.hstack([kstar - M.expected_adjacency(*x).sum(axis=0), sstar - M.adjacency_weighted(*x).sum(axis=0)])

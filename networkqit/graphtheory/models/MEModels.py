@@ -17,35 +17,56 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 """
 Some Maximum entropy graph models, inherit from ExpectedModel.
 See Tiziano Squartini thesis for more details
+Also reference:
+Garlaschelli, D., & Loffredo, M. I. (2008).
+Maximum likelihood: Extracting unbiased information from complex networks.
+PRE 78(1), 1–4. https://doi.org/10.1103/PhysRevE.78.015101
+
+G here is the graph adjacency matrix, A is the binary adjacency, W is the weighted
 """
 
-from networkqit.graphtheory import graph_laplacian as graph_laplacian
 import numpy as np
-import numdifftools as nd
 from .ExpectedGraphModel import ExpectedModel
 
 class UBCM(ExpectedModel):
     """
-    Undirected binary configuration model
+    1. Model name: Undirected Binary Configuration Model
+
+    2. Constraints: degree sequence k_i^*
     
-    Hamiltonian of the problem:
-    H(A) = sum_{i<j} (theta_i) k_i^*
+    3. Hamiltonian:
+        H(A) = sum_{i<j} (alpha_i) k_i^*
     
-    Expected link probability
-    pij = xi xj/(1+xi xj)
+    4. Lagrange multipliers substitutions:
+        x_i = exp(-alpha_i)
     
-    where x_i = exp(-theta_i)
+    5. Number of parameters:
+        N
+    
+    6. Link probability <aij>
+        <aij> = pij = xixj/(1 + xixj)
+
+    7. Expected link weight <wij>
+        <wij> = <aij>
+
+    8. LogLikelihood logP:
+        sum_{i<j} a_{ij}*log(pij) + (1-aij)*log(1-pij)
+    
+    9. Reference:
+        Squartini thesis page 110
     """
+    
     def __init__(self, **kwargs):
         if kwargs is not None:
             super().__init__(**kwargs)
         self.N = kwargs['N']
         self.args_mapping = ['x_' + str(i) for i in range(0, self.N)]
         self.model_type = 'topological'
-        self.formula = '$\frac{x_i x_j}{1+x_i x_j}$'
+        #self.formula = '$p_{ij} = \frac{x_i x_j}{1+x_i x_j}$'
         self.bounds = [(0, None) for i in range(0, self.N)]
 
     def expected_adjacency(self, *args):
@@ -68,80 +89,104 @@ class UBCM(ExpectedModel):
                 g[:,l,l] = g[l,:,l]
         return g
 
-    def likelihood(self, G, *args):
-        # See the definition here:
-        # Garlaschelli, D., & Loffredo, M. I. (2008).
-        # Maximum likelihood: Extracting unbiased information from complex networks.
-        # PRE 78(1), 1–4. https://doi.org/10.1103/PhysRevE.78.015101
-        # G here is the graph binary adjacency matrix
+    def loglikelihood(self, G, *args):
         pij = self.expected_adjacency(*args)
-        #one_min_pij = 1.0 - pij
-        #one_min_pij[one_min_pij <= 0] = np.finfo(float).eps
-        #loglike = (W * (np.log(pij) - np.log(one_min_pij)) + np.log(one_min_pij)).sum()
-        #loglike = np.triu(W * (np.log(pij) - np.log(one_min_pij)) + np.log(one_min_pij), 1).sum()
         loglike = G*np.log(pij) + (1-G)*np.log(1-pij)
-        loglike[np.logical_or(np.isnan(loglike), np.isinf(loglike))] = 0
+        #loglike[np.logical_or(np.isnan(loglike), np.isinf(loglike))] = 0
         return np.triu(loglike,1).sum()
+    
+    def saddle_point(self, G, *args):
+        k = (G>0).sum()
+        pij = self.expected_adjacency(*args)
+        avgk = pij.sum(axis=0)
+        return k-avgk
 
 class UWCM(ExpectedModel):
     """"
-    Undirected weighted configuration model
-    Constraints: strength sequence
-    Hamiltonian of the problem
-    H(W) = sum_{i<j} theta_i s_i^*
-    
-    Expected number of links
-    wij = yi yj/(1- yi yj)
+    1. Model name: Undirected Weighted Configuration Model
 
-    where y_i = exp(-theta_i)
+    2. Constraints: strength sequence s_i^*
+    
+    3. Hamiltonian:
+        H(A) = sum_{i<j} (beta_i) s_i^*
+    
+    4. Lagrange multipliers substitutions:
+        y_i = exp(-beta_i)
+        pij = y_i y_j
+    
+    5. Number of parameters:
+        N
+    
+    6. Link probability <aij>:
+        <aij> = pij = yiyj
+
+    7. Expected link weight <wij>:
+        <wij> = yiyj/(1-yiyj)
+
+    8. LogLikelihood logP:
+        logP = sum_{i<j} w_{ij}*log(pij) + log(1-pij)
+    
+    9. Reference:
+        Squartini thesis page 110
     """
+    
     def __init__(self, **kwargs):
         if kwargs is not None:
             super().__init__(**kwargs)
         self.args_mapping = ['y_' + str(i) for i in range(0, kwargs['N'])]
         self.model_type = 'topological'
-        self.formula = '$\frac{y_i y_j}{1-y_i y_j}$'
+        #self.formula = '$<w_{ij}> = \frac{y_i y_j}{1-y_i y_j}$'
         self.bounds = [(0, None) for i in range(0, kwargs['N'])]
 
     def expected_adjacency(self, *args):
-        O = np.outer(args, args)
-        P = np.nan_to_num(O / (1.0 - O))
-        P[P<=0] = np.finfo(float).eps
-        return P
+        pij = np.outer(args, args)
+        return pij
     
-    def likelihood(self, G, *args):
-        pij = np.outer(args,args) # see Squartini thesis page 116
+    def adjacency_weighted(self, *args):
+        return self.pij/(1-self.pi)
+    
+    def loglikelihood(self, G, *args):
+        pij = self.expected_adjacency(args)
         loglike = G*np.log(pij) + (np.log(1-pij))
         loglike[np.logical_or(np.isnan(loglike), np.isinf(loglike))] = 0
         return np.triu(loglike,1).sum()
 
+    def saddle_point(self, G, *args):
+        s = G.sum(axis=0)
+        wij = self.adjacency_weighted(*args)
+        return s - wij.sum(axis=0)
+        
 
 class UBWRG(ExpectedModel):
     """
-    Undirected binary weighted random graph model
-    Constraints: total number of links L, total weight W
-    Hamiltonian:
-        
-    H(G) = sum_{i<j} \alpha Heaviside(w_{ij}) + (beta_i + beta_j) w_{ij}
-         = \alpha L(A) + beta Wtot(W)
+    1. Model name: Undirected Binary Weighted Random Graph model
     
-    Substitutions:
+    2. Constraints: total number of links L, total weight W
+    3. Hamiltonian:
+        H(G) = sum_{i<j} \alpha Heaviside(w_{ij}) + beta w_{ij}
+             = \alpha L(A) + beta Wtot(W)
+    
+    4. Substitutions:
         x = exp(-alpha)
         y = exp(-beta)
     
-    Number of paramters: 2
+    5. Number of paramters:
+        2
     
-    Link probability <aij>
-    <aij> = pij = x*y/(1 - y + x*y)
+    6. Link probability <aij>
+        <aij> = pij = x*y/(1 - y + x*y)
     
-    Expected link weights <wij>
-    <wij> = (x*y) / ( (1-y + x*y)*(1-y) )
+    7. Expected link weights <wij>
+        <wij> = (x*y) / ( (1-y + x*y)*(1-y) )
     
-    Reference: Squartini thesis page 124
+    8. Loglikelihood logP:
+        logP = L(A)log(x) +  Wtot(W)log(y) + N(N-1)/2 log( (1-y)/(1-y + xy) )
+        
+    Reference: Squartini thesis page 122
     """
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
-        self.args_mapping =   ['x_' + str(i) for i in range(0, kwargs['N'])] + ['y_' + str(i) for i in range(0, kwargs['N'])]
+        self.args_mapping =   ['x','y']
         #self.formula = '$\frac{x  y_i y_j)}{(1 - y_iy_j + x y_i y_j)(1 - y_i y_j)}$' TODO
         self.N = kwargs['N']
         self.bounds = [(0, None)]*(self.N+1)
@@ -153,111 +198,68 @@ class UBWRG(ExpectedModel):
         return pij
 
     def adjacency_weighted(self, *args):
-        y = args[(self.N):]
+        y = args[1]
         pij = self.expected_adjacency(*args)
-        yiyj = np.outer(y,y)
-        return pij / (1-yiyj)
+        return pij / (1-y)
 
-    def likelihood(self, G, *args):
-        # see Squartini thesis page 126
-        x,y = args[0:self.N], args[(self.N):]
-        k = (G>0).sum(axis=0)
-        s = G.sum(axis=0)
-        xij = np.outer(x,x)
-        yij = np.outer(y,y)
-        loglike = (x*k).sum() + (y*s).sum() + np.triu(np.log( (1-yij)/(1-yij + xij*yij) ) ,1).sum()
+    def loglikelihood(self, G, *args):
+        x,y = args[0], args[1]
+        L = (np.triu(G,1)>0).sum()
+        Wtot = (np.triu(G,1)).sum()
+        loglike = L*np.log(x) + Wtot*np.log(y) + self.N*(self.N-1)/2 * np.log( (1-y)/(1-y+x*y))
         return loglike
+    
+    def saddle_point(self, G, *args):
+        L = np.triu(G>0,1).sum()
+        Wtot = np.triu(G,1).sum()
+        p = self.expected_adjacency(*args)
+        w = self.adjacency_weighted(*args)
+        pairs = self.N*(self.N-1)/2
+        return np.hstack([L-p*pairs,Wtot-w*pairs])
 
-class UECM2(ExpectedModel):
-    """
-    Undirected Enhanced binary configuration model II
-    Constraints: total number of links L, strength sequence s_i
-    Hamiltonian:
-        
-    H(G) = sum_{i<j} \alpha Heaviside(w_{ij}) + (beta_i + beta_j) w_{ij}
-         = \alpha L(A) + beta_i s_i^*
-    
-    Substitutions:
-        x = exp(-alpha)
-        y_i = exp(-beta_i)
-    
-    Number of paramters: N + 1
-    
-    Link probability <aij>
-    <aij> = pij = x*yiyj/(1-yiyj+x*yiyj)
-    
-    Expected link weights <wij>
-    <wij> = (x*yiyj) / ( (1-yiy+x*yiyj)*(1-yiyj) )
-    
-    Reference: Squartini thesis page 124
-    """
-    def __init__(self,**kwargs):
-        super().__init__(**kwargs)
-        self.args_mapping =   ['x_' + str(i) for i in range(0, kwargs['N'])] + ['y_' + str(i) for i in range(0, kwargs['N'])]
-        #self.formula = '$\frac{x  y_i y_j)}{(1 - y_iy_j + x y_i y_j)(1 - y_i y_j)}$' TODO
-        self.N = kwargs['N']
-        self.bounds = [(0, None)]*(self.N+1)
-        
-    def expected_adjacency(self, *args):
-        x,y = args[0:self.N], args[(self.N):]
-        xij = np.outer(x,x)
-        yij = np.outer(y,y)
-        pij = np.nan_to_num((xij * yij) / ((1 - yij + xij * yij)))
-        pij[pij<0] = np.finfo(float).eps
-        return pij
-
-    def adjacency_weighted(self, *args):
-        y = args[(self.N):]
-        pij = self.expected_adjacency(*args)
-        yiyj = np.outer(y,y)
-        return pij / (1-yiyj)
-
-    def likelihood(self, G, *args):
-        # see Squartini thesis page 126
-        x,y = args[0:self.N], args[(self.N):]
-        k = (G>0).sum(axis=0)
-        s = G.sum(axis=0)
-        xij = np.outer(x,x)
-        yij = np.outer(y,y)
-        loglike = (x*k).sum() + (y*s).sum() + np.triu(np.log( (1-yij)/(1-yij + xij*yij) ) ,1).sum()
-        return loglike
 
 class UECM3(ExpectedModel):
     """
-    Undirected Enhanced binary configuration model III
-    Constraints: degree sequence, strength sequence
-    Hamiltonian:
-        
-    H(G) = sum_{i<j} (alpha_i+alpha_j) Heaviside(w_{ij}) + (beta_i + beta_j) w_{ij}
-         = sum_i alpha_i k_i^* + beta_i s_i^*
-    
-    Substitutions:
-        x = exp(-alpha)
+    1. Model name: Undirected Enhanced Configuration model III
+
+    2. Constraints: strenght sequence s_i^*, degree sequence k_i^*
+
+    3. Hamiltonian:
+        H(G) = sum_i \alpha_i k_i^* + \beta_i s_i^* 
+             = sum_{i<j} (\alpha_i+\alpha_i) Heaviside(w_{ij}) + (beta_i + beta_j) w_{ij}
+
+    4. Lagrange multipliers substitutions:
+        x_i = exp(-alpha_i)
         y_i = exp(-beta_i)
-        
-    Number of parameters: 2N
-    
-    Link probability <aij>
-    <aij> = pij = (xixj * yiyj) / ((1 - yiyj + xixj * yiyj))
-    
-    Expected link weights <wij>
-    <wij> = (xixj*yiyj) / ( (1-yiy+xixj*yiyj)*(1-yiyj) )
-    
-    Reference: Squartini thesis page 126
+
+    5. Number of parameters:
+        2N
+
+    6. Link probability <aij>:
+        <aij> = (xixj yiyj) / (1 - yiyj + xixj*yiyj)
+
+    7. Link probability <wij>:
+        <wij> = (xixj yiyj) / ((1 - yiyj + xixj*yiyj)(1-yiyj))
+
+    8. LogLikelihood logP:
+        logP = sum_i k_i(A) log(x_i) + sum_i s_i(W) log(y_i) + sum_{i<j} log( (1-yiyj) / (1-yiyj+xixj*yiyj) )
+
+    9. Reference:
+        Squartini thesis page 126
     """
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
         self.args_mapping =   ['x_' + str(i) for i in range(0, kwargs['N'])] + ['y_' + str(i) for i in range(0, kwargs['N'])]
         #self.formula = '$\frac{x_i x_j  y_i y_j)}{(1 - y_iy_j + x_i x_j y_i y_j)(1 - y_i y_j)}$' TODO
         self.N = kwargs['N']
-        self.bounds = [(0,None)]*(2*self.N)
+        self.bounds = [(0,None)] * (2*self.N)
         
 
     def expected_adjacency(self, *args):
         x,y = args[0:self.N], args[(self.N):]
-        xij = np.outer(x,x)
-        yij = np.outer(y,y)
-        pij = np.nan_to_num((xij * yij) / ((1 - yij + xij * yij)))
+        xixj = np.outer(x,x)
+        yiyj = np.outer(y,y)
+        pij = np.nan_to_num((xixj * yiyj) / ((1 - yiyj + xixj * yiyj)))
         pij[pij<0] = np.finfo(float).eps
         return pij
 
@@ -267,15 +269,19 @@ class UECM3(ExpectedModel):
         yiyj = np.outer(y,y)
         return pij / (1.0-yiyj)
 
-    def likelihood(self, G, *args):
-        # see Squartini thesis page 126
+    def loglikelihood(self, G, *args):
         x,y = args[0:self.N], args[(self.N):]
         k = (G>0).sum(axis=0)
         s = G.sum(axis=0)
-        xij = np.outer(x,x)
-        yij = np.outer(y,y)
-        loglike = (x*k).sum() + (y*s).sum() + np.triu(np.log( (1-yij)/(1-yij + xij*yij) ) ,1).sum()
+        xixj = np.outer(x,x)
+        yiyj = np.outer(y,y)
+        loglike = (x*k).sum() + (y*s).sum() + np.triu(np.log( (1-yiyj)/(1-yiyj + xixj*yiyj) ) ,1).sum()
         return loglike
+
+
+###########################################################################
+####################  Continuous models TO DO LATER #######################
+###########################################################################
 
 class cWECMt1(ExpectedModel):
     """
@@ -284,15 +290,15 @@ class cWECMt1(ExpectedModel):
     H(W) = sum_{i<j} alpha_i Heaviside(w_{ij}-t) + beta_i w_{ij}
 
     Expected link probability
-    pij = xij*((yij)**t)/(1.0+xij*yijt - yijt)
+    pij = xixj*((yiyj)**t)/(1.0+xixj*yiyjt - yiyjt)
 
     Expected link weight
-    (t*(xij-1.0)*yijt)/((1.0 + xij*yijt - yijt )) - 1.0/(np.log(np.abs(yij+eps)))
+    (t*(xixj-1.0)*yiyjt)/((1.0 + xixj*yiyjt - yiyjt )) - 1.0/(np.log(np.abs(yiyj+eps)))
     """
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
         self.args_mapping =   ['x_' + str(i) for i in range(0, kwargs['N'])] + ['y_' + str(i) for i in range(0, kwargs['N'])]
-        self.formula = '$\frac{x_i x_j (y_i y_j)^t}{1+ x_i x_j(y_i y_j)^t - (y_i y_j^t)}'
+        #self.formula = '$\frac{x_i x_j (y_i y_j)^t}{1+ x_i x_j(y_i y_j)^t - (y_i y_j^t)}'
         self.bounds = [(0, None) for i in range(0, kwargs['N'] ) ]*2
         self.bounds = [0,np.inf]
         self.N = kwargs['N']
@@ -302,21 +308,21 @@ class cWECMt1(ExpectedModel):
         x,y = args[0:self.N], args[(self.N):]
 
         t = self.threshold
-        xij = np.outer(x,x)
-        yij = np.outer(y,y)
-        yijt = np.real(yij**t)
-        pij = np.nan_to_num(xij*((yij)**t)/(1.0+xij*yijt - yijt))
+        xixj = np.outer(x,x)
+        yiyj = np.outer(y,y)
+        yiyjt = np.real(yiyj**t)
+        pij = np.nan_to_num(xixj*((yiyj)**t)/(1.0+xixj*yiyjt - yiyjt))
         pij[pij<0] = np.finfo(float).eps
         return pij
     
     def adjacency_weighted(self, *args):
         x,y = args[0:self.N], args[(self.N):]
         t = self.threshold
-        xij = np.outer(x,x)
-        yij = np.outer(y,y)
-        yijt = np.real(yij**t)
+        xixj = np.outer(x,x)
+        yiyj = np.outer(y,y)
+        yiyjt = np.real(yiyj**t)
         eps = 1E-16
-        wij = np.nan_to_num((t*(xij-1.0)*yijt)/((1.0 + xij*yijt - yijt )) - 1.0/(np.log(np.abs(yij+eps))))
+        wij = np.nan_to_num((t*(xixj-1.0)*yiyjt)/((1.0 + xixj*yiyjt - yiyjt )) - 1.0/(np.log(np.abs(yiyj+eps))))
         wij[wij<0] = eps
         return wij
 
@@ -328,15 +334,15 @@ class cWECMt2(ExpectedModel):
     H(W) = sum_{i<j} (alpha_i+alpha_j) Heaviside(w_{ij}-t) + (beta_i+beta_j) w_{ij} Heaviside(w_{ij}-t)
 
     Expected link probability
-    pij = xij*(yij^t) / (t*log(yij) + xij*(yij)^t)
+    pij = xixj*(yiyj^t) / (t*log(yiyj) + xixj*(yiyj)^t)
 
     Expected link weight
-    wij = (1+yij^t)(xij (yij)^t) / ( log(yij)*(t*log(yij) +xij*(yij)^t ) )
+    wij = (1+yiyj^t)(xixj (yiyj)^t) / ( log(yiyj)*(t*log(yiyj) +xixj*(yiyj)^t ) )
     """
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
         self.args_mapping =   ['x_' + str(i) for i in range(0, kwargs['N'])] + ['y_' + str(i) for i in range(0, kwargs['N'])]
-        self.formula = '$\frac{x_i x_j (y_i y_j)^t}{t \log(yi y_j) + x_i x_j (y_i y_j)^t}$'
+        #self.formula = '$\frac{x_i x_j (y_i y_j)^t}{t \log(yi y_j) + x_i x_j (y_i y_j)^t}$'
         self.bounds = [(0, None) for i in range(0, kwargs['N'] ) ]*2
         self.N = kwargs['N']
         self.threshold = kwargs['threshold']
@@ -344,23 +350,23 @@ class cWECMt2(ExpectedModel):
     def expected_adjacency(self, *args):
         x,y = args[0:self.N], args[(self.N):]
         t = self.threshold
-        xij = np.outer(x,x)
-        yij = np.outer(y,y)
-        yijt = np.real(yij**t)
+        xixj = np.outer(x,x)
+        yiyj = np.outer(y,y)
+        yiyjt = np.real(yiyj**t)
         eps = 1E-16
-        pij = np.nan_to_num(xij*(yij**t) / (t*np.log(yij+eps) + xij*(yij)**t))
+        pij = np.nan_to_num(xixj*(yiyj**t) / (t*np.log(yiyj+eps) + xixj*(yiyj)**t))
         pij[pij<0] = np.finfo(float).eps
         return pij
     
     def adjacency_weighted(self, *args):
         x,y = args[0:self.N], args[(self.N):]
         t = self.threshold
-        xij = np.outer(x,x)
-        yij = np.outer(y,y)
-        yijt = np.real(yij**t)
+        xixj = np.outer(x,x)
+        yiyj = np.outer(y,y)
+        yiyjt = np.real(yiyj**t)
         eps = 1E-16
-        num = (1+yijt)*(xij)*(yijt)
-        den = np.log(np.abs(yij+eps)) * ( np.log(np.abs(yij+eps)) + xij*yijt ) 
+        num = (1+yiyjt)*(xixj)*(yiyjt)
+        den = np.log(np.abs(yiyj+eps)) * ( np.log(np.abs(yiyj+eps)) + xixj*yiyjt ) 
         wij = np.nan_to_num( num / den )
         wij[wij<0] = eps
         return wij
@@ -379,7 +385,7 @@ class SpatialCM(ExpectedModel):
         if kwargs is not None:
             super().__init__(**kwargs)
         self.args_mapping = ['x_' + str(i) for i in range(0, kwargs['N'])] + ['gamma','z']
-        self.formula = '$\frac{z x_i x_j e^{-\gamma d_{ij}}}{ 1 + z x_i x_j e^{-\gamma d_{ij}}  }$'
+        #self.formula = '$\frac{z x_i x_j e^{-\gamma d_{ij}}}{ 1 + z x_i x_j e^{-\gamma d_{ij}}  }$'
         self.bounds = [(0,None) for i in range(0,kwargs['N'])] + [(0,None),(0,None)]
         self.dij = kwargs['dij']
         self.expdij = np.exp(-kwargs['dij'])
