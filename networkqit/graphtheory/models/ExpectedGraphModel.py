@@ -28,10 +28,9 @@ random graph models and the expected graph models described here.
 
 from networkqit.graphtheory import graph_laplacian as graph_laplacian
 import numpy as np
-import math
 import numdifftools as nd
 
-class ExpectedModel(object):
+class ExpectedModel():
     """
     ExpectedModel is the base class that defines all the operations inherited from models of expected adjacency matrix, expected Laplacian and 
     gradients of expected laplacian. It defines the behaviour of model operations such as addition or multiplication.
@@ -124,6 +123,11 @@ class ExpectedModel(object):
             x (numpy.array): parameters vector.
         """
         return self._expected_laplacian_grad_autodiff(*x)
+
+    def likelihood(self, G, *args):
+        # implement here where G is the adjacency matrix (Weighted or binary)
+        raise NotImplementedError
+        pass
 
     
 class Operator(ExpectedModel):
@@ -364,9 +368,8 @@ class HiddenVariables(ExpectedModel):
 
     def expected_adjacency(self, *args):
         if self.parameters.get('powerlaw',True):
-            return np.outer([*args[0:-1]],[*args[0:-1]])**(-args[-1])
-        else:
-            return np.outer([*args],[*args])
+            return np.outer([*args[0:-1]],[*args[0:-1]])**(-args[-1])        
+        return np.outer([*args],[*args])
         
 class TopoDegreeProd(ExpectedModel):
     """
@@ -463,138 +466,30 @@ class TopoJaccard(ExpectedModel):
     def expected_adjacency(self, *args):
         return args[0]*(self.M)**(-args[1])
 
-class UBCM(ExpectedModel):
-    """
-    Undirected binary configuration model
-    pij = xi xj/(1+xi xj)
-    """
-    def __init__(self, **kwargs):
-        if kwargs is not None:
-            super().__init__(**kwargs)
-        self.N = kwargs['N']
-        self.args_mapping = ['x_' + str(i) for i in range(0, self.N)]
-        self.model_type = 'topological'
-        self.formula = '$\frac{x_i x_j}{1+x_i x_j}$'
-        self.bounds = [(0, None) for i in range(0, self.N)]
-
-    def expected_adjacency(self, *args):
-        O = np.outer(args, args)
-        return O / (1+O)
-
-    def expected_laplacian_grad(self, x):
-        N = self.N 
-        g = np.zeros([N,N,N])
-        for l in range(0,N):
-            degL = 0
-            v = set(range(0,N))-set([l])
-            for k in v:
-                degL += x[k]/((1+x[l]*x[k])**2)
-            for i in range(0,N):
-                g[i,i,l] = x[i]/((1+x[i]*x[l])**2)
-            g[l,l,l] = degL
-            for i in v:
-                g[l,i,l] = -x[i]/((1+x[i]*x[l])**2)
-                g[:,l,l] = g[l,:,l]
-        return g
+#class S1(ExpectedModel):
+#    def __init__(self, **kwargs):
+#        if kwargs is not None:
+#            super().__init__(**kwargs)
+#        self.args_mapping = [
+#            'x_' + str(i) for i in range(0, kwargs['N'])] + ['beta', 'mu']
+#        self.model_type = 'topological'
+#        self.formula = '$\frac{1}{1+\left(\frac{d_{ij}}{\mu k_i k_j}\right)^\beta}$'
+#        self.bounds = [(0, None) for i in range(0, kwargs['N'])]
+#
+#    def expected_adjacency(self, *args):
+#        beta = args[-2]
+#        mu = args[-1]
+#        O = args[-1]*np.outer(args[:-2])
+#        return 1.0/(1.0 + O**args[-2])
 
 
-class UWCM(ExpectedModel):
-    """"
-    Undirected weighted configuration model
-    pij = yi yj/(1- yi yj)
-    """
-    def __init__(self, **kwargs):
-        if kwargs is not None:
-            super().__init__(**kwargs)
-        self.args_mapping = ['y_' + str(i) for i in range(0, kwargs['N'])]
-        self.model_type = 'topological'
-        self.formula = '$\frac{y_i y_j}{1-y_i y_j}$'
-        self.bounds = [(0, None) for i in range(0, kwargs['N'])]
-
-    def expected_adjacency(self, *args):
-        O = np.outer(args, args)
-        P = np.nan_to_num(O / (1.0 - O))
-        P[P<=0] = np.finfo(float).eps
-        return P
-
-class UECM(ExpectedModel):
-    """
-    Enhanced binary configuration model
-    pij = (xixj * yiyj) / ((1 - yiyj + xixj * yiyj)*(1 - yiyj))
-    """
-    def __init__(self,**kwargs):
-        super().__init__(**kwargs)
-        self.args_mapping =   ['x_' + str(i) for i in range(0, kwargs['N'])] + ['y_' + str(i) for i in range(0, kwargs['N'])]
-        self.formula = '$\frac{x_i x_j  y_i y_j)}{(1 - y_iy_j + x_i x_j y_i y_j)(1 - y_i y_j)}$'
-        self.bounds = [(0, None) for i in range(0, kwargs['N'] ) ]*2
-        self.N = kwargs['N']
-
-    def expected_adjacency(self, *args):
-        x = args
-        xixj = np.outer(x[0:self.N], x[0:self.N])
-        yiyj = np.outer(x[self.N:], x[self.N:])
-        #return (xixj * yiyj) / (1 - yiyj + xixj * yiyj)
-        P = np.nan_to_num((xixj * yiyj) / ((1 - yiyj + xixj * yiyj)*(1 - yiyj)))
-        P[P<0] = np.finfo(float).eps
-        return P
-
-    def adjacency_weighted(self, *args):
-        x = args
-        P = self.expected_adjacency(*args)
-        yiyj = np.outer(x[self.N:], x[self.N:])
-        return P/(1-yiyj)
-
-    
-class SpatialCM(ExpectedModel):
-    """
-    Implements the random graph model with spatial constraints from:
-    Ruzzenenti, F., Picciolo, F., Basosi, R., & Garlaschelli, D. (2012). 
-    Spatial effects in real networks: Measures, null models, and applications. 
-    Physical Review E - Statistical, Nonlinear, and Soft Matter Physics, 86(6), 
-    1–13. https://doi.org/10.1103/PhysRevE.86.066110
-    """
-    def __init__(self, **kwargs):
-        if kwargs is not None:
-            super().__init__(**kwargs)
-        self.args_mapping = ['x_' + str(i) for i in range(0, kwargs['N'])] + ['gamma','z']
-        self.formula = '$\frac{z x_i x_j e^{-\gamma d_{ij}}}{ 1 + z x_i x_j e^{-\gamma d_{ij}}  }$'
-        self.bounds = [(0,None) for i in range(0,kwargs['N'])] + [(0,None),(0,None)]
-        self.dij = kwargs['dij']
-        self.expdij = np.exp(-kwargs['dij'])
-        self.is_weighted = kwargs.get('is_weighted',False)
-    
-    def expected_adjacency(self, *args):        
-        O = args[-1]*np.outer(args[0:-2],args[0:-2]) * self.expdij**(args[-2])
-        if self.is_weighted:
-            return O / (1 + O)
-        else:
-            return O / (1-O)
-
-class S1(ExpectedModel):
-    def __init__(self, **kwargs):
-        if kwargs is not None:
-            super().__init__(**kwargs)
-        self.args_mapping = [
-            'x_' + str(i) for i in range(0, kwargs['N'])] + ['beta', 'mu']
-        self.model_type = 'topological'
-        self.formula = '$\frac{1}{1+\left(\frac{d_{ij}}{\mu k_i k_j}\right)^\beta}$'
-        self.bounds = [(0, None) for i in range(0, kwargs['N'])]
-
-    def expected_adjacency(self, *args):
-        beta = args[-2]
-        mu = args[-1]
-        O = args[-1]*np.outer(args[:-2])
-        return 1.0/(1.0 + O**args[-2])
-
-
-class ModelFactory(object):
+class ModelFactory():
+    @staticmethod
     def factory(type, **kwargs):
         if type == 'Edr':
             return Edr(**kwargs)
-        if type == 'EdrStretched':
-            return EdrStretched(**kwargs)
         assert 0, "Non supported model: " + type
-    factory = staticmethod(factory)
+    #factory = staticmethod(factory)
 
     def __init__(self, **kwargs):
         super().__init__()
@@ -605,7 +500,7 @@ class ModelFactory(object):
         return self.__next__()
 
     def __next__(self):
-        for m in Model.__subclasses__():
+        for m in ExpectedModel.__subclasses__():
             if self.model_type is None:
                 yield m
                 #self.n = self.n+1

@@ -57,12 +57,11 @@ from abc import ABC, abstractmethod
 
 import numdifftools as nd
 import numpy as np
-from numpy import triu, log, inf
 from scipy.linalg import eigvalsh
 from scipy.misc import logsumexp
 from scipy.optimize import minimize, least_squares, fsolve
 
-from networkqit.graphtheory import UBCM, UWCM, UECM
+from networkqit.graphtheory import *
 from networkqit.graphtheory import graph_laplacian as graph_laplacian
 from networkqit.infotheory.density import VonNeumannDensity, SpectralDivergence, compute_vonneuman_density
 
@@ -138,28 +137,25 @@ class MLEOptimizer(ModelOptimizer):
         """
         n = len(self.x0)  # number of parameters of the model is recovered by the size of x0
         eps = np.finfo(float).eps
-        bounds = ((0) * len(self.A), (inf) * len(self.x0))
+        bounds = ((0) * len(self.A), (np.inf) * len(self.x0))
         A = (self.A > 0).astype(float)  # binarize the input adjacency matrix
         W = self.A
 
-        # See the definition here:
-        # Garlaschelli, D., & Loffredo, M. I. (2008).
-        # Maximum likelihood: Extracting unbiased information from complex networks.
-        # PRE 78(1), 1–4. https://doi.org/10.1103/PhysRevE.78.015101
-        def likelihood(x):
-            pijx = model(x)
-            one_min_pij = 1.0 - pijx
-            one_min_pij[one_min_pij <= 0] = eps
-            l = triu(W * (log(pijx) - log(one_min_pij)) + log(one_min_pij), 1).sum()
-            return l
-
         # Use the Trust-Region reflective algorithm to optimize likelihood
-        self.sol = least_squares(fun=likelihood, x0=np.squeeze(self.x0),
-                                 method='trf',
+        self.sol = least_squares(fun=lambda z : model.likelihood(A,z), x0=np.squeeze(self.x0),
+                                 method='dogbox',
                                  bounds=bounds,
                                  xtol=kwargs.get('xtol', 2E-10),
                                  gtol=kwargs.get('gtol', 2E-10),
-                                 max_nfev=kwargs.get('max_nfev', len(self.x0) * 100000))
+                                 max_nfev=kwargs.get('max_nfev', len(self.x0) * 100000),
+                                 verbose=kwargs.get('verbose', 1))
+
+#        self.sol = minimize(fun=lambda z : model.likelihood(A,z), x0=np.squeeze(self.x0),
+#                            method='L-BFGS-B',
+#                            bounds=model.bounds,
+#                            options={'ftol':kwargs.get('ftol', 2E-10), 'gtol':kwargs.get('gtol', 2E-16)})
+#                            #bounds = model.bounds)
+
         return self.sol
 
     def runfsolve(self, **kwargs):
@@ -169,33 +165,47 @@ class MLEOptimizer(ModelOptimizer):
         The gradients with respect to the parameters are set to zero.
         
         kwargs keys:
-            UBCM (string): specify the undirected binary configuration model. xixj/(1-xixj)
-            UWCM (string): specify the undirected weighted configuration model. (yiyj)/(1-yiyj)
+            UBCM (string):      specify the undirected binary configuration model. xixj/(1-xixj)
+            UWCM (string):      specify the undirected weighted configuration model. (yiyj)/(1-yiyj)
+            UECM (string):      specify the enhanced undirected configuration model.
+            cWECMt1 (string):   specify the continuous enhanced weighted undirected configuration model with threshold on link existence
+            cWECMt2 (string):   specify the continuous enhanced weighted undirected configuration model with threshold on both link existence and weight
         """
         n = len(self.x0)
         eps = np.finfo(float).eps
-        bounds = ((eps) * len(self.A), (inf) * len(self.x0))
-        pij = None
-        A = (self.A > 0).astype(float)
-        W = self.A
+        #bounds = ((eps) * len(self.A), (np.inf) * len(self.x0))
+        A = (self.A > 0).astype(float) # empirical binary adjacency matrix
+        W = self.A # empirical weighted adjacency matrix
+        kstar = A.sum(axis=0) # empirical degre sequence
+        sstar = W.sum(axis=0) # empirical strenght sequence
         f = None
         if kwargs['model'] is 'UBCM':
-            kstar = A.sum(axis=0)
             M = UBCM(N=len(A))
             f = lambda x: np.abs(kstar - M(x).sum(axis=0))
         elif kwargs['model'] is 'UWCM':
-            sstar = W.sum(axis=0)
             M = UWCM(N=len(self.A))
             f = lambda x: np.abs(sstar - M(x).sum(axis=0))
         elif kwargs['model'] is 'UECM':
-            kstar = A.sum(axis=0)
-            sstar = W.sum(axis=0)
             M = UECM(N=len(A))
-            f = lambda x: np.abs(
-                np.hstack([kstar - M.adjacency(*x).sum(axis=0), sstar - M.adjacency_weighted(*x).sum(axis=0)]))
+            f = lambda x: np.abs( np.hstack([kstar - M.expected_adjacency(*x).sum(axis=0), sstar - M.adjacency_weighted(*x).sum(axis=0)]))
+        elif kwargs['model'] is 'cWECMt1':
+            M = cWECMt1(N=len(A),threshold=kwargs['threshold'])
+            f = lambda x : np.hstack([kstar - M.expected_adjacency(*x).sum(axis=0), sstar - M.adjacency_weighted(*x).sum(axis=0)])
+        elif kwargs['model'] is 'cWECMt2':
+            M = cWECMt2(N=len(A),threshold=kwargs['threshold'])
+            f = lambda x : np.hstack([kstar - M.expected_adjacency(*x).sum(axis=0), sstar - M.adjacency_weighted(*x).sum(axis=0)])
+        else:
+            raise RuntimeError('Not a supported model')
 
-        # Use the Trust-Region reflective algorithm to optimize likelihood
-        self.sol = fsolve(func=f, x0=np.squeeze(self.x0), xtol=1E-16)
+        # Use the Dogobx method to optimize likelihood
+        self.sol = least_squares(fun=f,
+                                 x0=np.squeeze(self.x0),
+                                 bounds=[np.finfo(float).eps, np.inf],
+                                 method='dogbox',
+                                 xtol=kwargs.get('xtol', 2E-10),
+                                 gtol=kwargs.get('xtol', 2E-10),
+                                 max_nfev=kwargs.get('max_nfev', len(self.x0) * 100000),
+                                 verbose=kwargs.get('verbose',1))
 
         return self.sol
 
@@ -422,6 +432,8 @@ class StochasticOptimizer(ModelOptimizer):
     :math: `\nabla_{\theta}S(\rho \| \sigma) = \beta \textrm\biggl \lbrack \rho \nabla_{\theta}\mathbb{E}_{\theta}[L]} \biggr \rbrack`
         
     :math: `\frac{\partial S(\rho \| \sigma)}{\partial \theta_k} = \beta \textrm{Tr}\lbrack \rho \frac{\partial}{\partial \theta_k} \rbrack + \frac{\partial}{\partial \theta_k}\mathbb{E}_{\theta}\log \textrm{Tr} e^{-\beta L(\theta)}\lbrack \rbrack`
+    
+    This class requires either Tensorflow or Pytorch to support backpropagation in the eigenvalues routines
     """
 
     def __init__(self, A, x0, beta_range, **kwargs):

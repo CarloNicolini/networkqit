@@ -11,3 +11,6 @@ from networkqit.graphtheory.matrices import *
 from networkqit.graphtheory.models import *
 import networkqit.graphtheory.models.ExpectedGraphModel
 from networkqit.graphtheory.models.ExpectedGraphModel import *
+
+import networkqit.graphtheory.models.MEModels
+from networkqit.graphtheory.models.MEModels import *
