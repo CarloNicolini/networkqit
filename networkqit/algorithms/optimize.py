@@ -108,15 +108,15 @@ class MLEOptimizer(ModelOptimizer):
     maximum likelihood parameters estimation in the classical settings.
     """
 
-    def __init__(self, A, x0, **kwargs):
+    def __init__(self, G, x0, **kwargs):
         """
         Init the optimizer.
         
         Args:
-            A (numpy.array) :is the empirical network to study. A N x N adjacency matrix as numpy.array. Can be weighted or unweighted.
+            G (numpy.array) :is the empirical network to study. A N x N adjacency matrix as numpy.array. Can be weighted or unweighted.
             x0 (numpy.array): is the k-element array of initial parameters estimates. Typically set as random.    
         """
-        self.A = A
+        self.G = G
         self.x0 = x0
 
     def gradient(self, **kwargs):
@@ -135,26 +135,23 @@ class MLEOptimizer(ModelOptimizer):
         """
         Optimize the likelihood of the model given the observation A. 
         """
-        n = len(self.x0)  # number of parameters of the model is recovered by the size of x0
         eps = np.finfo(float).eps
         bounds = ((eps) * len(self.A), (np.inf) * len(self.x0))
-        A = (self.A > 0).astype(float)  # binarize the input adjacency matrix
-        W = self.A
-
         # Use the Trust-Region reflective algorithm to maximize loglikelihood
-        self.sol = least_squares(fun=lambda z : -model.loglikelihood(A,z), x0=np.squeeze(self.x0),
-                                 method='dogbox',
-                                 bounds=bounds,
-                                 xtol=kwargs.get('xtol', 1E-12),
-                                 gtol=kwargs.get('gtol', 1E-12),
-                                 max_nfev=kwargs.get('max_nfev', len(self.x0) * 100000),
-                                 verbose=kwargs.get('verbose', 1))
+#        self.sol = least_squares(fun=lambda z : -model.loglikelihood(A,z), x0=np.squeeze(self.x0),
+#                                 method='dogbox',
+#                                 bounds=bounds,
+#                                 xtol=kwargs.get('xtol', 1E-12),
+#                                 gtol=kwargs.get('gtol', 1E-12),
+#                                 max_nfev=kwargs.get('max_nfev', len(self.x0) * 100000),
+#                                 verbose=kwargs.get('verbose', 1))
 
-#        self.sol = minimize(fun=lambda z : model.likelihood(A,z), x0=np.squeeze(self.x0),
-#                            method='L-BFGS-B',
-#                            bounds=model.bounds,
-#                            options={'ftol':kwargs.get('ftol', 2E-10), 'gtol':kwargs.get('gtol', 2E-16)})
-#                            #bounds = model.bounds)
+        opts = {'ftol':kwargs.get('ftol', 1E-20),
+                'xtol':kwargs.get('xtol', 1E-20)}
+        self.sol = minimize(fun=lambda z : -model.loglikelihood(A,z), x0=np.squeeze(self.x0),
+                            method='SLSQP',
+                            bounds=model.bounds,
+                            options=opts)
 
         return self.sol
 
@@ -171,34 +168,31 @@ class MLEOptimizer(ModelOptimizer):
             cWECMt1 (string):   specify the continuous enhanced weighted undirected configuration model with threshold on link existence
             cWECMt2 (string):   specify the continuous enhanced weighted undirected configuration model with threshold on both link existence and weight
         """
-        n = len(self.x0)
-        eps = np.finfo(float).eps
         #bounds = ((eps) * len(self.A), (np.inf) * len(self.x0))
-        A = (self.A > 0).astype(float) # empirical binary adjacency matrix
-        W = self.A # empirical weighted adjacency matrix
-        kstar = A.sum(axis=0) # empirical degre sequence
-        sstar = W.sum(axis=0) # empirical strenght sequence
-        f = None
-        if kwargs['model'] is 'UBCM':
-            M = UBCM(N=len(A))
-            f = lambda x: kstar - M(x).sum(axis=0)
-        elif kwargs['model'] is 'UWCM':
-            M = UWCM(N=len(self.A))
-            f = lambda x: sstar - M(x).sum(axis=0)
-        elif kwargs['model'] is 'UECM':
-            M = UECM(N=len(A))
-            f = lambda x: np.hstack([kstar - M.expected_adjacency(*x).sum(axis=0), sstar - M.adjacency_weighted(*x).sum(axis=0)])
-        elif kwargs['model'] is 'cWECMt1':
-            M = cWECMt1(N=len(A),threshold=kwargs['threshold'])
-            f = lambda x : np.hstack([kstar - M.expected_adjacency(*x).sum(axis=0), sstar - M.adjacency_weighted(*x).sum(axis=0)])
-        elif kwargs['model'] is 'cWECMt2':
-            M = cWECMt2(N=len(A),threshold=kwargs['threshold'])
-            f = lambda x : np.hstack([kstar - M.expected_adjacency(*x).sum(axis=0), sstar - M.adjacency_weighted(*x).sum(axis=0)])
-        else:
-            raise RuntimeError('Not a supported model')
+#        kstar = A.sum(axis=0) # empirical degre sequence
+#        sstar = W.sum(axis=0) # empirical strenght sequence
+#        f = None
+#        if kwargs['model'] is 'UBCM':
+#            M = UBCM(N=len(A))
+#            f = lambda x: kstar - M(x).sum(axis=0)
+#        elif kwargs['model'] is 'UWCM':
+#            M = UWCM(N=len(A))
+#            f = lambda x: sstar - M(x).sum(axis=0)
+#        elif kwargs['model'] is 'UECM':
+#            M = UECM(N=len(A))
+#            f = lambda x: np.hstack([kstar - M.expected_adjacency(*x).sum(axis=0), sstar - M.adjacency_weighted(*x).sum(axis=0)])
+#        elif kwargs['model'] is 'cWECMt1':
+#            M = cWECMt1(N=len(A),threshold=kwargs['threshold'])
+#            f = lambda x : np.hstack([kstar - M.expected_adjacency(*x).sum(axis=0), sstar - M.adjacency_weighted(*x).sum(axis=0)])
+#        elif kwargs['model'] is 'cWECMt2':
+#            M = cWECMt2(N=len(A),threshold=kwargs['threshold'])
+#            f = lambda x : np.hstack([kstar - M.expected_adjacency(*x).sum(axis=0), sstar - M.adjacency_weighted(*x).sum(axis=0)])
+#        else:
+#            raise RuntimeError('Not a supported model')
 
         # Use the Dogobx method to optimize likelihood
-        self.sol = least_squares(fun=f,
+        M = kwargs['model']
+        self.sol = least_squares(fun=lambda z : M.saddle_point(self.G, z),
                                  x0=np.squeeze(self.x0),
                                  bounds=[np.finfo(float).eps, np.inf],
                                  method='dogbox',
@@ -207,6 +201,7 @@ class MLEOptimizer(ModelOptimizer):
                                  max_nfev=kwargs.get('max_nfev', len(self.x0) * 100000),
                                  verbose=kwargs.get('verbose',1))
 
+    
         return self.sol
 
 

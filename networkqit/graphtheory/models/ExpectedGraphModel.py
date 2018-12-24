@@ -141,6 +141,7 @@ class ExpectedModel():
     
 class Operator(ExpectedModel):
     def __init__(self, left, right):
+        super().__init__()
         self.left = left
         self.right = right
         # unique elements, order preserving
@@ -159,8 +160,19 @@ class Operator(ExpectedModel):
         self.bounds = left.bounds + right.bounds
         self.formula = left.formula[0:-1] + str(self) + right.formula[1:]
         # print(self.args_mapping,self.idx_args_left,self.idx_args_right,self.right.args_mapping)
-
-
+    def loglikelihood(self, G, *args):
+        pass
+    
+    def saddle_point(self, G, *args):
+        pass
+    
+    def expected_adjacency(self,*args):
+        pass
+    
+    def expected_laplacian(self,*args):
+        pass
+    
+    
 class Mul(Operator):
     def __call__(self, x):
         return self.left(x[self.idx_args_left]) * self.right(x[self.idx_args_right])
@@ -222,7 +234,7 @@ class Edr(ExpectedModel):
             super().__init__(**kwargs)
         self.args_mapping = ['c_edr', 'mu_edr']
         self.model_type = 'spatial'
-        self.formula = '$c_{edr} e^{-\mu_{edr} d_{ij}}$'
+        self.formula = r'$c_{edr} e^{-\mu_{edr} d_{ij}}$'
         self.bounds = [(0, None), (0, None)]
 
     def expected_adjacency(self, *args):
@@ -250,7 +262,7 @@ class EdrTruncated(ExpectedModel):
             super().__init__(**kwargs)
         self.args_mapping = ['c_edr_trunc', 'lambda_edr_trunc', 'b_edr_trunc']
         self.model_type = 'spatial'
-        self.formula = '$\frac{e^{-d_{ij}/\lambda}} {\lambda \left(1-e^{-b/\lambda} \right)}$'
+        self.formula = r'$\frac{e^{-d_{ij}/\lambda}} {\lambda \left(1-e^{-b/\lambda} \right)}$'
         self.bounds = [(0, None), (0, None), (0, None)]
 
     def expected_adjacency(self, *args):
@@ -272,7 +284,7 @@ class PowerLawDistance(ExpectedModel):
             super().__init__(**kwargs)
         self.args_mapping = ['c_pldr', 'mu_pldr']
         self.model_type = 'spatial'
-        self.formula = '$c_{pldr} d_{ij}^{-\mu_{pldr}}$'
+        self.formula = r'$c_{pldr} d_{ij}^{-\mu_{pldr}}$'
         self.bounds = [(0, None), (0, None)]
 
     def expected_adjacency(self, *args):
@@ -291,7 +303,7 @@ class Weibull(ExpectedModel):
             super().__init__(**kwargs)
         self.args_mapping = ['c_wei', 'mu_wei', 'gamma_wei']
         self.model_type = 'spatial'        
-        self.formula = '$c_{wei} d_{ij}^{\gamma_{wei}-1} e^{-(\mu_{wei} d_{ij})^\gamma_{wei}}$'
+        self.formula = r'$c_{wei} d_{ij}^{\gamma_{wei}-1} e^{-(\mu_{wei} d_{ij})^\gamma_{wei}}$'
         self.bounds = [(0, None), (0, None), (0, None)]
 
     def expected_adjacency(self, *args):
@@ -312,7 +324,7 @@ class EdrSum(ExpectedModel):
         self.args_mapping = [
             'c_edrsum_'+str(int(i/2)) if i % 2 == 0 else 'mu_edrsum_'+str(int(i/2)) for i in range(0, 2*num_exp)]
         self.model_type = 'spatial'
-        self.formula = '$\sum \limits_{l=0}^L c_l e^{-d_{ij} \mu_l}$'
+        self.formula = r'$\sum \limits_{l=0}^L c_l e^{-d_{ij} \mu_l}$'
         self.bounds = [(0,None)] *2 * num_exp
 
     def expected_adjacency(self, *args):
@@ -342,7 +354,7 @@ class LevyFligth(ExpectedModel):
         self.args_mapping = ['c_levy', 'delta_r_0_levy',
                              'gamma_levy', 'cutoff_levy']
         self.model_type = 'spatial'
-        self.formula = '$c_{levy} $'
+        self.formula = r'$c_{levy} $'
         self.bounds = [(0, None), (0, None), (0, None), (0,None)]
 
     def expected_adjacency(self, *args):
@@ -357,7 +369,7 @@ class TopoIdentity(ExpectedModel):
             super().__init__(**kwargs)
         self.args_mapping = []
         self.model_type = 'topological'
-        self.formula = '$1$'
+        self.formula = r'$1$'
         self.bounds = None
 
     def expected_adjacency(self, *args):
@@ -370,7 +382,7 @@ class HiddenVariables(ExpectedModel):
             super().__init__(**kwargs)
         self.args_mapping = ['x_' + str(i) for i in range(0, kwargs['N'])]
         self.model_type = 'topological'
-        self.formula = '$1$'
+        self.formula = r'$1$'
         self.bounds = [(0, None) for i in range(0, kwargs['N'])]
         if self.parameters.get('powerlaw', False):
             self.args_mapping += ['gamma']
@@ -392,7 +404,7 @@ class TopoDegreeProd(ExpectedModel):
             super().__init__(**kwargs)
         self.args_mapping = ['c_degprod', 'mu_degprod']
         self.model_type = 'topological'
-        self.formula = '$c_{degprod} (k_i k_j)^{-\mu_{degprod}}$'
+        self.formula = r'$c_{degprod} (k_i k_j)^{-\mu_{degprod}}$'
         self.bounds = [(0, None), (0, None)]
 
     def expected_adjacency(self, *args):
@@ -410,7 +422,7 @@ class TopoDegreeAvg(ExpectedModel):
             super().__init__(**kwargs)
         self.args_mapping = ['c_degavg', 'mu_degavg']
         self.model_type = 'topological'
-        self.formula = '$0.5 c_{degavg} (k_i+ k_j)^{-\mu_{degavg}}$'
+        self.formula = r'$0.5 c_{degavg} (k_i+ k_j)^{-\mu_{degavg}}$'
         self.bounds = [(0, None), (0, None)]
 
     def expected_adjacency(self, *args):
@@ -430,7 +442,7 @@ class TopoDegreeDiff(ExpectedModel):
             super().__init__(**kwargs)
         self.args_mapping = ['c_degdiff', 'mu_degdiff']
         self.model_type = 'topological'
-        self.formula = '$c_{degdiff} (|k_i - k_j|)^{-\mu_{degdiff}}$'
+        self.formula = r'$c_{degdiff} (|k_i - k_j|)^{-\mu_{degdiff}}$'
         self.bounds = [(0, None), (0, None)]
 
     def expected_adjacency(self, *args):
@@ -456,9 +468,9 @@ class TopoJaccard(ExpectedModel):
         self.model_type = 'topological'
         self.normalized = kwargs.get('normalized', True)
         if self.normalized:
-            self.formula = '$c_{jacc} (J_{ij})^{-\mu_{jacc}}$'
+            self.formula = r'$c_{jacc} (J_{ij})^{-\mu_{jacc}}$'
         else:
-            self.formula = '$c_{commnei} (\sum_l A_{il}A_{lj})^{-\mu_{commnei}}$'
+            self.formula = r'$c_{commnei} (\sum_l A_{il}A_{lj})^{-\mu_{commnei}}$'
         self.A = kwargs['A'] # save the adjacency matrix        
         self.generate_matching() # then generate the matching
         self.bounds = [(0, None), (0, None)]
@@ -493,6 +505,7 @@ class TopoJaccard(ExpectedModel):
 
 
 class ModelFactory():
+    
     @staticmethod
     def factory(type, **kwargs):
         if type == 'Edr':

@@ -67,11 +67,11 @@ class UBCM(ExpectedModel):
         self.args_mapping = ['x_' + str(i) for i in range(0, self.N)]
         self.model_type = 'topological'
         #self.formula = '$p_{ij} = \frac{x_i x_j}{1+x_i x_j}$'
-        self.bounds = [(0, None) for i in range(0, self.N)]
+        self.bounds = [(np.finfo(float).eps, None) for i in range(0, self.N)]
 
     def expected_adjacency(self, *args):
         xixj = np.outer(args, args)
-        return xixj / (1+xixj)
+        return xixj / (1 + xixj)
 
     def expected_laplacian_grad(self, x):
         N = self.N 
@@ -91,12 +91,12 @@ class UBCM(ExpectedModel):
 
     def loglikelihood(self, G, *args):
         pij = self.expected_adjacency(*args)
-        loglike = G*np.log(pij) + (1-G)*np.log(1-pij)
-        #loglike[np.logical_or(np.isnan(loglike), np.isinf(loglike))] = 0
+        loglike = G*np.log(pij + np.finfo(float).eps) + (1-G)*np.log(1-pij - np.finfo(float).eps)
+        loglike[np.logical_or(np.isnan(loglike), np.isinf(loglike))] = 0
         return np.triu(loglike,1).sum()
     
     def saddle_point(self, G, *args):
-        k = (G>0).sum()
+        k = (G>0).sum(axis=0)
         pij = self.expected_adjacency(*args)
         avgk = pij.sum(axis=0)
         return k-avgk
@@ -136,7 +136,7 @@ class UWCM(ExpectedModel):
         self.args_mapping = ['y_' + str(i) for i in range(0, kwargs['N'])]
         self.model_type = 'topological'
         #self.formula = '$<w_{ij}> = \frac{y_i y_j}{1-y_i y_j}$'
-        self.bounds = [(0, None) for i in range(0, kwargs['N'])]
+        self.bounds = [(np.finfo(float).eps, None) for i in range(0, self.N)]
 
     def expected_adjacency(self, *args):
         pij = np.outer(args, args)
@@ -189,7 +189,7 @@ class UBWRG(ExpectedModel):
         self.args_mapping =   ['x','y']
         #self.formula = '$\frac{x  y_i y_j)}{(1 - y_iy_j + x y_i y_j)(1 - y_i y_j)}$' TODO
         self.N = kwargs['N']
-        self.bounds = [(0, None)]*(self.N+1)
+        self.bounds = [(np.finfo(float).eps, None)]*(self.N+1)
         
     def expected_adjacency(self, *args):
         x,y = args[0], args[1]
@@ -252,7 +252,7 @@ class UECM3(ExpectedModel):
         self.args_mapping =   ['x_' + str(i) for i in range(0, kwargs['N'])] + ['y_' + str(i) for i in range(0, kwargs['N'])]
         #self.formula = '$\frac{x_i x_j  y_i y_j)}{(1 - y_iy_j + x_i x_j y_i y_j)(1 - y_i y_j)}$' TODO
         self.N = kwargs['N']
-        self.bounds = [(0,None)] * (2*self.N)
+        self.bounds = [(np.finfo(float).eps ,None)] * (2*self.N)
         
 
     def expected_adjacency(self, *args):
@@ -299,9 +299,8 @@ class cWECMt1(ExpectedModel):
         super().__init__(**kwargs)
         self.args_mapping =   ['x_' + str(i) for i in range(0, kwargs['N'])] + ['y_' + str(i) for i in range(0, kwargs['N'])]
         #self.formula = '$\frac{x_i x_j (y_i y_j)^t}{1+ x_i x_j(y_i y_j)^t - (y_i y_j^t)}'
-        self.bounds = [(0, None) for i in range(0, kwargs['N'] ) ]*2
-        self.bounds = [0,np.inf]
         self.N = kwargs['N']
+        self.bounds = [(np.finfo(float).eps, None) for i in range(0, 2*self.N ) ]
         self.threshold = kwargs['threshold']
 
     def expected_adjacency(self, *args):
@@ -343,7 +342,7 @@ class cWECMt2(ExpectedModel):
         super().__init__(**kwargs)
         self.args_mapping =   ['x_' + str(i) for i in range(0, kwargs['N'])] + ['y_' + str(i) for i in range(0, kwargs['N'])]
         #self.formula = '$\frac{x_i x_j (y_i y_j)^t}{t \log(yi y_j) + x_i x_j (y_i y_j)^t}$'
-        self.bounds = [(0, None) for i in range(0, kwargs['N'] ) ]*2
+        self.bounds = [(np.finfo(float).eps, None) for i in range(0, 2*self.N ) ]
         self.N = kwargs['N']
         self.threshold = kwargs['threshold']
 
@@ -386,7 +385,7 @@ class SpatialCM(ExpectedModel):
             super().__init__(**kwargs)
         self.args_mapping = ['x_' + str(i) for i in range(0, kwargs['N'])] + ['gamma','z']
         #self.formula = '$\frac{z x_i x_j e^{-\gamma d_{ij}}}{ 1 + z x_i x_j e^{-\gamma d_{ij}}  }$'
-        self.bounds = [(0,None) for i in range(0,kwargs['N'])] + [(0,None),(0,None)]
+        self.bounds = [(np.finfo(float).eps,None) for i in range(0,kwargs['N'])] + [(np.finfo(float).eps,None),(np.finfo(float).eps,None)]
         self.dij = kwargs['dij']
         self.expdij = np.exp(-kwargs['dij'])
         self.is_weighted = kwargs.get('is_weighted',False)
