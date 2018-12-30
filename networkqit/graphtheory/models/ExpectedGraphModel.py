@@ -508,6 +508,7 @@ class ModelFactory():
     
     @staticmethod
     def factory(type, **kwargs):
+        raise RuntimeError('Must implement all the models manually')
         if type == 'Edr':
             return Edr(**kwargs)
         assert 0, "Non supported model: " + type
