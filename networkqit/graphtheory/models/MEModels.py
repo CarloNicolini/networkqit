@@ -63,7 +63,6 @@ class UBCM(ExpectedModel):
     def __init__(self, **kwargs):
         if kwargs is not None:
             super().__init__(**kwargs)
-        self.N = kwargs['N']
         self.args_mapping = ['x_' + str(i) for i in range(0, self.N)]
         self.model_type = 'topological'
         #self.formula = '$p_{ij} = \frac{x_i x_j}{1+x_i x_j}$'
@@ -325,6 +324,11 @@ class cWECMt1(ExpectedModel):
         wij[wij<0] = eps
         return wij
 
+    def saddle_point(self,G,*args):
+        k = (G>0).sum(axis=0)
+        pij = self.expected_adjacency(self,*args)
+        raise RuntimeError('TODO')
+        return np.hstack([L-p*pairs,Wtot-w*pairs])
 
 class cWECMt2(ExpectedModel):
     """
@@ -347,18 +351,18 @@ class cWECMt2(ExpectedModel):
         self.threshold = kwargs['threshold']
 
     def expected_adjacency(self, *args):
-        x,y = args[0:self.N], args[(self.N):]
+        x,y = args[0][0:self.N], args[0][(self.N):]
         t = self.threshold
         xixj = np.outer(x,x)
         yiyj = np.outer(y,y)
         yiyjt = np.real(yiyj**t)
         eps = 1E-16
-        pij = np.nan_to_num(xixj*(yiyj**t) / (t*np.log(yiyj+eps) + xixj*(yiyj)**t))
+        pij = np.nan_to_num(xixj*(yiyjt) / (t*np.log(yiyj+eps) + xixj*(yiyjt)))
         pij[pij<0] = np.finfo(float).eps
         return pij
     
     def adjacency_weighted(self, *args):
-        x,y = args[0:self.N], args[(self.N):]
+        x,y = args[0][0:self.N], args[0][(self.N):]
         t = self.threshold
         xixj = np.outer(x,x)
         yiyj = np.outer(y,y)
@@ -369,8 +373,21 @@ class cWECMt2(ExpectedModel):
         wij = np.nan_to_num( num / den )
         wij[wij<0] = eps
         return wij
+    
+    def saddle_point(self,G, *args):
+        k = (G>0).sum(axis=0)
+        pij = self.expected_adjacency(*args)
+        avgk = pij.sum(axis=0)
+        w = G.sum(axis=0)
+        wij = self.adjacency_weighted(*args)
+        avgw = wij.sum(axis=0)
+        return np.hstack([k-avgk,w-avgw])
 
-
+#     def saddle_point(self, G, *args):
+#            k = (G>0).sum(axis=0)
+#            pij = self.expected_adjacency(*args)
+#            avgk = pij.sum(axis=0)
+#            return k-avgk
 
 class SpatialCM(ExpectedModel):
     """

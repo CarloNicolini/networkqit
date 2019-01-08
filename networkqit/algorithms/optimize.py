@@ -192,16 +192,68 @@ class MLEOptimizer(ModelOptimizer):
 
         # Use the Dogobx method to optimize likelihood
         M = kwargs['model']
-        self.sol = least_squares(fun=lambda z : M.saddle_point(self.G, z),
-                                 x0=np.squeeze(self.x0),
-                                 bounds=[np.finfo(float).eps, np.inf],
-                                 method='dogbox',
-                                 xtol=kwargs.get('xtol', 2E-10),
-                                 gtol=kwargs.get('xtol', 2E-10),
-                                 max_nfev=kwargs.get('max_nfev', len(self.x0) * 100000),
-                                 verbose=kwargs.get('verbose',1))
+#        self.sol = least_squares(fun=lambda z : M.saddle_point(self.G, z),
+#                                 x0=np.squeeze(self.x0),
+#                                 bounds=[np.finfo(float).eps, np.inf],
+#                                 method='dogbox',
+#                                 xtol=kwargs.get('xtol', 2E-10),
+#                                 gtol=kwargs.get('xtol', 2E-10),
+#                                 max_nfev=kwargs.get('max_nfev', len(self.x0) * 100000),
+#                                 verbose=kwargs.get('verbose',1))
+        
+        def helper(*helperargs, **helperkwargs):
+            #print(helperargs[0](self.x0))
+            results = least_squares(fun=helperargs[0],
+                                    x0=np.squeeze(helperargs[1]),
+                                    bounds=[np.finfo(float).eps, np.inf],
+                                    method='dogbox',
+                                    xtol=kwargs.get('xtol', 1E-5),
+                                    gtol=kwargs.get('xtol', 1E-5),
+                                    max_nfev=kwargs.get('max_nfev', len(self.x0) * 1000),
+                                    verbose=kwargs.get('verbose',2))
+            return results
+        
+        from .basinhoppingmod import basinhopping
+        
+        class BHPositiveBounds(object):
+            def __init__(self, xmin):
+                self.xmin = xmin
+            def __call__(self, **kwargs):
+                x = kwargs["x_new"]
+                tmin = bool(np.all(x > self.xmin))
+                return tmin
+            
+            
+        class RandomDisplacementBounds(object):
+            """random displacement with bounds:  see: https://stackoverflow.com/a/21967888/2320035
+                Modified! (dropped acceptance-rejection sampling for a more specialized approach)
+            """
+            def __init__(self, xmin, xmax, stepsize=0.5):
+                self.xmin = xmin
+                self.xmax = xmax
+                self.stepsize = stepsize
+        
+            def __call__(self, x):
+                """take a random step but ensure the new position is within the bounds """
+                min_step = np.maximum(self.xmin - x, -self.stepsize)
+                max_step = np.minimum(self.xmax - x, self.stepsize)
+        
+                random_step = np.random.uniform(low=min_step, high=max_step, size=x.shape)
+                xnew = x + random_step
+        
+                return xnew
+        
+        bounded_step = RandomDisplacementBounds(np.zeros([len(self.x0),]), 1E10*np.ones([len(self.x0),]))
 
-    
+        bounds = BHPositiveBounds(xmin=np.zeros([len(self.x0),]))
+        self.sol = basinhopping(func=lambda z: 0.5*(M.saddle_point(self.G, z)**2).sum(),
+                                x0=self.x0,
+                                minimize_routine=helper,
+                                minimizer_kwargs={'saddle_point_equations': lambda z : M.saddle_point(self.G, z)},
+                                accept_test=bounds,
+                                take_step=bounded_step,
+                                niter=5,
+                                disp=True)
         return self.sol
 
 

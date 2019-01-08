@@ -52,6 +52,7 @@ class ExpectedModel():
                     of tuples.
         """
         super().__init__()
+        self.N = kwargs['N']
         self.args_mapping = None
         self.num_classes = len(ExpectedModel.__subclasses__())
         self.model_type = kwargs.get('model_type', None)

@@ -21,25 +21,11 @@ pairs = n*(n-1)/2
 m = k.sum()
 
 M = UBCM(N=len(A))
-
 x0 = np.random.random([len(A),])
-x0 = k/1000
-x0 = np.ones_like(x0)
 opt = nq.MLEOptimizer(A, x0=x0)
 
-#sol = opt.run(M, xtol=1E-32, gtol=1E-32)
-#print('Maximum likelihood solution=',-M.loglikelihood(*sol['x']))
-#
-#plt.figure()
-#pij = M.expected_adjacency(*sol['x'])
-#plt.plot(pij.sum(axis=0),A.sum(axis=0),'or')
-#plt.plot(pij.sum(axis=0),pij.sum(axis=0),'-k')
-#plt.grid(True)
-#plt.show()
-
-
+sol = opt.runfsolve(model=M)
 plt.figure()
-sol = opt.runfsolve(model=UBCM(N=len(A)), xtol=1E-16)
 print('Saddle point solution=', M.loglikelihood(*sol['x']))
 pij = M.expected_adjacency(*sol['x'])
 plt.plot(pij.sum(axis=0),A.sum(axis=0),'or')
