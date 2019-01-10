@@ -237,23 +237,22 @@ class MLEOptimizer(ModelOptimizer):
                 """take a random step but ensure the new position is within the bounds """
                 min_step = np.maximum(self.xmin - x, -self.stepsize)
                 max_step = np.minimum(self.xmax - x, self.stepsize)
-        
                 random_step = np.random.uniform(low=min_step, high=max_step, size=x.shape)
                 xnew = x + random_step
-        
                 return xnew
         
-        bounded_step = RandomDisplacementBounds(np.zeros([len(self.x0),]), 1E10*np.ones([len(self.x0),]))
+        bounded_step = RandomDisplacementBounds(np.zeros([len(self.x0),]),
+                                                np.inf*np.ones([len(self.x0),]))
 
-        bounds = BHPositiveBounds(xmin=np.zeros([len(self.x0),]))
-        self.sol = basinhopping(func=lambda z: 0.5*(M.saddle_point(self.G, z)**2).sum(),
-                                x0=self.x0,
-                                minimize_routine=helper,
-                                minimizer_kwargs={'saddle_point_equations': lambda z : M.saddle_point(self.G, z)},
-                                accept_test=bounds,
-                                take_step=bounded_step,
-                                niter=5,
-                                disp=True)
+        bounds = BHPositiveBounds(xmin = np.zeros([len(self.x0),]))
+        self.sol = basinhopping(func = lambda _z: 0.5*(M.saddle_point(self.G, _z)**2).sum(),
+                                x0 = self.x0,
+                                minimize_routine = helper,
+                                minimizer_kwargs = {'saddle_point_equations': lambda z : M.saddle_point(self.G, z)},
+                                accept_test = bounds,
+                                take_step = bounded_step,
+                                niter = 5,
+                                disp = True)
         return self.sol
 
 
