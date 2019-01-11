@@ -196,6 +196,9 @@ class MLEOptimizer(ModelOptimizer):
                                        gtol=kwargs.get('xtol', 1E-10),
                                        max_nfev=kwargs.get('max_nfev', max_nfev),
                                        verbose=kwargs.get('verbose',1))
+            # use this form with linear loss as in the basinhopping
+            # func argument to be consistent
+            opt_result['fun'] = 0.5*np.sum(opt_result['fun']**2)
             return opt_result
 
         # If the model is convex, we simply run least_squares
@@ -204,11 +207,12 @@ class MLEOptimizer(ModelOptimizer):
         else: # otherwise combine local and global optimization with basinhopping
             from .basinhoppingmod import basinhopping, BHBounds, BHRandStepBounded
             xmin = np.zeros_like(self.x0)+np.finfo(float).eps
-            xmax = xmin + np.inf
+            xmax = xmin + np.inf # broadcast infinity
             bounds = BHBounds(xmin = xmin)
             bounded_step = BHRandStepBounded(xmin, xmax, stepsize=0.5)
             self.sol = basinhopping(func = lambda z: 0.5*(model.saddle_point(self.G, z)**2).sum(),
                                     x0 = np.squeeze(self.x0),
+                                    T=kwargs.get('T',1),
                                     minimize_routine = basin_opt,
                                     minimizer_kwargs = {'saddle_point_equations': lambda z : model.saddle_point(self.G, z)},
                                     accept_test = bounds,
