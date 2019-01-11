@@ -206,12 +206,11 @@ class MLEOptimizer(ModelOptimizer):
             xmin = np.zeros_like(self.x0)+np.finfo(float).eps
             xmax = xmin + np.inf
             bounds = BHBounds(xmin = xmin)
-            model.saddle_point = lambda G,z : ((z-1)**2).sum()
             bounded_step = BHRandStepBounded(xmin, xmax, stepsize=0.5)
-            self.sol = basinhopping(func = lambda _z: 0.5*(model.saddle_point(self.G, _z)**2).sum(),
-                                    x0 = self.x0,
+            self.sol = basinhopping(func = lambda z: 0.5*(model.saddle_point(self.G, z)**2).sum(),
+                                    x0 = np.squeeze(self.x0),
                                     minimize_routine = basin_opt,
-                                    minimizer_kwargs = {'saddle_point_equations': lambda z : M.saddle_point(self.G, z)},
+                                    minimizer_kwargs = {'saddle_point_equations': lambda z : model.saddle_point(self.G, z)},
                                     accept_test = bounds,
                                     take_step = bounded_step,
                                     niter = kwargs.get('basin_hopping_niter',100),

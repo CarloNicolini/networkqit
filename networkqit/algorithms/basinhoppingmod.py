@@ -636,8 +636,8 @@ def basinhopping(func, x0, niter=100, T=1.0, stepsize=0.5,
     if minimize_routine is None:
         wrapped_minimizer = MinimizerWrapper(scipy.optimize.minimize, func, **minimizer_kwargs)
     else:
-        wrapped_minimizer = MinimizerWrapper(minimize_routine, func, **minimizer_kwargs)
-
+        wrapped_minimizer = MinimizerWrapper(minimize_routine, minimizer_kwargs['saddle_point_equations'], **minimizer_kwargs)
+    print('===================',wrapped_minimizer.func)
     # set up step-taking algorithm
     if take_step is not None:
         if not isinstance(take_step, collections.Callable):

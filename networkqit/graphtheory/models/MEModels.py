@@ -31,7 +31,9 @@ G here is the graph adjacency matrix, A is the binary adjacency, W is the weight
 
 import numpy as np
 from .ExpectedGraphModel import ExpectedModel
+
 EPS = np.finfo(float).eps
+#EPS = 0
 class UBCM(ExpectedModel):
     """
     1. Model name: Undirected Binary Configuration Model
@@ -357,8 +359,8 @@ class cWECMt2(ExpectedModel):
         xixj = np.outer(x,x)
         yiyj = np.outer(y,y)
         yiyjt = np.real(yiyj**t)
-        pij = np.nan_to_num(xixj*(yiyjt) / (t*np.log(yiyj+EPS) + xixj*(yiyjt)))
-        pij[pij<0] = EPS
+        pij = np.nan_to_num( (xixj*(yiyjt)) / (t*np.log(yiyj+EPS) + xixj*(yiyjt)))
+        pij[pij<0] = 0
         return pij
     
     def expected_weighted_adjacency(self, *args):
@@ -368,12 +370,12 @@ class cWECMt2(ExpectedModel):
         yiyj = np.outer(y,y)
         yiyjt = np.real(yiyj**t)
         num = (1+yiyjt)*(xixj)*(yiyjt)
-        den = np.log(np.abs(yiyj+EPS)) * ( np.log(np.abs(yiyj+EPS)) + xixj*yiyjt ) 
+        den = np.log(yiyj) * ( t*np.log(yiyj) + xixj*yiyjt)
         wij = np.nan_to_num( num / den )
-        wij[wij<0] = EPS
+        wij[wij<0] = 0
         return wij
     
-    def saddle_point(self,G, *args):
+    def saddle_point(self, G, *args):
         k = (G>0).sum(axis=0)
         pij = self.expected_adjacency(*args)
         avgk = pij.sum(axis=0)
