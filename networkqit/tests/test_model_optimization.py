@@ -7,12 +7,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import bct
 import networkqit as nq
-from networkqit.graphtheory.models.MEModels import cWECMt2
-
-
-W = np.loadtxt('/home/carlo/workspace/communityalg/data/GroupAverage_rsfMRI_unthr.adj')[0:128,0:128]
-t = 0.2
-W = bct.threshold_absolute(W,t)
+from networkqit.graphtheory.models.MEModels import cWECMt1, cWECMt2, UBCM, UWCM
+filename = '/home/carlo/workspace/communityalg/data/GroupAverage_rsfMRI_unthr.adj'
+W = np.loadtxt(filename)[0:64,0:64]
+threshold = 0.4
+W = bct.threshold_absolute(W, threshold)
 A = (W>0).astype(float)
 k = A.sum(axis=0)
 m = k.sum()
@@ -21,15 +20,17 @@ Wtot = s.sum()
 n = len(W)
 pairs = n*(n-1)/2
 
-M = cWECMt2(N=len(W), threshold=t)
-x0 = np.concatenate([k,s])/pairs
+M = cWECMt1(N=len(W), threshold=threshold)
+#x0 = np.random.random([len(W),1])
+x0 = np.concatenate([k,s])/1E3
 #x0 = np.random.random([2*len(W),1])*1E-5
 # Optimize part with basinhopping
 opt = nq.MLEOptimizer(W, x0=x0)
-sol = opt.runfsolve(model=M)
+sol = opt.runfsolve(model=M, basinhopping=True, verbose=2)
 print('Optimization done...')
 pij = M.expected_adjacency(sol['x'])
-wij = M.adjacency_weighted(sol['x'])
+wij = M.expected_weighted_adjacency(sol['x'])
+
 ############## PLOTTING PART ############## 
 
 plt.figure(figsize=(12,8))

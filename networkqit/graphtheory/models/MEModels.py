@@ -31,7 +31,7 @@ G here is the graph adjacency matrix, A is the binary adjacency, W is the weight
 
 import numpy as np
 from .ExpectedGraphModel import ExpectedModel
-
+EPS = np.finfo(float).eps
 class UBCM(ExpectedModel):
     """
     1. Model name: Undirected Binary Configuration Model
@@ -66,7 +66,7 @@ class UBCM(ExpectedModel):
         self.args_mapping = ['x_' + str(i) for i in range(0, self.N)]
         self.model_type = 'topological'
         #self.formula = '$p_{ij} = \frac{x_i x_j}{1+x_i x_j}$'
-        self.bounds = [(np.finfo(float).eps, None) for i in range(0, self.N)]
+        self.bounds = [(EPS, None) for i in range(0, self.N)]
 
     def expected_adjacency(self, *args):
         xixj = np.outer(args, args)
@@ -90,7 +90,7 @@ class UBCM(ExpectedModel):
 
     def loglikelihood(self, G, *args):
         pij = self.expected_adjacency(*args)
-        loglike = G*np.log(pij + np.finfo(float).eps) + (1-G)*np.log(1-pij - np.finfo(float).eps)
+        loglike = G*np.log(pij + EPS) + (1-G)*np.log(1-pij - EPS)
         loglike[np.logical_or(np.isnan(loglike), np.isinf(loglike))] = 0
         return np.triu(loglike,1).sum()
     
@@ -135,14 +135,16 @@ class UWCM(ExpectedModel):
         self.args_mapping = ['y_' + str(i) for i in range(0, kwargs['N'])]
         self.model_type = 'topological'
         #self.formula = '$<w_{ij}> = \frac{y_i y_j}{1-y_i y_j}$'
-        self.bounds = [(np.finfo(float).eps, None) for i in range(0, self.N)]
+        self.bounds = [(EPS, None) for i in range(0, self.N)]
 
     def expected_adjacency(self, *args):
-        pij = np.outer(args, args)
-        return pij
+        self.pij = np.outer(args, args)
+        return self.pij
     
-    def adjacency_weighted(self, *args):
-        return self.pij/(1-self.pi)
+    def expected_weighted_adjacency(self, *args):
+        pij = self.expected_adjacency(args)
+        self.wij = pij / (1 - pij)
+        return self.wij
     
     def loglikelihood(self, G, *args):
         pij = self.expected_adjacency(args)
@@ -152,7 +154,7 @@ class UWCM(ExpectedModel):
 
     def saddle_point(self, G, *args):
         s = G.sum(axis=0)
-        wij = self.adjacency_weighted(*args)
+        wij = self.expected_weighted_adjacency(args)
         return s - wij.sum(axis=0)
         
 
@@ -188,15 +190,15 @@ class UBWRG(ExpectedModel):
         self.args_mapping =   ['x','y']
         #self.formula = '$\frac{x  y_i y_j)}{(1 - y_iy_j + x y_i y_j)(1 - y_i y_j)}$' TODO
         self.N = kwargs['N']
-        self.bounds = [(np.finfo(float).eps, None)]*(self.N+1)
+        self.bounds = [(EPS, None)]*(self.N+1)
         
     def expected_adjacency(self, *args):
         x,y = args[0], args[1]
         pij = np.nan_to_num((x * y) / ((1 - y + x * y)))
-        pij[pij<0] = np.finfo(float).eps
+        pij[pij<0] = EPS
         return pij
 
-    def adjacency_weighted(self, *args):
+    def expected_weighted_adjacency(self, *args):
         y = args[1]
         pij = self.expected_adjacency(*args)
         return pij / (1-y)
@@ -212,7 +214,7 @@ class UBWRG(ExpectedModel):
         L = np.triu(G>0,1).sum()
         Wtot = np.triu(G,1).sum()
         p = self.expected_adjacency(*args)
-        w = self.adjacency_weighted(*args)
+        w = self.expected_weighted_adjacency(*args)
         pairs = self.N*(self.N-1)/2
         return np.hstack([L-p*pairs,Wtot-w*pairs])
 
@@ -251,7 +253,7 @@ class UECM3(ExpectedModel):
         self.args_mapping =   ['x_' + str(i) for i in range(0, kwargs['N'])] + ['y_' + str(i) for i in range(0, kwargs['N'])]
         #self.formula = '$\frac{x_i x_j  y_i y_j)}{(1 - y_iy_j + x_i x_j y_i y_j)(1 - y_i y_j)}$' TODO
         self.N = kwargs['N']
-        self.bounds = [(np.finfo(float).eps ,None)] * (2*self.N)
+        self.bounds = [(EPS ,None)] * (2*self.N)
         
 
     def expected_adjacency(self, *args):
@@ -259,10 +261,10 @@ class UECM3(ExpectedModel):
         xixj = np.outer(x,x)
         yiyj = np.outer(y,y)
         pij = np.nan_to_num((xixj * yiyj) / ((1 - yiyj + xixj * yiyj)))
-        pij[pij<0] = np.finfo(float).eps
+        pij[pij<0] = EPS
         return pij
 
-    def adjacency_weighted(self, *args):
+    def expected_weighted_adjacency(self, *args):
         y = args[(self.N):]
         pij = self.expected_adjacency(*args)
         yiyj = np.outer(y,y)
@@ -292,14 +294,14 @@ class cWECMt1(ExpectedModel):
     pij = xixj*((yiyj)**t)/(1.0+xixj*yiyjt - yiyjt)
 
     Expected link weight
-    (t*(xixj-1.0)*yiyjt)/((1.0 + xixj*yiyjt - yiyjt )) - 1.0/(np.log(np.abs(yiyj+eps)))
+    (t*(xixj-1.0)*yiyjt)/((1.0 + xixj*yiyjt - yiyjt )) - 1.0/(np.log(np.abs(yiyj+EPS)))
     """
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
         self.args_mapping =   ['x_' + str(i) for i in range(0, kwargs['N'])] + ['y_' + str(i) for i in range(0, kwargs['N'])]
         #self.formula = '$\frac{x_i x_j (y_i y_j)^t}{1+ x_i x_j(y_i y_j)^t - (y_i y_j^t)}'
         self.N = kwargs['N']
-        self.bounds = [(np.finfo(float).eps, None) for i in range(0, 2*self.N ) ]
+        self.bounds = [(EPS, None) for i in range(0, 2*self.N ) ]
         self.threshold = kwargs['threshold']
 
     def expected_adjacency(self, *args):
@@ -310,18 +312,17 @@ class cWECMt1(ExpectedModel):
         yiyj = np.outer(y,y)
         yiyjt = np.real(yiyj**t)
         pij = np.nan_to_num(xixj*((yiyj)**t)/(1.0+xixj*yiyjt - yiyjt))
-        pij[pij<0] = np.finfo(float).eps
+        pij[pij<0] = EPS
         return pij
     
-    def adjacency_weighted(self, *args):
+    def expected_weighted_adjacency(self, *args):
         x,y = args[0:self.N], args[(self.N):]
         t = self.threshold
         xixj = np.outer(x,x)
         yiyj = np.outer(y,y)
         yiyjt = np.real(yiyj**t)
-        eps = 1E-16
-        wij = np.nan_to_num((t*(xixj-1.0)*yiyjt)/((1.0 + xixj*yiyjt - yiyjt )) - 1.0/(np.log(np.abs(yiyj+eps))))
-        wij[wij<0] = eps
+        wij = np.nan_to_num((t*(xixj-1.0)*yiyjt)/((1.0 + xixj*yiyjt - yiyjt )) - 1.0/(np.log(np.abs(yiyj+EPS))))
+        wij[wij<0] = EPS
         return wij
 
     def saddle_point(self,G,*args):
@@ -346,7 +347,7 @@ class cWECMt2(ExpectedModel):
         super().__init__(**kwargs)
         self.args_mapping =   ['x_' + str(i) for i in range(0, kwargs['N'])] + ['y_' + str(i) for i in range(0, kwargs['N'])]
         #self.formula = '$\frac{x_i x_j (y_i y_j)^t}{t \log(yi y_j) + x_i x_j (y_i y_j)^t}$'
-        self.bounds = [(np.finfo(float).eps, None) for i in range(0, 2*self.N ) ]
+        self.bounds = [(EPS, None) for i in range(0, 2*self.N ) ]
         self.N = kwargs['N']
         self.threshold = kwargs['threshold']
 
@@ -356,22 +357,20 @@ class cWECMt2(ExpectedModel):
         xixj = np.outer(x,x)
         yiyj = np.outer(y,y)
         yiyjt = np.real(yiyj**t)
-        eps = 1E-16
-        pij = np.nan_to_num(xixj*(yiyjt) / (t*np.log(yiyj+eps) + xixj*(yiyjt)))
-        pij[pij<0] = np.finfo(float).eps
+        pij = np.nan_to_num(xixj*(yiyjt) / (t*np.log(yiyj+EPS) + xixj*(yiyjt)))
+        pij[pij<0] = EPS
         return pij
     
-    def adjacency_weighted(self, *args):
+    def expected_weighted_adjacency(self, *args):
         x,y = args[0][0:self.N], args[0][(self.N):]
         t = self.threshold
         xixj = np.outer(x,x)
         yiyj = np.outer(y,y)
         yiyjt = np.real(yiyj**t)
-        eps = 1E-16
         num = (1+yiyjt)*(xixj)*(yiyjt)
-        den = np.log(np.abs(yiyj+eps)) * ( np.log(np.abs(yiyj+eps)) + xixj*yiyjt ) 
+        den = np.log(np.abs(yiyj+EPS)) * ( np.log(np.abs(yiyj+EPS)) + xixj*yiyjt ) 
         wij = np.nan_to_num( num / den )
-        wij[wij<0] = eps
+        wij[wij<0] = EPS
         return wij
     
     def saddle_point(self,G, *args):
@@ -379,7 +378,7 @@ class cWECMt2(ExpectedModel):
         pij = self.expected_adjacency(*args)
         avgk = pij.sum(axis=0)
         w = G.sum(axis=0)
-        wij = self.adjacency_weighted(*args)
+        wij = self.expected_weighted_adjacency(*args)
         avgw = wij.sum(axis=0)
         return np.hstack([k-avgk,w-avgw])
 
@@ -402,7 +401,7 @@ class SpatialCM(ExpectedModel):
             super().__init__(**kwargs)
         self.args_mapping = ['x_' + str(i) for i in range(0, kwargs['N'])] + ['gamma','z']
         #self.formula = '$\frac{z x_i x_j e^{-\gamma d_{ij}}}{ 1 + z x_i x_j e^{-\gamma d_{ij}}  }$'
-        self.bounds = [(np.finfo(float).eps,None) for i in range(0,kwargs['N'])] + [(np.finfo(float).eps,None),(np.finfo(float).eps,None)]
+        self.bounds = [(EPS,None) for i in range(0,kwargs['N'])] + [(EPS,None),(EPS,None)]
         self.dij = kwargs['dij']
         self.expdij = np.exp(-kwargs['dij'])
         self.is_weighted = kwargs.get('is_weighted',False)

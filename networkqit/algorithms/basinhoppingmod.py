@@ -705,36 +705,28 @@ def basinhopping(func, x0, niter=100, T=1.0, stepsize=0.5,
     return res
 
 
-def _test_func2d_nograd(x):
-    f = (cos(14.5 * x[0] - 0.3) + (x[1] + 0.2) * x[1] + (x[0] + 0.2) * x[0]
-         + 1.010876184442655)
-    return f
+class BHBounds(object):
+    def __init__(self, xmin):
+        self.xmin = xmin
+    def __call__(self, **kwargs):
+        x = kwargs["x_new"]
+        tmin = bool(np.all(x > self.xmin))
+        return tmin
+    
+    
+class BHRandStepBounded(object):
+    """ Bounded random displacement:  see: https://stackoverflow.com/a/21967888/2320035
+        Modified! (dropped acceptance-rejection sampling for a more specialized approach)
+    """
+    def __init__(self, xmin, xmax, stepsize=0.5):
+        self.xmin = xmin
+        self.xmax = xmax
+        self.stepsize = stepsize
 
-
-def _test_func2d(x):
-    f = (cos(14.5 * x[0] - 0.3) + (x[0] + 0.2) * x[0] + cos(14.5 * x[1] -
-         0.3) + (x[1] + 0.2) * x[1] + x[0] * x[1] + 1.963879482144252)
-    df = np.zeros(2)
-    df[0] = -14.5 * sin(14.5 * x[0] - 0.3) + 2. * x[0] + 0.2 + x[1]
-    df[1] = -14.5 * sin(14.5 * x[1] - 0.3) + 2. * x[1] + 0.2 + x[0]
-    return f, df
-
-
-if __name__ == "__main__":
-    print("\n\nminimize a 2d function without gradient")
-    # minimum expected at ~[-0.195, -0.1]
-    kwargs = {"method": "L-BFGS-B"}
-    x0 = np.array([1.0, 1.])
-    scipy.optimize.minimize(_test_func2d_nograd, x0, **kwargs)
-    ret = basinhopping(_test_func2d_nograd, x0, minimizer_kwargs=kwargs,
-                       niter=200, disp=False)
-    print("minimum expected at  func([-0.195, -0.1]) = 0.0")
-    print(ret)
-
-    print("\n\ntry a harder 2d problem")
-    kwargs = {"method": "L-BFGS-B", "jac": True}
-    x0 = np.array([1.0, 1.0])
-    ret = basinhopping(_test_func2d, x0, minimizer_kwargs=kwargs, niter=200,
-                       disp=False)
-    print("minimum expected at ~, func([-0.19415263, -0.19415263]) = 0")
-    print(ret)
+    def __call__(self, x):
+        """take a random step but ensure the new position is within the bounds """
+        min_step = np.maximum(self.xmin - x, -self.stepsize)
+        max_step = np.minimum(self.xmax - x, self.stepsize)
+        random_step = np.random.uniform(low=min_step, high=max_step, size=x.shape)
+        xnew = x + random_step
+        return xnew

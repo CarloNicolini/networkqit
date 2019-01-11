@@ -91,9 +91,15 @@ class ExpectedModel():
 
     def expected_adjacency(self, *args):
         """
-        In this base class the expected adjacency is not implemented and has to be implemented by every single inherited class.
+        In this base class the expected binary adjacency is not implemented and has to be implemented by every single inherited class.
         """
         raise NotImplementedError
+
+    def expected_weighted_adjacency(self, *args):
+        """
+        In this base class the expected weighted adjacency is not implemented and has to be implemented by every single inherited class.
+        """
+        raise NotImplementedError        
 
     def _expected_laplacian_grad_autodiff(self, *args):
         """
