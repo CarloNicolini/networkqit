@@ -206,7 +206,7 @@ class MLEOptimizer(ModelOptimizer):
             self.sol = basin_opt(lambda z : model.saddle_point(self.G, z), self.x0)
         else: # otherwise combine local and global optimization with basinhopping
             from .basinhoppingmod import basinhopping, BHBounds, BHRandStepBounded
-            xmin = np.zeros_like(self.x0)+np.finfo(float).eps
+            xmin = np.zeros_like(self.x0) + 1E-9 #np.finfo(float).eps
             xmax = xmin + np.inf # broadcast infinity
             bounds = BHBounds(xmin = xmin)
             bounded_step = BHRandStepBounded(xmin, xmax, stepsize=0.5)
@@ -217,7 +217,7 @@ class MLEOptimizer(ModelOptimizer):
                                     minimizer_kwargs = {'saddle_point_equations': lambda z : model.saddle_point(self.G, z)},
                                     accept_test = bounds,
                                     take_step = bounded_step,
-                                    niter = kwargs.get('basin_hopping_niter',100),
+                                    niter = kwargs.get('basin_hopping_niter',5),
                                     disp = bool(kwargs.get('verbose')))
         return self.sol
 

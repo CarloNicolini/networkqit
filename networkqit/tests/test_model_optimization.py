@@ -9,8 +9,8 @@ import bct
 import networkqit as nq
 from networkqit.graphtheory.models.MEModels import cWECMt1, cWECMt2, UBCM, UWCM
 filename = '/home/carlo/workspace/communityalg/data/Coactivation_matrix_weighted.adj'
-W = np.loadtxt(filename)[0:32,0:32]
-threshold = 0.1
+W = np.loadtxt(filename)[64:128,64:128]
+threshold = 0.02
 W = bct.threshold_absolute(W, threshold)
 A = (W>0).astype(float)
 k = A.sum(axis=0)
@@ -19,14 +19,16 @@ s = W.sum(axis=0)
 Wtot = s.sum()
 n = len(W)
 pairs = n*(n-1)/2
+plt.imshow(W)
+plt.show()
 
 M = cWECMt2(N=len(W), threshold=threshold)
 #x0 = np.random.random([2*len(W),])
-x0 = np.concatenate([k,s])*1E-4 #+ (np.random.random([2*len(W),])*2-1)*1E-5
+x0 = (np.concatenate([k,s])+1E-5)*1E-3 #+ (np.random.random([2*len(W),])*2-1)*1E-5
 #x0 = np.random.random([2*len(W),1])*1E-2
 # Optimize part with basinhopping
 opt = nq.MLEOptimizer(W, x0=x0)
-sol = opt.runfsolve(model=M, basinhopping=True, verbose=1, xtol=1E-5, gtol=1E-5, basin_hopping_niter=100)
+sol = opt.runfsolve(model=M, basinhopping=True, verbose=2, T=10, xtol=1E-4, gtol=1E-4, basin_hopping_niter=5)
 print('Optimization done...')
 
 pij = M.expected_adjacency(sol['x'])
