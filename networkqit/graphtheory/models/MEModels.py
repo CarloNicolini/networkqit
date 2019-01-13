@@ -282,68 +282,34 @@ class UECM3(ExpectedModel):
         return loglike
 
 
-###########################################################################
-####################  Continuous models TO DO LATER #######################
-###########################################################################
 
-class cWECMt1(ExpectedModel):
+#################### Continuous models #######################
+
+class CWTECM(ExpectedModel):
     """
-    Enhanced Weighted Continuous Configuration Model with threshold only on link presence
-    Hamiltonian of the problem
-    H(W) = sum_{i<j} alpha_i Heaviside(w_{ij}-t) + beta_i w_{ij}
+    1. Model name: Continuous Weighted Thresholded Enhanced Configuration Model
 
-    Expected link probability
-    pij = xixj*((yiyj)**t)/(1.0+xixj*yiyjt - yiyjt)
-
-    Expected link weight
-    (t*(xixj-1.0)*yiyjt)/((1.0 + xixj*yiyjt - yiyjt )) - 1.0/(np.log(np.abs(yiyj+EPS)))
-    """
-    def __init__(self,**kwargs):
-        super().__init__(**kwargs)
-        self.args_mapping =   ['x_' + str(i) for i in range(0, kwargs['N'])] + ['y_' + str(i) for i in range(0, kwargs['N'])]
-        #self.formula = '$\frac{x_i x_j (y_i y_j)^t}{1+ x_i x_j(y_i y_j)^t - (y_i y_j^t)}'
-        self.N = kwargs['N']
-        self.bounds = [(EPS, None) for i in range(0, 2*self.N ) ]
-        self.threshold = kwargs['threshold']
-
-    def expected_adjacency(self, *args):
-        x,y = args[0:self.N], args[(self.N):]
-
-        t = self.threshold
-        xixj = np.outer(x,x)
-        yiyj = np.outer(y,y)
-        yiyjt = np.real(yiyj**t)
-        pij = np.nan_to_num(xixj*((yiyj)**t)/(1.0+xixj*yiyjt - yiyjt))
-        pij[pij<0] = EPS
-        return pij
+    2. Constraints: degree sequence k_i^*, strenght sequence s_i and threshold hyperparameter t
     
-    def expected_weighted_adjacency(self, *args):
-        x,y = args[0:self.N], args[(self.N):]
-        t = self.threshold
-        xixj = np.outer(x,x)
-        yiyj = np.outer(y,y)
-        yiyjt = np.real(yiyj**t)
-        wij = np.nan_to_num((t*(xixj-1.0)*yiyjt)/((1.0 + xixj*yiyjt - yiyjt )) - 1.0/(np.log(np.abs(yiyj+EPS))))
-        wij[wij<0] = EPS
-        return wij
+    3. Hamiltonian:
+        H(W) = sum_{i<j} (alpha_i+alpha_j) Heaviside(w_{ij}-t) + (beta_i+beta_j) w_{ij} Heaviside(w_{ij}-t)
+    
+    4. Lagrange multipliers substitutions:
+        x_i = exp(-alpha_i)
+        y_i = exp(-beta_i)
+    
+    5. Number of parameters:
+        2N
+    
+    6. Link probability <aij>
+        
 
-    def saddle_point(self,G,*args):
-        k = (G>0).sum(axis=0)
-        pij = self.expected_adjacency(self,*args)
-        raise RuntimeError('TODO')
-        return np.hstack([L-p*pairs,Wtot-w*pairs])
+    7. Expected link weight <wij>
+        
 
-class cWECMt2(ExpectedModel):
-    """
-    Enhanced Weighted Continuous Configuration Model with threshold only on link presence and weight
-    Hamiltonian of the problem
-    H(W) = sum_{i<j} (alpha_i+alpha_j) Heaviside(w_{ij}-t) + (beta_i+beta_j) w_{ij} Heaviside(w_{ij}-t)
+    8. LogLikelihood logP:
+        sum_{i<j} a_{ij}*log(pij) + (1-aij)*log(1-pij)
 
-    Expected link probability
-    pij = xixj*(yiyj^t) / (t*log(yiyj) + xixj*(yiyj)^t)
-
-    Expected link weight
-    wij = (1+yiyj^t)(xixj (yiyj)^t) / ( log(yiyj)*(t*log(yiyj) +xixj*(yiyj)^t ) )
     """
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
@@ -356,39 +322,41 @@ class cWECMt2(ExpectedModel):
     def expected_adjacency(self, *args):
         x,y = args[0][0:self.N], args[0][(self.N):]
         t = self.threshold
-        xixj = np.outer(x,x)
-        yiyj = np.outer(y,y)
-        yiyjt = np.real(yiyj**t)
-        pij = np.nan_to_num( (xixj*(yiyjt)) / (t*np.log(yiyj+EPS) + xixj*(yiyjt)))
-        pij[pij<0] = 0
-        return pij
+        xixj = np.abs(np.outer(x,x)) # these variables are always > 0
+        yiyj = np.abs(np.outer(y,y)) # these variables are always > 0
+        yiyjt = yiyj**t
+        pij = (xixj*yiyjt )/ (xixj*yiyjt - t*np.log(yiyj)) # <aij>
+        return np.nan_to_num(pij)
     
     def expected_weighted_adjacency(self, *args):
         x,y = args[0][0:self.N], args[0][(self.N):]
         t = self.threshold
-        xixj = np.outer(x,x)
-        yiyj = np.outer(y,y)
-        yiyjt = np.real(yiyj**t)
-        num = (1+yiyjt)*(xixj)*(yiyjt)
-        den = np.log(yiyj) * ( t*np.log(yiyj) + xixj*yiyjt)
-        wij = np.nan_to_num( num / den )
-        wij[wij<0] = 0
-        return wij
+        xixj = np.abs(np.outer(x,x)) # these variables are always > 0
+        yiyj = np.abs(np.outer(y,y)) # these variables are always > 0
+        yiyjt = yiyj**t
+        wij = ((t*np.log(yiyj)-1)/(t*np.log(yiyj)))
+        wij *= ((xixj*yiyjt )/ (xixj*yiyjt - t*np.log(yiyj))) # <aij>
+        return np.nan_to_num(wij)
     
     def saddle_point(self, G, *args):
         k = (G>0).sum(axis=0)
         pij = self.expected_adjacency(*args)
-        avgk = pij.sum(axis=0)
+        avgk = pij.sum(axis=0) #- pij.diagonal()
         w = G.sum(axis=0)
         wij = self.expected_weighted_adjacency(*args)
-        avgw = wij.sum(axis=0)
+        avgw = wij.sum(axis=0) #- wij.diagonal()
         return np.hstack([k-avgk,w-avgw])
 
-#     def saddle_point(self, G, *args):
-#            k = (G>0).sum(axis=0)
-#            pij = self.expected_adjacency(*args)
-#            avgk = pij.sum(axis=0)
-#            return k-avgk
+    def loglikelihood(self, G, *args):
+        x,y = args[0][0:self.N], args[0][(self.N):]
+        t = self.threshold
+        xixj = np.abs(np.outer(x,x)) # these variables are always > 0
+        yiyj = np.abs(np.outer(y,y)) # these variables are always > 0
+        yiyjt = yiyj**t
+        A = (G>0).astype(float)
+        loglike = np.log(-np.log(yiyj)) + A*np.log(xixj) + G*np.log(yiyj) - np.log(xixj*(yiyj**t) - t*np.log(yiyj))
+        loglike = np.nan_to_num(loglike)
+        return np.triu(loglike,1).sum()
 
 class SpatialCM(ExpectedModel):
     """

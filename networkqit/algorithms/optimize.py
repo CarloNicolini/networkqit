@@ -131,25 +131,21 @@ class MLEOptimizer(ModelOptimizer):
 
     def run(self, model, **kwargs):
         """
-        Optimize the likelihood of the model given the observation A. 
+        Maximimize the likelihood of the model given the observed network G. 
         """
-        eps = np.finfo(float).eps
-        bounds = ((eps) * len(self.A), (np.inf) * len(self.x0))
         # Use the Trust-Region reflective algorithm to maximize loglikelihood
-#        self.sol = least_squares(fun=lambda z : -model.loglikelihood(A,z), x0=np.squeeze(self.x0),
-#                                 method='dogbox',
-#                                 bounds=bounds,
-#                                 xtol=kwargs.get('xtol', 1E-12),
-#                                 gtol=kwargs.get('gtol', 1E-12),
-#                                 max_nfev=kwargs.get('max_nfev', len(self.x0) * 100000),
-#                                 verbose=kwargs.get('verbose', 1))
+        opts = {'ftol':kwargs.get('ftol', 1E-10),
+                'gtol':kwargs.get('gtol', 1E-10),
+                'eps': kwargs.get('eps',1E-10),
+                }
 
-        opts = {'ftol':kwargs.get('ftol', 1E-20),
-                'xtol':kwargs.get('xtol', 1E-20)}
-        self.sol = minimize(fun=lambda z : -model.loglikelihood(A,z), x0=np.squeeze(self.x0),
-                            method='SLSQP',
+        self.sol = minimize(fun=lambda z : -model.loglikelihood(self.G,z),
+                            x0=np.squeeze(self.x0),
+                            method='L-BFGS-B', # L-BFGS-B finds the saddle point well
                             bounds=model.bounds,
                             options=opts)
+        if self.sol['status'] != 0:
+            raise Exception('Method did not converge to maximum likelihood')
 
         return self.sol
 
@@ -174,6 +170,9 @@ class MLEOptimizer(ModelOptimizer):
             model: a model from MEModels with "saddle_point" method implemented
         
         kwargs:
+            basin_hopping: (bool) whether to run global optimization with local
+                            optimization by least_squares
+            basin_hopping_niter: (int) number of basin hopping repetitions
             xtol:       (float) set the termination tolerance on parameters
                         (default 1E-10)
             gtol:       (float) set the termination tolerance on gradients
@@ -195,7 +194,7 @@ class MLEOptimizer(ModelOptimizer):
                                        xtol=kwargs.get('xtol', 1E-10),
                                        gtol=kwargs.get('xtol', 1E-10),
                                        max_nfev=kwargs.get('max_nfev', max_nfev),
-                                       verbose=kwargs.get('verbose',1))
+                                       verbose=kwargs.get('verbose',0))
             # use this form with linear loss as in the basinhopping
             # func argument to be consistent
             opt_result['fun'] = 0.5*np.sum(opt_result['fun']**2)
