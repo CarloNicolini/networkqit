@@ -145,6 +145,9 @@ class ExpectedModel():
     def saddle_point(self, G, *args):
         raise NotImplementedError
 
+    def sample_adjacency(self, *args, **kwargs):
+        raise NotImplementedError
+
     
 class Operator(ExpectedModel):
     def __init__(self, left, right):
@@ -228,6 +231,18 @@ class ErdosRenyi(ExpectedModel):
         G[:,0,:] = (N-1) * np.eye(N) - (1-np.eye(N))
         return G
 
+    def sample_adjacency(self, x, **kwargs):
+        from autograd import numpy as anp
+        def sigmoid(x):
+            rij = anp.random.random([self.N, self.N])
+            rij = anp.triu(rij,1)
+            rij += rij.T
+            slope = kwargs.get('slope', 500)
+            P = x * (1.0 - anp.eye(self.N))
+            return 1.0 / (1.0 + anp.exp(-slope*(P-rij)) )
+        A = anp.triu(sigmoid(x), 1)
+        A += A.T
+        return A
 
 class Edr(ExpectedModel):
     """
