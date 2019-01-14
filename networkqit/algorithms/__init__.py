@@ -22,8 +22,10 @@
 # # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import networkqit.algorithms.optimize
+from networkqit.algorithms.stochastic_optimize_autograd import *
 import networkqit.algorithms.community
 
 from networkqit.algorithms import *
 from networkqit.algorithms.optimize import *
+from networkqit.algorithms.stochastic_optimize_autograd import *
 from networkqit.algorithms.community import *

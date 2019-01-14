@@ -221,9 +221,10 @@ class MLEOptimizer(ModelOptimizer):
         return self.sol
 
 
-####################################
-## Spectral entropy optimization ###
-####################################
+##############################################################################
+## Spectral entropy optimization in the continuous approximation with E[L] ###
+##############################################################################
+
 class ExpectedModelOptimizer(ModelOptimizer):
     """
     This class is at the base of the continuos optimization method
@@ -244,18 +245,16 @@ class ExpectedModelOptimizer(ModelOptimizer):
         self.beta_range = beta_range
         self.x0 = x0
 
-    def setup(self, expected_adj_fun, expected_lapl_grad_fun=None, step_callback=None):
+    def setup(self, model, step_callback=None):
         """
         Setup the optimizer. Must specify the model function, as a function that returns the expected adjacency matrix,
         Optionally one can also provide the modelfun_grad, a function that returns the gradient of the expected Laplacian.
 
         args:
-            expected_adj_fun: a function in the form f(θ) that once called returns the expected adjacency matrix of a model E_θ[A].
-            expected_lapl_grad_fun: a function in the form f(θ) that once called returns the gradients of the expected Laplacian of a model ∇_θ[E_θ[A]]. 
-            step_callback: a callback function to control the current status of optimization.
+            model: a model from ExpectedModel
         """
-        self.modelfun = expected_adj_fun
-        self.modelfun_grad = expected_lapl_grad_fun
+        self.expected_adj_fun = model.expected_adjacency
+        self.self.expected_lapl_fun_grad = model.expected_laplacian
         self.step_callback = step_callback
         self.bounds = expected_adj_fun.bounds
 
@@ -273,11 +272,10 @@ class ExpectedModelOptimizer(ModelOptimizer):
         Returns:
             the gradient as a three index numpy array. The last index is the one pertaining to the k-th component of x
         """
-        sigma = compute_vonneuman_density(graph_laplacian(self.modelfun(x)), beta)
+        sigma = compute_vonneuman_density(graph_laplacian(self.expected_adj_fun(x)), beta)
         # Here instead of tracing over the matrix product, we just sum over the entrywise product of the two matrices
         # (rho-sigma) and the ∂E_θ[L]/.
-        return np.array(
-            [np.sum(np.multiply(rho - sigma, self.modelfun_grad(x)[:, i, :].T)) for i in range(0, len(self.x0))])
+        return np.array([np.sum(np.multiply(rho - sigma, self.self.expected_lapl_fun_grad(x)[:, i, :].T)) for i in range(0, len(self.x0))])
 
     def hessian(self, x, beta):
         """
@@ -286,7 +284,7 @@ class ExpectedModelOptimizer(ModelOptimizer):
         """
         import numdifftools as nd
         H = nd.Hessian(lambda y: SpectralDivergence(
-            Lobs=self.L, Lmodel=graph_laplacian(self.modelfun(y)), beta=beta).rel_entropy)(x)
+            Lobs=self.L, Lmodel=graph_laplacian(self.expected_adj_fun(y)), beta=beta).rel_entropy)(x)
         return H  # (x)
 
     def run(self, **kwargs):
@@ -315,7 +313,7 @@ class ExpectedModelOptimizer(ModelOptimizer):
         # Iterate over all beta provided by the user
         for beta in self.beta_range:
             # define the relative entropy function, dependent on current beta
-            self.rel_entropy_fun = lambda x: SpectralDivergence(Lobs=self.L, Lmodel=graph_laplacian(self.modelfun(x)),
+            self.rel_entropy_fun = lambda x: SpectralDivergence(Lobs=self.L, Lmodel=graph_laplacian(self.expected_adj_fun(x)),
                                                                 beta=beta).rel_entropy
 
             # Define initially fgrad as None, relying on numerical computation of it
@@ -325,7 +323,7 @@ class ExpectedModelOptimizer(ModelOptimizer):
             rho = None
 
             # If user provides gradients of the model, use them, redefyining fgrad to pass to solver
-            if self.modelfun_grad is not None:
+            if self.self.expected_lapl_fun_grad is not None:
                 # compute rho for each beta, just once
                 rho = VonNeumannDensity(A=None, L=self.L, beta=beta).density
                 # define the gradient of the Dkl, given rho at current beta
@@ -364,10 +362,10 @@ class ExpectedModelOptimizer(ModelOptimizer):
                 self.step_callback(beta, sol[-1].x)
 
             # Here creates the output data structure as a dictionary of the optimization parameters and variables
-            spect_div = SpectralDivergence(Lobs=self.L, Lmodel=graph_laplacian(self.modelfun(sol[-1].x)), beta=beta)
-            sol[-1]['DeltaL'] = (np.trace(self.L) - np.trace(graph_laplacian(self.modelfun(sol[-1].x)))) / 2
+            spect_div = SpectralDivergence(Lobs=self.L, Lmodel=graph_laplacian(self.expected_adj_fun(sol[-1].x)), beta=beta)
+            sol[-1]['DeltaL'] = (np.trace(self.L) - np.trace(graph_laplacian(self.expected_adj_fun(sol[-1].x)))) / 2
             if kwargs.get('compute_sigma', False):
-                Lmodel = graph_laplacian(self.modelfun(sol[-1].x))
+                Lmodel = graph_laplacian(self.expected_adj_fun(sol[-1].x))
                 rho = VonNeumannDensity(A=None, L=self.L, beta=beta).density
                 sigma = VonNeumannDensity(A=None, L=Lmodel, beta=beta).density
                 sol[-1]['<DeltaL>'] = np.trace(np.dot(rho, Lmodel)) - np.trace(np.dot(sigma, Lmodel))
@@ -380,9 +378,9 @@ class ExpectedModelOptimizer(ModelOptimizer):
             sol[-1]['loglike'] = spect_div.loglike
             sol[-1]['rel_entropy'] = spect_div.rel_entropy
             sol[-1]['entropy'] = spect_div.entropy
-            sol[-1]['AIC'] = 2 * len(self.modelfun.args_mapping) - 2 * sol[-1]['loglike']
-            for i in range(0, len(self.modelfun.args_mapping)):
-                sol[-1][self.modelfun.args_mapping[i]] = sol[-1].x[i]
+            sol[-1]['AIC'] = 2 * len(self.expected_adj_fun.args_mapping) - 2 * sol[-1]['loglike']
+            for i in range(0, len(self.expected_adj_fun.args_mapping)):
+                sol[-1][self.expected_adj_fun.args_mapping[i]] = sol[-1].x[i]
         self.sol = sol
         return sol
 
@@ -397,11 +395,11 @@ class ExpectedModelOptimizer(ModelOptimizer):
             import pandas as pd
             return pd.DataFrame(self.sol).set_index('T')  # it's 1/beta
         else:
-            s = "{:>20} " * (len(self.modelfun.args_mapping) + 1)
-            print('=' * 20 * (len(self.modelfun.args_mapping) + 1))
+            s = "{:>20} " * (len(self.expected_adj_fun.args_mapping) + 1)
+            print('=' * 20 * (len(self.expected_adj_fun.args_mapping) + 1))
             print('Summary:')
-            print('Model:\t' + str(self.modelfun.formula))
-            print('=' * 20 * (len(self.modelfun.args_mapping) + 1))
+            print('Model:\t' + str(self.expected_adj_fun.formula))
+            print('=' * 20 * (len(self.expected_adj_fun.args_mapping) + 1))
             print('Optimization method: ' + self.method)
             print('Variables bounds: ')
             for i, b in enumerate(self.bounds):
@@ -410,20 +408,20 @@ class ExpectedModelOptimizer(ModelOptimizer):
                 right = '+∞' if self.bounds[i][1] is None else str(
                     self.bounds[i][1])
                 print("{: >1} {:} {: >10} {:} {: >1}".format(
-                    left, '<=', self.modelfun.args_mapping[i], '<=', right))
-            print('=' * 20 * (len(self.modelfun.args_mapping) + 1))
+                    left, '<=', self.expected_adj_fun.args_mapping[i], '<=', right))
+            print('=' * 20 * (len(self.expected_adj_fun.args_mapping) + 1))
             print('Results:')
-            print('=' * 20 * (len(self.modelfun.args_mapping) + 1))
+            print('=' * 20 * (len(self.expected_adj_fun.args_mapping) + 1))
             print('Von Neumann Log Likelihood:\t' +
                   str(self.sol[-1]['loglike']))
             print('Von Neumann Entropy:\t\t' + str(self.sol[-1]['entropy']))
             print('Von Neumann Relative entropy:\t' +
                   str(self.sol[-1]['rel_entropy']))
             print('AIC:\t\t\t\t' + str(self.sol[-1]['AIC']))
-            print('=' * 20 * (len(self.modelfun.args_mapping) + 1))
+            print('=' * 20 * (len(self.expected_adj_fun.args_mapping) + 1))
             print('Estimate:')
-            print('=' * 20 * (len(self.modelfun.args_mapping) + 1))
-            print(s.format('beta', *self.modelfun.args_mapping))
+            print('=' * 20 * (len(self.expected_adj_fun.args_mapping) + 1))
+            print(s.format('beta', *self.expected_adj_fun.args_mapping))
             for i in range(0, len(self.sol)):
                 row = [str(x) for x in self.sol[i].x]
                 print(s.format(self.sol[i]['beta'], *row))
