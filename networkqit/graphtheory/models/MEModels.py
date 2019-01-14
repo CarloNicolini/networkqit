@@ -103,17 +103,12 @@ class UBCM(ExpectedModel):
         return k-avgk
 
     def sample_adjacency(self, *args, **kwargs):
-        from autograd import numpy as anp
-        def sigmoid(x):
-            rij = anp.random.random([self.N, self.N])
-            rij = anp.triu(rij,1)
-            rij += rij.T
-            slope = kwargs.get('slope', 500.0)
-            P = self.expected_adjacency(x)
-            return 1.0 / (1.0 + anp.exp(-slope*(P-rij)) )
-        A = anp.triu(sigmoid(args), 1)
-        A += A.T
-        return A
+        rij = np.random.random([self.N, self.N])
+        rij = np.triu(rij,1)
+        rij += rij.T
+        slope = kwargs.get('slope', 200.0)
+        P = np.outer(*args,*args) / (1.0 + np.outer(*args,*args))
+        return 1.0 / (1.0 + np.exp(-slope*(P-rij)))
 
 
 class UWCM(ExpectedModel):

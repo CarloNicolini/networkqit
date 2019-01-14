@@ -22,7 +22,7 @@
 Method and functions based on the information theory of networks
 """
 import numdifftools as nd
-import numpy as np
+import autograd.numpy as np
 from scipy.linalg import expm, logm, eigvalsh
 from scipy.optimize import root
 from scipy.stats import entropy

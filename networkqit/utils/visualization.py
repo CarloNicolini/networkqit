@@ -14,7 +14,7 @@ Visualization utilities for model optimization and entropy visualization
 
 import matplotlib.pyplot as plt
 from drawnow import drawnow
-import numpy as np
+import autograd.numpy as np
 import seaborn as sns
 from networkqit.infotheory.density import compute_vonneuman_density, compute_vonneumann_entropy
 from networkqit.graphtheory import graph_laplacian as graph_laplacian

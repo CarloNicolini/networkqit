@@ -177,7 +177,8 @@ class StochasticGradientDescent(StochasticOptimizer):
                     raise RuntimeError('bounds_exceeded')
                 x_old = x.copy()
                 x -= eta * grad_t
-                print('x=', np.linalg.norm(x), '|grad|=', np.linalg.norm(grad_t), ' m=', self.expected_adj_fun(x).sum() / 2, 'beta=', beta)
+                #print('x=', x, '|grad|=', np.linalg.norm(grad_t), ' m=', self.expected_adj_fun(x).sum() / 2, 'beta=', beta)
+                print(' m=', self.expected_adj_fun(x).sum() / 2)
                 if self.step_callback is not None:
                     self.step_callback(beta, x)
             print(opt_message)
@@ -239,7 +240,8 @@ class Adam(StochasticOptimizer):
                 vttilde = vt / (1.0 - (beta2 ** t))  # compute bias-corrected second raw moment estimate
                 x_old = x.copy()
                 x -= alpha * mttilde / np.sqrt(vttilde + epsilon)
-                print('x=', np.linalg.norm(x), '|grad|=', np.linalg.norm(grad_t), ' m=', self.expected_adj_fun(x).sum() / 2, 'beta=', beta)
+                #print('x=', np.linalg.norm(x), '|grad|=', np.linalg.norm(grad_t), ' m=', self.expected_adj_fun(x).sum() / 2, 'beta=', beta)
+                print(' m=', self.expected_adj_fun(x).sum() / 2)
                 if self.step_callback is not None:
                     self.step_callback(beta, x)
                 all_x.append(x[0])

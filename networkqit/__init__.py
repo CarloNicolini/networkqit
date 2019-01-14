@@ -64,7 +64,7 @@ year={2018}}"""
 
 name = "networkqit"
 
-import numpy as np
+import autograd.numpy as np
 import networkx as nx
 
 # These are import orderwise
