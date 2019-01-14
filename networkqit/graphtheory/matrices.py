@@ -26,7 +26,7 @@ The graph Laplacian is computed from an adjacency matrix as $L=D-A$.
 The normalized graph Laplacian is computed as $\\mathcal{L}=I - D^{-1/2} A D^{-1/2}$.
 """
 
-import numpy as np
+import autograd.numpy as np
 
 
 def graph_laplacian(A):
@@ -34,9 +34,7 @@ def graph_laplacian(A):
     Get the graph Laplacian from the adjacency matrix
     :math:`\\mathbf{L} = \\mathbf{D} - \\mathbf{A}`
     """
-    D = np.zeros(A.shape)
-    np.fill_diagonal(D, A.sum(axis=0))
-    return D - A
+    return np.diag(A.sum(axis=0)) - A
 
 
 def normalized_graph_laplacian(A):

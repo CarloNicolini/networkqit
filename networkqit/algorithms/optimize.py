@@ -54,8 +54,7 @@ Finally, the `MLEOptimizer` maximizes the standard likelihood of a model and it 
 #    BSD license.
 
 from abc import ABC, abstractmethod
-import numdifftools as nd
-import numpy as np
+import autograd.numpy as np
 from scipy.linalg import eigvalsh
 from scipy.misc import logsumexp
 from scipy.optimize import minimize, least_squares, fsolve

@@ -29,7 +29,7 @@ PRE 78(1), 1–4. https://doi.org/10.1103/PhysRevE.78.015101
 G here is the graph adjacency matrix, A is the binary adjacency, W is the weighted
 """
 
-import numpy as np
+import autograd.numpy as np
 from .ExpectedGraphModel import ExpectedModel
 
 EPS = np.finfo(float).eps
@@ -101,6 +101,20 @@ class UBCM(ExpectedModel):
         pij = self.expected_adjacency(*args)
         avgk = pij.sum(axis=0)
         return k-avgk
+
+    def sample_adjacency(self, *args, **kwargs):
+        from autograd import numpy as anp
+        def sigmoid(x):
+            rij = anp.random.random([self.N, self.N])
+            rij = anp.triu(rij,1)
+            rij += rij.T
+            slope = kwargs.get('slope', 500.0)
+            P = self.expected_adjacency(x)
+            return 1.0 / (1.0 + anp.exp(-slope*(P-rij)) )
+        A = anp.triu(sigmoid(args), 1)
+        A += A.T
+        return A
+
 
 class UWCM(ExpectedModel):
     """"

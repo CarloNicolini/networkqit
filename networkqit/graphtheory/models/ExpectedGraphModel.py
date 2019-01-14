@@ -27,8 +27,7 @@ matrix and Laplacian, so please do not make confusion between
 random graph models and the expected graph models described here.
 """
 
-import numpy as np
-import numdifftools as nd
+import autograd.numpy as np
 from networkqit.graphtheory import graph_laplacian as graph_laplacian
 
 
@@ -105,6 +104,7 @@ class ExpectedModel():
         """
         If the user does not provide an implementation of the method
         """
+        import numdifftools as nd
         return nd.Gradient(lambda x : graph_laplacian(self(x)))(np.array([*args]))
 
     def expected_laplacian(self, *args):

@@ -103,7 +103,7 @@ class StochasticOptimizer(ModelOptimizer):
         self.sample_adjacency_fun = model.sample_adjacency
         self.expected_laplacian_grad_fun = model.expected_laplacian_grad
         self.step_callback = step_callback
-        #self.bounds = expected_adj_fun.bounds
+        self.bounds = model.bounds
 
     # Need to rewrite this graph laplacian to use autograd implementation of numpy
     def graph_laplacian(self, A):
@@ -111,8 +111,8 @@ class StochasticOptimizer(ModelOptimizer):
 
     def gradient(self, x, rho, beta, num_samples=1):
         # Compute the relative entropy between rho and sigma, using tensors with autograd support
+        # TODO: Fix because now it has no multiple samples support
         def rel_entropy(z):
-            #Lmodel = [self.graph_laplacian( self.sample_adjacency_fun(z) ) for i in range(num_samples)]
             Lmodel = self.graph_laplacian( self.sample_adjacency_fun(z) )
             Emodel = np.sum(np.multiply(Lmodel,rho)) / num_samples
             Eobs = np.sum(np.multiply(self.L, rho)) / num_samples
@@ -132,7 +132,7 @@ class StochasticOptimizer(ModelOptimizer):
         """
         Start the optimization process
         """
-        pass
+        raise NotImplementedError
 
 
 class StochasticGradientDescent(StochasticOptimizer):
@@ -148,7 +148,7 @@ class StochasticGradientDescent(StochasticOptimizer):
 
     def run(self, **kwargs):
         x = self.x0
-        num_samples = kwargs.get('num_samples', 1)
+        #num_samples = kwargs.get('num_samples', 1)
         clip_gradients = kwargs.get('clip_gradients', None)
         max_iters = kwargs.get('max_iters', 1000)
         eta = kwargs.get('eta', 1E-3)
@@ -182,6 +182,77 @@ class StochasticGradientDescent(StochasticOptimizer):
                     self.step_callback(beta, x)
             print(opt_message)
             sol.append({'x': x})
+        self.sol = sol
+        return sol
+
+class Adam(StochasticOptimizer):
+    """
+    Implements the ADAM stochastic gradient descent.
+    """
+
+    def __init__(self, A, x0, beta_range, **kwargs):
+        self.A = A
+        self.L = graph_laplacian(self.A)
+        self.x0 = x0
+        self.beta_range = beta_range
+
+    def run(self, **kwargs):
+        x = self.x0
+        #num_samples = kwargs.get('num_samples', 1)
+        clip_gradients = kwargs.get('clip_gradients', None)
+        max_iters = kwargs.get('max_iters', 1000)
+        eta = kwargs.get('eta', 1E-3)
+        gtol = kwargs.get('gtol', 1E-6)
+        xtol = kwargs.get('xtol', 1E-3)
+
+        alpha = kwargs.get('alpha', 1E-3)
+        gtol = kwargs.get('gtol', 1E-3)
+        beta1 = 0.9
+        beta2 = 0.999
+        epsilon = 1E-8
+
+        # Populate the solution list as function of beta
+        # the list sol contains all optimization points
+        sol = []
+        # Iterate over all beta provided by the user
+        mt, vt = np.zeros(self.x0.shape), np.zeros(self.x0.shape)
+        all_x = []
+        for beta in self.beta_range:
+            x = self.x0
+            rho = VonNeumannDensity(A=None, L=self.L, beta=beta).density
+            converged = False
+            opt_message = ''
+            t = 0
+            while not converged:
+                t += 1
+                grad_t =  self.gradient(x, rho, beta)
+                # Convergence status
+                if np.linalg.norm(grad_t) < gtol:
+                    converged, opt_message = True, 'gradient tolerance exceeded'
+                if t > max_iters:
+                    converged, opt_message = True, 'max_iters_exceed'
+                if np.any(x[0]<0):
+                    raise RuntimeError('bounds_exceeded')
+                mt = beta1 * mt + (1.0 - beta1) * grad_t
+                vt = beta2 * vt + (1.0 - beta2) * grad_t * grad_t
+                mttilde = mt / (1.0 - (beta1 ** t))  # compute bias corrected first moment estimate
+                vttilde = vt / (1.0 - (beta2 ** t))  # compute bias-corrected second raw moment estimate
+                x_old = x.copy()
+                x -= alpha * mttilde / np.sqrt(vttilde + epsilon)
+                print('x=', np.linalg.norm(x), '|grad|=', np.linalg.norm(grad_t), ' m=', self.expected_adj_fun(x).sum() / 2, 'beta=', beta)
+                if self.step_callback is not None:
+                    self.step_callback(beta, x)
+                all_x.append(x[0])
+            sol.append({'x': x.copy()})
+            # Here creates the output data structure as a dictionary of the optimization parameters and variables
+            spect_div = SpectralDivergence(Lobs=self.L, Lmodel=graph_laplacian(self.sample_adjacency_fun(sol[-1]['x'])), beta=beta)
+            sol[-1]['DeltaL'] = (np.trace(self.L) - np.trace(graph_laplacian(self.sample_adjacency_fun(sol[-1]['x'])))) / 2
+            sol[-1]['T'] = 1 / beta
+            sol[-1]['beta'] = beta
+            sol[-1]['loglike'] = spect_div.loglike
+            sol[-1]['rel_entropy'] = spect_div.rel_entropy
+            sol[-1]['entropy'] = spect_div.entropy
+
         self.sol = sol
         return sol
 
