@@ -152,7 +152,7 @@ class StochasticGradientDescent(StochasticOptimizer):
         clip_gradients = kwargs.get('clip_gradients', None)
         max_iters = kwargs.get('max_iters', 1000)
         eta = kwargs.get('eta', 1E-3)
-        gtol = kwargs.get('gtol', 1E-5)
+        gtol = kwargs.get('gtol', 1E-6)
         xtol = kwargs.get('xtol', 1E-3)
         # Populate the solution list as function of beta
         # the list sol contains all optimization points
@@ -173,14 +173,14 @@ class StochasticGradientDescent(StochasticOptimizer):
                     converged, opt_message = True, 'gradient tolerance exceeded'
                 if t > max_iters:
                     converged, opt_message = True, 'max_iters_exceed'
-                # if x[0]<0:
-                #    converged, opt_message = True, 'bounds_exceeded'
+                if np.any(x[0]<0):
+                    raise RuntimeError('bounds_exceeded')
                 x_old = x.copy()
                 x -= eta * grad_t
-                print('\rbeta=', beta, '|grad|=', np.linalg.norm(grad_t), 'x=', np.linalg.norm(x), ' m=', self.expected_adj_fun(x).sum() / 2, end='')
+                print('x=', np.linalg.norm(x), '|grad|=', np.linalg.norm(grad_t), ' m=', self.expected_adj_fun(x).sum() / 2, 'beta=', beta)
                 if self.step_callback is not None:
                     self.step_callback(beta, x)
-
+            print(opt_message)
             sol.append({'x': x})
         self.sol = sol
         return sol
