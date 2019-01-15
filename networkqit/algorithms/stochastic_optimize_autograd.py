@@ -158,8 +158,7 @@ class StochasticOptimizer(ModelOptimizer):
             return dkl
 
         f_and_df = autograd.value_and_grad(rel_entropy_batched) # gradient of relative entropy as a function
-        f_and_df_vals = f_and_df(x)
-        return f_and_df_vals[0], f_and_df_vals[1]
+        return f_and_df(x)
 
     def run(self, model, **kwargs):
         """
@@ -288,7 +287,7 @@ class Adam(StochasticOptimizer):
                 all_x.append(x[0])
                 all_dkl.append(dkl)
                 #sol[-1]['rel_entropy'] = dkl
-                if t % 1000 == 0:
+                if t % 50 == 0:
                     def draw_fig():
                         sol.append({'x': x.copy()})
                         # Here creates the output data structure as a dictionary of the optimization parameters and variables

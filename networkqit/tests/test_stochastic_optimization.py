@@ -24,6 +24,6 @@ x0 = np.random.random([34,])
 
 #G = opt.gradient(x = np.random.random([N,]), rho=rho, beta=beta, batch_size=2)
 #G(x0)
-sol = opt.run(eta=1E-3, max_iters=100, gtol=1E-3, batch_size=10)
+sol = opt.run(eta=1E-2, max_iters=10000, gtol=1E-3, batch_size=1)
 plt.pause(5)
 plt.show()

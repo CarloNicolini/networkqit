@@ -112,8 +112,8 @@ class UBCM(ExpectedModel):
         xixj = np.einsum('ij,ik->ijk',batch_args, batch_args)
         P = xixj / (1.0 + xixj)
         A = 1.0 / (1.0 + np.exp(-slope*(P-rij))) # sampling
-        A = np.triu(A, 1)
-        A += np.transpose(A,axes=[0,2,1])
+        A = np.triu(A, 1) # make it symmetric 
+        A += np.transpose(A, axes=[0,2,1])
         return A
 
 class UWCM(ExpectedModel):
