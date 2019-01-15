@@ -11,7 +11,7 @@ import networkx as nx
 
 #A = np.loadtxt('/home/carlo2/workspace/communityalg/data/karate.adj')
 
-A = nx.to_numpy_array(nq.ring_of_cliques(4,8))
+A = nq.ring_of_custom_cliques([12,8,4,2])
 N = len(A)
 M = nq.FreeModel(N=N)
 p = A.sum() / (N*(N-1))
@@ -26,6 +26,6 @@ opt.setup(model=M)
 #x0 = np.random.random([34,])
 
 #G = opt.gradient(x=np.random.random([N,1]), rho=rho, beta=beta, num_samples=1)
-sol = opt.run(eta=1E-3, max_iters=np.inf, gtol=1E-5, batch_size=16)
+sol = opt.run(eta=1E-3, max_iters=np.inf, gtol=1E-5, batch_size=64)
 plt.pause(5)
 plt.show()

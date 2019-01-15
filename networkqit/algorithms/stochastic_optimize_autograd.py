@@ -265,7 +265,7 @@ class Adam(StochasticOptimizer):
                 all_x.append(x[0])
                 all_dkl.append(dkl)
                 #sol[-1]['rel_entropy'] = dkl
-                if t % 50 == 0:
+                if t % 100 == 0:
                     def draw_fig():
                         sol.append({'x': x.copy()})
                         # Here creates the output data structure as a dictionary of the optimization parameters and variables

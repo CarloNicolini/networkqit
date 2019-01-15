@@ -11,7 +11,7 @@ from networkqit.algorithms.stochastic_optimize_autograd import StochasticGradien
 A = np.loadtxt(home + '/workspace/communityalg/data/karate.adj')
 import networkx as nx
 #A = np.loadtxt('/home/carlo2/workspace/communityalg/data/karate.adj')
-A = nx.to_numpy_array(nq.ring_of_cliques(5,5))
+A = nq.ring_of_custom_cliques([12,8,4,2])
 
 N = len(A)
 M = nq.UBCM(N=N)
@@ -22,9 +22,9 @@ L = nq.graph_laplacian(A)
 
 beta = 1
 x0 = np.random.random([N,])
-opt = Adam(A=A, L=L, x0=x0, beta_range=[beta])
+opt = Adam(A=A, L=L, x0=x0, beta_range=np.logspace(1,-2,50))
 rho = nq.VonNeumannDensity(A=None, L=L, beta=beta).density
 opt.setup(model=M)
-sol = opt.run(eta=1E-3, max_iters=np.inf, gtol=1E-3, batch_size=1024)
+sol = opt.run(eta=1E-3, max_iters=np.inf, gtol=1E-3, batch_size=32)
 plt.pause(5)
 plt.show()
