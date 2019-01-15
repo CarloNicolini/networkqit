@@ -109,9 +109,14 @@ class StochasticOptimizer(ModelOptimizer):
     def graph_laplacian(self, A):
         return np.diag(np.sum(A, axis=0)) - A
 
-    def gradient(self, x, rho, beta, batch_size=2):
+    def gradient(self, x, rho, beta, batch_size=1):
         # Compute the relative entropy between rho and sigma, using tensors with autograd support
         # TODO: Fix because now it has no multiple samples support
+        Eobs = np.sum(self.L*rho) # = Tr[rho Lobs]
+        lambd_obs = eigh(self.L)[0] # eigh is a batched operation
+        Fobs = - logsumexp(-beta*lambd_obs) / beta
+        entropy = beta*(Eobs-Fobs)
+
         def rel_entropy(z):
             Lmodel = self.graph_laplacian(self.sample_adjacency_fun(z))
             print(Lmodel.dtype)
@@ -140,20 +145,18 @@ class StochasticOptimizer(ModelOptimizer):
             return dkl
 
         def rel_entropy_batched(z):
-            N = len(z) # number of free variables
+            N = len(self.A)
             # advanced broadcasting here!
-            Amodel = self.sample_adjacency_fun(z, batch_size=batch_size) # a batched number of adjacency matrices [batch_size,N,N]
+            # Sample 'batch_size' adjacency matrices shape=[batch_size,N,N]
+            Amodel = self.sample_adjacency_fun(z, batch_size=batch_size)
             Dmodel = np.eye(N) * np.transpose(np.zeros([1,1,N]) + np.einsum('ijk->ik',Amodel),[1,0,2])
-            Lmodel =  Dmodel - self.sample_adjacency_fun(z) # returns a batch_size x N x N tensor
+            Lmodel =  Dmodel - Amodel # returns a batch_size x N x N tensor
             # do average over batches of the sum of product of matrix elements (done with * operator)
-            Emodel = np.mean(np.sum(np.sum(Lmodel*rho,axis=2),axis=1))
-            Eobs = np.sum(self.L*rho) # = Tr[rho Lobs]
-            lambd_obs = eigh(self.L)[0] # eigh is a batched operation
+            Emodel = np.mean(np.sum(np.sum(Lmodel*rho,axis=2), axis=1))
             lambd_model = eigh(Lmodel)[0] # eigh is a batched operation, 
             Fmodel = - np.mean(logsumexp(-beta*lambd_model, axis=1) / beta)
-            Fobs = - logsumexp(-beta*lambd_obs) / beta
             loglike = beta*(Emodel-Fmodel)
-            entropy = beta*(Eobs-Fobs)
+
             dkl = loglike - entropy
             return dkl
 
@@ -279,7 +282,7 @@ class Adam(StochasticOptimizer):
                 vttilde = vt / (1.0 - (beta2 ** t))  # compute bias-corrected second raw moment estimate
                 x_old = x.copy()
                 x -= alpha * mttilde / np.sqrt(vttilde + epsilon)
-                if t % 1000 == 0:
+                if t % 10 == 0:
                     print('iter=',t, '|grad|=', np.linalg.norm(grad_t))#, ' m=', self.expected_adj_fun(x).sum() / 2, 'beta=', beta)
                 #print(' m=', self.expected_adj_fun(x).sum() / 2)
                 if self.step_callback is not None:
@@ -301,7 +304,7 @@ class Adam(StochasticOptimizer):
                         plt.subplot(1,3,1)
                         plt.imshow(self.A)
                         plt.subplot(1,3,2)
-                        plt.imshow(self.sample_adjacency_fun(x))
+                        plt.imshow(self.sample_adjacency_fun(x)[0,:,:])
                         plt.subplot(1,3,3)
                         plt.plot(all_dkl)
                         plt.tight_layout()

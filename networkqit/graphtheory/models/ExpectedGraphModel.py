@@ -231,7 +231,7 @@ class ErdosRenyi(ExpectedModel):
         G[:,0,:] = (N-1) * np.eye(N) - (1-np.eye(N))
         return G
 
-    def sample_adjacency(self, x, **kwargs):
+    def sample_adjacency(self, *args, **kwargs):
         from autograd import numpy as anp
         def sigmoid(x):
             rij = anp.random.random([self.N, self.N])
@@ -265,17 +265,16 @@ class FreeModel(ExpectedModel):
     def expected_laplacian_grad(self, x):
         raise NotImplementedError
 
-    def sample_adjacency(self, x, **kwargs):
-        from autograd import numpy as anp
+    def sample_adjacency(self, *args, **kwargs):
         batch_size = kwargs.get('batch_size', 1)
-        def sigmoid(x):
-            rij = anp.random.random([batch_size, self.N, self.N])
-            rij = anp.triu(rij,1) # batched triu!
-            rij += np.transpose(rij,axes=[0,2,1]) # batched transposition
-            slope = kwargs.get('slope', 500)
-            P = np.reshape(np.tile(np.reshape(x,[self.N,self.N]), [batch_size,1]),[batch_size,N,N])
-            return 1.0 / (1.0 + anp.exp(-slope*(P-rij)) )
-        A = anp.triu(sigmoid(x), 1)
+        # sample symmetric random uniforms
+        rij = np.random.random([batch_size, self.N, self.N])
+        rij = np.triu(rij,1) # batched triu!
+        rij += np.transpose(rij,axes=[0,2,1]) # batched transposition
+        slope = kwargs.get('slope', 200)
+        P = np.reshape(np.tile(np.reshape(*args,[self.N,self.N]), [batch_size,1]),[batch_size, self.N, self.N])
+        A = 1.0 / (1.0 + np.exp(-slope*(P-rij)) )
+        A = np.triu(A, 1)
         A += np.transpose(A,axes=[0,2,1])
         return A
 
