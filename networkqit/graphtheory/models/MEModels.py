@@ -103,13 +103,18 @@ class UBCM(ExpectedModel):
         return k-avgk
 
     def sample_adjacency(self, *args, **kwargs):
-        rij = np.random.random([self.N, self.N])
+        batch_size = kwargs.get('batch_size',1)
+        rij = np.random.random([batch_size, self.N, self.N])
         rij = np.triu(rij,1)
-        rij += rij.T
+        rij += np.transpose(rij,[0,2,1]) # transpose last axis
         slope = kwargs.get('slope', 200.0)
-        P = np.outer(*args,*args) / (1.0 + np.outer(*args,*args))
-        return 1.0 / (1.0 + np.exp(-slope*(P-rij)))
-
+        batch_args = np.tile(*args,[batch_size,1]) # replicate
+        xixj = np.einsum('ij,ik->ijk',batch_args, batch_args)
+        P = xixj / (1.0 + xixj)
+        A = 1.0 / (1.0 + np.exp(-slope*(P-rij))) # sampling
+        A = np.triu(A, 1)
+        A += np.transpose(A,axes=[0,2,1])
+        return A
 
 class UWCM(ExpectedModel):
     """"

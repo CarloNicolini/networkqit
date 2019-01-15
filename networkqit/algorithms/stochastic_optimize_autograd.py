@@ -109,13 +109,14 @@ class StochasticOptimizer(ModelOptimizer):
     def graph_laplacian(self, A):
         return np.diag(np.sum(A, axis=0)) - A
 
-    def gradient(self, x, rho, beta, num_samples=1):
+    def gradient(self, x, rho, beta, batch_size=2):
         # Compute the relative entropy between rho and sigma, using tensors with autograd support
         # TODO: Fix because now it has no multiple samples support
         def rel_entropy(z):
-            Lmodel = self.graph_laplacian( self.sample_adjacency_fun(z) )
-            Emodel = np.sum(np.multiply(Lmodel,rho)) / num_samples
-            Eobs = np.sum(np.multiply(self.L, rho)) / num_samples
+            Lmodel = self.graph_laplacian(self.sample_adjacency_fun(z))
+            print(Lmodel.dtype)
+            Emodel = np.sum(np.multiply(Lmodel, rho)) / batch_size
+            Eobs = np.sum(np.multiply(self.L, rho)) / batch_size
             lambd_model = eigh(Lmodel)[0]
             lambd_obs = eigh(self.L)[0]
             Fmodel = - logsumexp(-beta*lambd_model) / beta
@@ -125,8 +126,40 @@ class StochasticOptimizer(ModelOptimizer):
             dkl = loglike - entropy
             return dkl
 
-        fgradx = autograd.grad(rel_entropy) # gradient of relative entropy as a function
-        return fgradx(x)
+        def rel_entropy2(z):
+            Lmodel = np.array([ self.graph_laplacian( self.sample_adjacency_fun(z) )  for i in range(batch_size)])
+            Emodel = np.mean(np.sum(np.sum(np.multiply(Lmodel,rho),axis=2),axis=1))
+            Eobs = np.sum(np.multiply(self.L, rho))
+            lambd_obs = eigh(self.L)[0]
+            lambd_model = np.array([eigh(Lmodel[i])[0] for i in range(batch_size)])
+            Fmodel = - np.mean(logsumexp(-beta*lambd_model, axis=1) / beta)
+            Fobs = - logsumexp(-beta*lambd_obs) / beta
+            loglike = beta*(Emodel-Fmodel)
+            entropy = beta*(Eobs-Fobs)
+            dkl = loglike - entropy
+            return dkl
+
+        def rel_entropy_batched(z):
+            N = len(z) # number of free variables
+            # advanced broadcasting here!
+            Amodel = self.sample_adjacency_fun(z, batch_size=batch_size) # a batched number of adjacency matrices [batch_size,N,N]
+            Dmodel = np.eye(N) * np.transpose(np.zeros([1,1,N]) + np.einsum('ijk->ik',Amodel),[1,0,2])
+            Lmodel =  Dmodel - self.sample_adjacency_fun(z) # returns a batch_size x N x N tensor
+            # do average over batches of the sum of product of matrix elements (done with * operator)
+            Emodel = np.mean(np.sum(np.sum(Lmodel*rho,axis=2),axis=1))
+            Eobs = np.sum(self.L*rho) # = Tr[rho Lobs]
+            lambd_obs = eigh(self.L)[0] # eigh is a batched operation
+            lambd_model = eigh(Lmodel)[0] # eigh is a batched operation, 
+            Fmodel = - np.mean(logsumexp(-beta*lambd_model, axis=1) / beta)
+            Fobs = - logsumexp(-beta*lambd_obs) / beta
+            loglike = beta*(Emodel-Fmodel)
+            entropy = beta*(Eobs-Fobs)
+            dkl = loglike - entropy
+            return dkl
+
+        f_and_df = autograd.value_and_grad(rel_entropy_batched) # gradient of relative entropy as a function
+        f_and_df_vals = f_and_df(x)
+        return f_and_df_vals[0], f_and_df_vals[1]
 
     def run(self, model, **kwargs):
         """
@@ -148,7 +181,7 @@ class StochasticGradientDescent(StochasticOptimizer):
 
     def run(self, **kwargs):
         x = self.x0
-        #num_samples = kwargs.get('num_samples', 1)
+        #batch_size = kwargs.get('batch_size', 1)
         clip_gradients = kwargs.get('clip_gradients', None)
         max_iters = kwargs.get('max_iters', 1000)
         eta = kwargs.get('eta', 1E-3)
@@ -158,7 +191,7 @@ class StochasticGradientDescent(StochasticOptimizer):
         # the list sol contains all optimization points
         sol = []
         # Iterate over all beta provided by the user
-
+        batch_size = kwargs.get('batch_size', 1)
         for beta in self.beta_range:
             x = self.x0
             rho = VonNeumannDensity(A=None, L=self.L, beta=beta).density
@@ -167,7 +200,7 @@ class StochasticGradientDescent(StochasticOptimizer):
             t = 0
             while not converged:
                 t += 1
-                grad_t =  self.gradient(x, rho, beta)
+                dkl, grad_t =  self.gradient(x, rho, beta, batch_size=batch_size)
                 # Convergence status
                 if np.linalg.norm(grad_t) < gtol:
                     converged, opt_message = True, 'gradient tolerance exceeded'
@@ -199,7 +232,7 @@ class Adam(StochasticOptimizer):
 
     def run(self, **kwargs):
         x = self.x0
-        #num_samples = kwargs.get('num_samples', 1)
+        #batch_size = kwargs.get('batch_size', 1)
         clip_gradients = kwargs.get('clip_gradients', None)
         max_iters = kwargs.get('max_iters', 1000)
         eta = kwargs.get('eta', 1E-3)
@@ -212,12 +245,19 @@ class Adam(StochasticOptimizer):
         beta2 = 0.999
         epsilon = 1E-8
 
+        from drawnow import drawnow, figure
+        import matplotlib.pyplot as plt
+        # if global namespace, import plt.figure before drawnow.figure
+        figure(figsize=(8, 4))
+
         # Populate the solution list as function of beta
         # the list sol contains all optimization points
         sol = []
         # Iterate over all beta provided by the user
         mt, vt = np.zeros(self.x0.shape), np.zeros(self.x0.shape)
         all_x = []
+        all_dkl = []
+        batch_size = kwargs.get('batch_size', 1)
         for beta in self.beta_range:
             x = self.x0
             rho = VonNeumannDensity(A=None, L=self.L, beta=beta).density
@@ -226,7 +266,7 @@ class Adam(StochasticOptimizer):
             t = 0
             while not converged:
                 t += 1
-                grad_t =  self.gradient(x, rho, beta)
+                dkl, grad_t =  self.gradient(x, rho, beta, batch_size=batch_size)
                 # Convergence status
                 if np.linalg.norm(grad_t) < gtol:
                     converged, opt_message = True, 'gradient tolerance exceeded'
@@ -240,21 +280,33 @@ class Adam(StochasticOptimizer):
                 vttilde = vt / (1.0 - (beta2 ** t))  # compute bias-corrected second raw moment estimate
                 x_old = x.copy()
                 x -= alpha * mttilde / np.sqrt(vttilde + epsilon)
-                #print('x=', np.linalg.norm(x), '|grad|=', np.linalg.norm(grad_t), ' m=', self.expected_adj_fun(x).sum() / 2, 'beta=', beta)
-                print(' m=', self.expected_adj_fun(x).sum() / 2)
+                if t % 1000 == 0:
+                    print('iter=',t, '|grad|=', np.linalg.norm(grad_t))#, ' m=', self.expected_adj_fun(x).sum() / 2, 'beta=', beta)
+                #print(' m=', self.expected_adj_fun(x).sum() / 2)
                 if self.step_callback is not None:
                     self.step_callback(beta, x)
                 all_x.append(x[0])
-            sol.append({'x': x.copy()})
-            # Here creates the output data structure as a dictionary of the optimization parameters and variables
-            spect_div = SpectralDivergence(Lobs=self.L, Lmodel=graph_laplacian(self.sample_adjacency_fun(sol[-1]['x'])), beta=beta)
-            sol[-1]['DeltaL'] = (np.trace(self.L) - np.trace(graph_laplacian(self.sample_adjacency_fun(sol[-1]['x'])))) / 2
-            sol[-1]['T'] = 1 / beta
-            sol[-1]['beta'] = beta
-            sol[-1]['loglike'] = spect_div.loglike
-            sol[-1]['rel_entropy'] = spect_div.rel_entropy
-            sol[-1]['entropy'] = spect_div.entropy
-
+                all_dkl.append(dkl)
+                #sol[-1]['rel_entropy'] = dkl
+                if t % 1000 == 0:
+                    def draw_fig():
+                        sol.append({'x': x.copy()})
+                        # Here creates the output data structure as a dictionary of the optimization parameters and variables
+                        # spect_div = SpectralDivergence(Lobs=self.L, Lmodel=graph_laplacian(self.sample_adjacency_fun(sol[-1]['x'])), beta=beta)
+                        # sol[-1]['DeltaL'] = (np.trace(self.L) - np.trace(graph_laplacian(self.sample_adjacency_fun(sol[-1]['x'])))) / 2
+                        # sol[-1]['T'] = 1.0 / beta
+                        # sol[-1]['beta'] = beta
+                        # sol[-1]['loglike'] = spect_div.loglike
+                        # sol[-1]['rel_entropy'] = spect_div.rel_entropy
+                        # sol[-1]['entropy'] = spect_div.entropy
+                        plt.subplot(1,3,1)
+                        plt.imshow(self.A)
+                        plt.subplot(1,3,2)
+                        plt.imshow(self.sample_adjacency_fun(x))
+                        plt.subplot(1,3,3)
+                        plt.plot(all_dkl)
+                        plt.tight_layout()
+                    drawnow(draw_fig)
         self.sol = sol
         return sol
 

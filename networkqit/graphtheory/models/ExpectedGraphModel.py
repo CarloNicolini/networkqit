@@ -244,6 +244,41 @@ class ErdosRenyi(ExpectedModel):
         A += A.T
         return A
 
+
+class FreeModel(ExpectedModel):
+    """
+    Erdos-Renyi expected model.
+    When called it returns an adjacency matrix that is constant everywhere and zero on the diagonal.
+    """
+
+    def __init__(self, **kwargs):
+        if kwargs is not None:
+            super().__init__(**kwargs)
+        #self.args_mapping = ['c_er']
+        self.model_type = 'topological'
+        #self.formula = '$c_{er}$'
+        self.bounds = [(0, None)]
+
+    def expected_adjacency(self, *args):
+        return np.reshape(*args,[self.N,self.N])
+    
+    def expected_laplacian_grad(self, x):
+        raise NotImplementedError
+
+    def sample_adjacency(self, x, **kwargs):
+        from autograd import numpy as anp
+        batch_size = kwargs.get('batch_size', 1)
+        def sigmoid(x):
+            rij = anp.random.random([batch_size, self.N, self.N])
+            rij = anp.triu(rij,1) # batched triu!
+            rij += np.transpose(rij,axes=[0,2,1]) # batched transposition
+            slope = kwargs.get('slope', 500)
+            P = np.reshape(np.tile(np.reshape(x,[self.N,self.N]), [batch_size,1]),[batch_size,N,N])
+            return 1.0 / (1.0 + anp.exp(-slope*(P-rij)) )
+        A = anp.triu(sigmoid(x), 1)
+        A += np.transpose(A,axes=[0,2,1])
+        return A
+
 class Edr(ExpectedModel):
     """
     Exponential Distance Rule model.
