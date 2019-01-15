@@ -57,7 +57,7 @@ Finally, the `MLEOptimizer` maximizes the standard likelihood of a model and it 
 
 from networkqit.graphtheory import *
 from networkqit.graphtheory import graph_laplacian as graph_laplacian
-from networkqit.infotheory.density import VonNeumannDensity, SpectralDivergence, compute_vonneuman_density
+from networkqit.infotheory.density import VonNeumannDensity, SpectralDivergence, compute_vonneuman_density, batch_compute_vonneumann_entropy
 
 from .optimize import ModelOptimizer
 
@@ -65,7 +65,6 @@ import autograd.numpy as np
 import autograd
 from autograd.numpy.linalg import eigh
 from autograd.scipy.misc import logsumexp
-from autograd.misc.optimizers import adam
 
 ################################################
 ## Stochastic optimzation from random samples ##
@@ -118,33 +117,6 @@ class StochasticOptimizer(ModelOptimizer):
         entropy = beta*(Eobs-Fobs)
 
         def rel_entropy(z):
-            Lmodel = self.graph_laplacian(self.sample_adjacency_fun(z))
-            print(Lmodel.dtype)
-            Emodel = np.sum(np.multiply(Lmodel, rho)) / batch_size
-            Eobs = np.sum(np.multiply(self.L, rho)) / batch_size
-            lambd_model = eigh(Lmodel)[0]
-            lambd_obs = eigh(self.L)[0]
-            Fmodel = - logsumexp(-beta*lambd_model) / beta
-            Fobs = - logsumexp(-beta*lambd_obs) / beta
-            loglike = beta*(Emodel-Fmodel)
-            entropy = beta*(Eobs-Fobs)
-            dkl = loglike - entropy
-            return dkl
-
-        def rel_entropy2(z):
-            Lmodel = np.array([ self.graph_laplacian( self.sample_adjacency_fun(z) )  for i in range(batch_size)])
-            Emodel = np.mean(np.sum(np.sum(np.multiply(Lmodel,rho),axis=2),axis=1))
-            Eobs = np.sum(np.multiply(self.L, rho))
-            lambd_obs = eigh(self.L)[0]
-            lambd_model = np.array([eigh(Lmodel[i])[0] for i in range(batch_size)])
-            Fmodel = - np.mean(logsumexp(-beta*lambd_model, axis=1) / beta)
-            Fobs = - logsumexp(-beta*lambd_obs) / beta
-            loglike = beta*(Emodel-Fmodel)
-            entropy = beta*(Eobs-Fobs)
-            dkl = loglike - entropy
-            return dkl
-
-        def rel_entropy_batched(z):
             N = len(self.A)
             # advanced broadcasting here!
             # Sample 'batch_size' adjacency matrices shape=[batch_size,N,N]
@@ -155,10 +127,13 @@ class StochasticOptimizer(ModelOptimizer):
             Emodel = np.mean(np.sum(np.sum(Lmodel*rho,axis=2), axis=1))
             lambd_model = eigh(Lmodel)[0] # eigh is a batched operation, 
             Fmodel = - np.mean(logsumexp(-beta*lambd_model, axis=1) / beta)
-            loglike = beta*(Emodel-Fmodel)
-
+            loglike = beta * (Emodel - Fmodel)
             dkl = loglike - entropy
             return dkl
+
+        # value and gradient of relative entropy as a function
+        dkl_and_dkldx = autograd.value_and_grad(rel_entropy)
+        return dkl_and_dkldx(x)
 
         f_and_df = autograd.value_and_grad(rel_entropy_batched) # gradient of relative entropy as a function
         return f_and_df(x)
@@ -301,12 +276,17 @@ class Adam(StochasticOptimizer):
                         # sol[-1]['loglike'] = spect_div.loglike
                         # sol[-1]['rel_entropy'] = spect_div.rel_entropy
                         # sol[-1]['entropy'] = spect_div.entropy
-                        plt.subplot(1,3,1)
+                        A0 = self.sample_adjacency_fun(x)[0,:,:]
+                        plt.subplot(2,2,1)
                         plt.imshow(self.A)
-                        plt.subplot(1,3,2)
-                        plt.imshow(self.sample_adjacency_fun(x)[0,:,:])
-                        plt.subplot(1,3,3)
+                        plt.subplot(2,2,2)
+                        plt.imshow(A0)
+                        plt.subplot(2,2,3)
                         plt.plot(all_dkl)
+                        plt.subplot(2,2,4)
+                        plt.semilogx(self.beta_range,batch_compute_vonneumann_entropy(self.L, self.beta_range),'.-')
+                        plt.semilogx(self.beta_range,batch_compute_vonneumann_entropy(self.graph_laplacian(A0), self.beta_range),'.-')
+                        #plt.legend(loc='best')
                         plt.tight_layout()
                     drawnow(draw_fig)
         self.sol = sol

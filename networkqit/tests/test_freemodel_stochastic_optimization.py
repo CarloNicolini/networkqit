@@ -18,7 +18,7 @@ p = A.sum() / (N*(N-1))
 L = nq.graph_laplacian(A)
 
 beta = 5.0
-opt = Adam(A=A, L=L, x0=np.random.random([N*N,]), beta_range=[beta])
+opt = Adam(A=A, L=L, x0=np.random.random([N*N,]), beta_range=np.logspace(1,-2,50))
 rho = nq.VonNeumannDensity(A=None, L=L, beta=beta).density
 opt.setup(model=M)
 

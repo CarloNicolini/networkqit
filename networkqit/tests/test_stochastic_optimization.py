@@ -20,16 +20,11 @@ L = nq.graph_laplacian(A)
 
 #print(M.sample_adjacency(np.random.random([34,1])))
 
-beta = 0.1
+beta = 1
 x0 = np.random.random([N,])
 opt = Adam(A=A, L=L, x0=x0, beta_range=[beta])
 rho = nq.VonNeumannDensity(A=None, L=L, beta=beta).density
 opt.setup(model=M)
-
-x0 = np.random.random([34,])
-
-#G = opt.gradient(x = np.random.random([N,]), rho=rho, beta=beta, batch_size=2)
-#G(x0)
-sol = opt.run(eta=1E-2, max_iters=10000, gtol=1E-3, batch_size=128)
+sol = opt.run(eta=1E-3, max_iters=np.inf, gtol=1E-3, batch_size=1024)
 plt.pause(5)
 plt.show()
