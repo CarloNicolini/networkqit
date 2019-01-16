@@ -9,8 +9,8 @@ import networkqit.graphtheory.models
 from networkqit.graphtheory.graphs import *
 from networkqit.graphtheory.matrices import *
 from networkqit.graphtheory.models import *
-import networkqit.graphtheory.models.ExpectedGraphModel
-from networkqit.graphtheory.models.ExpectedGraphModel import *
+import networkqit.graphtheory.models.GraphModel
+from networkqit.graphtheory.models.GraphModel import *
 
 import networkqit.graphtheory.models.MEModels
 from networkqit.graphtheory.models.MEModels import *

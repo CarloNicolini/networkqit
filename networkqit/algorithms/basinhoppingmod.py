@@ -10,7 +10,7 @@ import scipy.optimize
 import collections
 from scipy._lib._util import check_random_state
 
-__all__ = ['basinhopping']
+__all__ = ['basinhopping','BHBounds','BHRandStepBounded']
 
 
 class Storage(object):

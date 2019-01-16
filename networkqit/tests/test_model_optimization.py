@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import sys
-sys.path.append('/home/carlo/workspace/networkqit/')
+sys.path.append('/home/carlo2/workspace/networkqit/')
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -54,7 +54,7 @@ def plot(G,pij,wij):
 
 if __name__=='__main__':
 
-    filename = '/home/carlo/workspace/communityalg/data/Coactivation_matrix_weighted.adj'
+    filename = '/home/carlo2/workspace/communityalg/data/Coactivation_matrix_weighted.adj'
     G = np.loadtxt(filename)[0:32, 0:32]
     threshold = 0.1
     W = bct.threshold_absolute(G, threshold)

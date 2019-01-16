@@ -19,7 +19,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """
-Some Maximum entropy graph models, inherit from ExpectedModel.
+Some Maximum entropy graph models, inherit from GraphModel.
 See Tiziano Squartini thesis for more details
 Also reference:
 Garlaschelli, D., & Loffredo, M. I. (2008).
@@ -30,11 +30,12 @@ G here is the graph adjacency matrix, A is the binary adjacency, W is the weight
 """
 
 import autograd.numpy as np
-from .ExpectedGraphModel import ExpectedModel
+from .GraphModel import GraphModel
 
 EPS = np.finfo(float).eps
-#EPS = 0
-class UBCM(ExpectedModel):
+
+
+class UBCM(GraphModel):
     """
     1. Model name: Undirected Binary Configuration Model
 
@@ -67,7 +68,7 @@ class UBCM(ExpectedModel):
             super().__init__(**kwargs)
         self.args_mapping = ['x_' + str(i) for i in range(0, self.N)]
         self.model_type = 'topological'
-        #self.formula = '$p_{ij} = \frac{x_i x_j}{1+x_i x_j}$'
+        self.formula = '$p_{ij} = \frac{x_i x_j}{1+x_i x_j}$'
         self.bounds = [(EPS, None) for i in range(0, self.N)]
 
     def expected_adjacency(self, *args):
@@ -92,9 +93,9 @@ class UBCM(ExpectedModel):
 
     def loglikelihood(self, G, *args):
         pij = self.expected_adjacency(*args)
-        loglike = G*np.log(pij + EPS) + (1-G)*np.log(1-pij - EPS)
+        loglike = G * np.log(pij + EPS) + (1 - G)*np.log(1 - pij - EPS)
         loglike[np.logical_or(np.isnan(loglike), np.isinf(loglike))] = 0
-        return np.triu(loglike,1).sum()
+        return np.triu(loglike, 1).sum()
     
     def saddle_point(self, G, *args):
         k = (G>0).sum(axis=0)
@@ -103,20 +104,20 @@ class UBCM(ExpectedModel):
         return k-avgk
 
     def sample_adjacency(self, *args, **kwargs):
-        batch_size = kwargs.get('batch_size',1)
+        batch_size = kwargs.get('batch_size', 1)
         rij = np.random.random([batch_size, self.N, self.N])
-        rij = np.triu(rij,1)
+        rij = np.triu(rij, 1)
         rij += np.transpose(rij,[0,2,1]) # transpose last axis
         slope = kwargs.get('slope', 200.0)
-        batch_args = np.tile(*args,[batch_size,1]) # replicate
-        xixj = np.einsum('ij,ik->ijk',batch_args, batch_args)
+        batch_args = np.tile(*args,[batch_size, 1]) # replicate
+        xixj = np.einsum('ij,ik->ijk', batch_args, batch_args)
         P = xixj / (1.0 + xixj)
-        A = 1.0 / (1.0 + np.exp(-slope*(P-rij))) # sampling
-        A = np.triu(A, 1) # make it symmetric 
-        A += np.transpose(A, axes=[0,2,1])
+        A = 1.0 / (1.0 + np.exp(-slope*(P-rij))) # sampling, approximates binomial with continuos
+        A = np.triu(A, 1) # make it symmetric
+        A += np.transpose(A, axes=[0, 2, 1])
         return A
 
-class UWCM(ExpectedModel):
+class UWCM(GraphModel):
     """"
     1. Model name: Undirected Weighted Configuration Model
 
@@ -172,9 +173,24 @@ class UWCM(ExpectedModel):
         s = G.sum(axis=0)
         wij = self.expected_weighted_adjacency(args)
         return s - wij.sum(axis=0)
-        
 
-class UBWRG(ExpectedModel):
+    def sample_adjacency(self, *args, **kwargs):
+        batch_size = kwargs.get('batch_size', 1)
+        rij = np.random.random([batch_size, self.N, self.N])
+        rij = np.triu(rij, 1)
+        rij += np.transpose(rij, [0, 2, 1])  # transpose last axis
+        slope = kwargs.get('slope', 200.0)
+        batch_args = np.tile(*args, [batch_size, 1])  # replicate
+        yiyj = np.einsum('ij,ik->ijk', batch_args, batch_args)
+        P = yiyj / (1.0 - yiyj)
+        # TODO IMPLEMENT GEOMETRIC SAMPLING
+        A = 1.0 / (1.0 + np.exp(-slope * (P - rij)))  # sampling, approximates binomial with continuos
+        A = np.triu(A, 1)  # make it symmetric
+        A += np.transpose(A, axes=[0, 2, 1])
+        return A
+
+
+class UBWRG(GraphModel):
     """
     1. Model name: Undirected Binary Weighted Random Graph model
     
@@ -204,7 +220,7 @@ class UBWRG(ExpectedModel):
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
         self.args_mapping =   ['x','y']
-        #self.formula = '$\frac{x  y_i y_j)}{(1 - y_iy_j + x y_i y_j)(1 - y_i y_j)}$' TODO
+        # TODO self.formula = '$\frac{x  y_i y_j)}{(1 - y_iy_j + x y_i y_j)(1 - y_i y_j)}$'
         self.N = kwargs['N']
         self.bounds = [(EPS, None)]*(self.N+1)
         
@@ -235,7 +251,7 @@ class UBWRG(ExpectedModel):
         return np.hstack([L-p*pairs,Wtot-w*pairs])
 
 
-class UECM3(ExpectedModel):
+class UECM3(GraphModel):
     """
     1. Model name: Undirected Enhanced Configuration model III
 
@@ -299,7 +315,7 @@ class UECM3(ExpectedModel):
 
 #################### Continuous models #######################
 
-class CWTECM(ExpectedModel):
+class CWTECM(GraphModel):
     """
     1. Model name: Continuous Weighted Thresholded Enhanced Configuration Model
 
@@ -372,7 +388,7 @@ class CWTECM(ExpectedModel):
         loglike = np.nan_to_num(loglike)
         return np.triu(loglike,1).sum()
 
-class SpatialCM(ExpectedModel):
+class SpatialCM(GraphModel):
     """
     Implements the random graph model with spatial constraints from:
     Ruzzenenti, F., Picciolo, F., Basosi, R., & Garlaschelli, D. (2012). 

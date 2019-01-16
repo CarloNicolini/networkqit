@@ -53,7 +53,6 @@ Finally, the `MLEOptimizer` maximizes the standard likelihood of a model and it 
 #    All rights reserved.
 #    BSD license.
 
-from abc import ABC, abstractmethod
 import autograd
 import autograd.numpy as np
 from scipy.linalg import eigvalsh # a different routine, with no autograd support
@@ -64,14 +63,14 @@ from networkqit.graphtheory import *
 
 from networkqit.infotheory.density import *
 
-class ModelOptimizer(ABC):
-    def __init__(self, A, **kwargs):
+
+class ModelOptimizer:
+    def __init__(self, **kwargs):
         """
         This represents the base abstract class from which to inherit all the possible model optimization classes
         """
         super().__init__()
 
-    @abstractmethod
     def setup(self, **kwargs):
         """
         The setup method must be implemented by each single inherited class.
@@ -79,7 +78,6 @@ class ModelOptimizer(ABC):
         """
         pass
 
-    @abstractmethod
     def gradient(self, **kwargs):
         """
         The gradient method must be implemented by each single inherited class
@@ -89,17 +87,13 @@ class ModelOptimizer(ABC):
         """
         pass
 
-    @abstractmethod
-    def run(self, **kwargs):
+    def run(self, model, **kwargs):
         """
         The  method to call to start optimization
         """
         pass
 
 
-###############################################
-## Standard maximum likelihood optimization ###
-###############################################
 class MLEOptimizer(ModelOptimizer):
     """
     This class, inheriting from the model optimizer class solves the problem of 
@@ -116,34 +110,26 @@ class MLEOptimizer(ModelOptimizer):
         """
         self.G = G
         self.x0 = x0
+        self.sol = None
+        super().__init__(**kwargs)
 
-    def gradient(self, **kwargs):
-        """
-        Not implemented for this class
-        """
-        pass
-
-    def setup(self, **kwargs):
-        """
-        Not implemented for this class
-        """
-        pass
-
-    def run(self, **kwargs):
+    def run(self, model, **kwargs):
         """
         Maximimize the likelihood of the model given the observed network G. 
         """
         # Use the Trust-Region reflective algorithm to maximize loglikelihood
-        opts = {'ftol':kwargs.get('ftol', 1E-10),
-                'gtol':kwargs.get('gtol', 1E-10),
-                'eps': kwargs.get('eps',1E-10),
+        opts = {'ftol': kwargs.get('ftol', 1E-10),
+                'gtol': kwargs.get('gtol', 1E-10),
+                'eps':  kwargs.get('eps', 1E-10),
                 }
 
-        self.sol = minimize(fun=lambda z : -self.model.loglikelihood(self.G,z),
+        # Optimize using L-BFGS-B which typically returns good results
+        self.sol = minimize(fun=lambda z: -model.loglikelihood(self.G, z),
                             x0=np.squeeze(self.x0),
-                            method='L-BFGS-B', # L-BFGS-B finds the saddle point well
-                            bounds=self.model.bounds,
+                            method='L-BFGS-B',
+                            bounds=model.bounds,
                             options=opts)
+
         if self.sol['status'] != 0:
             raise Exception('Method did not converge to maximum likelihood')
 
@@ -197,37 +183,33 @@ class MLEOptimizer(ModelOptimizer):
                                        verbose=kwargs.get('verbose',0))
             # use this form with linear loss as in the basinhopping
             # func argument to be consistent
-            opt_result['fun'] = 0.5*np.sum(opt_result['fun']**2)
+            opt_result['fun'] = 0.5 * np.sum(opt_result['fun']**2)
             return opt_result
 
         # If the model is convex, we simply run least_squares
-        if kwargs.get('basinhopping',False)==False:
-            self.sol = basin_opt(lambda z : model.saddle_point(self.G, z), self.x0)
-        else: # otherwise combine local and global optimization with basinhopping
+        if not kwargs.get('basinhopping', False):
+            self.sol = basin_opt(lambda z: model.saddle_point(self.G, z), self.x0)
+        else:  # otherwise combine local and global optimization with basinhopping
             from .basinhoppingmod import basinhopping, BHBounds, BHRandStepBounded
-            xmin = np.zeros_like(self.x0) + 1E-9 #np.finfo(float).eps
-            xmax = xmin + np.inf # broadcast infinity
-            bounds = BHBounds(xmin = xmin)
+            xmin = np.zeros_like(self.x0) + np.finfo(float).eps
+            xmax = xmin + np.inf  # broadcast infinity
+            bounds = BHBounds(xmin=xmin)
             bounded_step = BHRandStepBounded(xmin, xmax, stepsize=0.5)
-            self.sol = basinhopping(func = lambda z: 0.5*(model.saddle_point(self.G, z)**2).sum(),
-                                    x0 = np.squeeze(self.x0),
-                                    T=kwargs.get('T',1),
+            self.sol = basinhopping(func=lambda z: 0.5*(model.saddle_point(self.G, z)**2).sum(),
+                                    x0=np.squeeze(self.x0),
+                                    T=kwargs.get('T', 1),
                                     minimize_routine = basin_opt,
-                                    minimizer_kwargs = {'saddle_point_equations': lambda z : model.saddle_point(self.G, z)},
-                                    accept_test = bounds,
-                                    take_step = bounded_step,
-                                    niter = kwargs.get('basin_hopping_niter',5),
-                                    disp = bool(kwargs.get('verbose')))
+                                    minimizer_kwargs={'saddle_point_equations': lambda z: model.saddle_point(self.G, z)},
+                                    accept_test=bounds,
+                                    take_step=bounded_step,
+                                    niter=kwargs.get('basin_hopping_niter', 5),
+                                    disp=bool(kwargs.get('verbose')))
         return self.sol
 
 
-##############################################################################
-## Spectral entropy optimization in the continuous approximation with E[L] ###
-##############################################################################
-
 class ExpectedModelOptimizer(ModelOptimizer):
     """
-    This class is at the base of the continuos optimization method
+    Continuos optimization method of spectral entropy in the continuous approximation S(rho, sigma(E[L])))
     """
 
     def __init__(self, A, x0, beta_range, **kwargs):
@@ -244,6 +226,11 @@ class ExpectedModelOptimizer(ModelOptimizer):
         self.L = graph_laplacian(A)
         self.beta_range = beta_range
         self.x0 = x0
+        self.expected_adj_fun = None
+        self.expected_lapl_fun_grad = None
+        self.step_callback = None
+        self.bounds = None
+        super().__init__(**kwargs)
 
     def setup(self, model, step_callback=None):
         """
@@ -251,12 +238,12 @@ class ExpectedModelOptimizer(ModelOptimizer):
         Optionally one can also provide the modelfun_grad, a function that returns the gradient of the expected Laplacian.
 
         args:
-            model: a model from ExpectedModel
+            model: a model from GraphModel
         """
         self.expected_adj_fun = model.expected_adjacency
-        self.self.expected_lapl_fun_grad = model.expected_laplacian
+        self.expected_lapl_fun_grad = model.expected_laplacian
         self.step_callback = step_callback
-        self.bounds = expected_adj_fun.bounds
+        self.bounds = model.bounds
 
     def gradient(self, x, rho, beta):
         """
@@ -276,16 +263,6 @@ class ExpectedModelOptimizer(ModelOptimizer):
         # Here instead of tracing over the matrix product, we just sum over the entrywise product of the two matrices
         # (rho-sigma) and the ∂E_θ[L]/.
         return np.array([np.sum(np.multiply(rho - sigma, self.self.expected_lapl_fun_grad(x)[:, i, :].T)) for i in range(0, len(self.x0))])
-
-    def hessian(self, x, beta):
-        """
-        If required by an optimization algorithms, here we relyi on the numdifftools Python3 library
-        to compute the Hessian of the model at given parameters x and beta
-        """
-        import numdifftools as nd
-        H = nd.Hessian(lambda y: SpectralDivergence(
-            Lobs=self.L, Lmodel=graph_laplacian(self.expected_adj_fun(y)), beta=beta).rel_entropy)(x)
-        return H  # (x)
 
     def run(self, **kwargs):
         """

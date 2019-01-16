@@ -21,12 +21,9 @@
 """
 Method and functions based on the information theory of networks
 """
-import numdifftools as nd
 import autograd.numpy as np
 from scipy.linalg import expm, logm, eigvalsh
-from scipy.optimize import root
 from scipy.stats import entropy
-
 from networkqit.graphtheory.matrices import graph_laplacian
 
 
@@ -41,39 +38,39 @@ def compute_vonneumann_entropy(**kwargs):
     Get the von neumann entropy of the density matrix :math:`S(\\rho) = -\\mathrm{Tr}[\\rho \log \\rho]`
     """
 
-    def S(L, beta):
-        l = eigvalsh(L)
+    def entropy(L, beta):
+        lambd = eigvalsh(L)
         # l = l[l > 0] # introduces an error, entropy doesn't tend to 0 in beta=inf
-        lrho = np.exp(-beta * l)
+        lrho = np.exp(-beta * lambd)
         Z = lrho.sum()
-        return np.log(Z) + beta * (l * lrho).sum() / Z
+        return np.log(Z) + beta * (lambd * lrho).sum() / Z
 
     if 'density' in kwargs.keys():
-        l = eigvalsh(kwargs['density'])
-        return entropy(l[l > 0])
+        lambd = eigvalsh(kwargs['density'])
+        return entropy(lambd[lambd > 0])
 
     elif 'A' in kwargs.keys() and 'beta' in kwargs.keys():
         A = kwargs['A']
         L = graph_laplacian(A)
-        return S(L, kwargs['beta'])
+        return entropy(L, kwargs['beta'])
 
     elif 'L' in kwargs.keys() and 'beta' in kwargs.keys():
-        return S(kwargs['L'], kwargs['beta'])
+        return entropy(kwargs['L'], kwargs['beta'])
 
 
 def batch_compute_vonneumann_entropy(L, beta_range):
     """
     This function computes spectral entropy over a range of beta, given that L remains the same
     """
-    l = eigvalsh(L)
-    S = []
+    lambd = eigvalsh(L)
+    entropy = []
     for b in beta_range:
-        lrho = np.exp(-b * l)
+        lrho = np.exp(-b * lambd)
         Z = lrho.sum()
-        S.append(np.log(Z) + b * (l * lrho).sum() / Z)
-    S = np.array(S)
-    S[np.isnan(S)] = 0
-    return np.array(S)
+        entropy.append(np.log(Z) + b * (lambd * lrho).sum() / Z)
+    entropy = np.array(entropy)
+    entropy[np.isnan(entropy)] = 0
+    return np.array(entropy)
 
 
 def compute_vonneumann_entropy_beta_deriv(**kwargs):
@@ -95,27 +92,71 @@ def compute_vonneumann_entropy_beta_deriv(**kwargs):
 
 
 def batch_compute_vonneumann_entropy_beta_deriv(L, beta_range):
-    l = eigvalsh(L)
+    """
+    Compute the Von Neumann entropy of a graph laplacian over the range of beta parameters
 
-    def s(b):
-        lrho = np.exp(-b * l)
-        Z = lrho.sum()
-        return np.log(Z) + b * (l * lrho).sum() / Z
+    Parameters
+    ----------
+    L: np.array
+        The graph laplacian
+    beta_range: (iterable) list or numpy.array
+        The range of beta
 
-    dsdb = nd.Derivative(lambda y: s(y), n=1)
+    Returns
+    -------
+    np.array
+        The unnormalized Von Neumann entropy over the beta values
+
+    Raises
+    ------
+    None
+    """
+
+    lambd = eigvalsh(L)
+    def entropy(b):
+        lambd_rho = np.exp(-b * lambd)
+        Z = lambd_rho.sum()
+        return np.log(Z) + b * (lambd * lambd_rho).sum() / Z
+
+    from numdifftools import Derivative
+    dsdb = Derivative(lambda y: entropy(y), n=1)
     return np.array([dsdb(x) for x in beta_range])
 
 
 def find_beta_logc(L, c, a=1E-5, b=1E5):
+    """
+    Computes the exact beta such that the Von Neumann entropy is S=log(c) where c is a float.
+    This method uses the bisection method to solve find the solution.
+
+    Parameters
+    ----------
+    L: np.array
+        The graph laplacian
+    c: float
+        a number, if integer, it is meant to represent the number of communities or blocks
+    a: float (default 1E-5)
+        lower bound on the beta search
+    b: float (default 1E5)
+        upper bound on the beta search
+
+    Returns
+    -------
+    float
+        the beta^* such that S(rho(beta^*)) = log(c)
+
+    Raises
+    ------
+    None
+    """
+
     from scipy.optimize import bisect
-    l = eigvalsh(L)
+    lambd = eigvalsh(L)
 
     def s(b, l):
         lrho = np.exp(-b * l)
         Z = lrho.sum()
         return np.log(Z) + b * (l * lrho).sum() / Z
-    
-    return bisect(lambda x: s(x, l) - np.log(c), 1E-5, 1E5)
+    return bisect(lambda x: s(x, lambd) - np.log(c), a, b)
 
 
 class VonNeumannDensity(object):

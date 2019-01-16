@@ -19,23 +19,20 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """
-Expected adjacency matrix of various graph models.
+Base class for the implementation of different graph models.
 Here are specified many possible models of sparse and dense graphs with 
-continuous dependency on some input parameters.
-Importantly the models defined here are models of **expected** adjacency 
-matrix and Laplacian, so please do not make confusion between
-random graph models and the expected graph models described here.
+dependency on some input parameters.
 """
 
 import autograd.numpy as np
 from networkqit.graphtheory import graph_laplacian as graph_laplacian
 
 
-class ExpectedModel():
+class GraphModel:
     """
-    ExpectedModel is the base class that defines all the operations inherited 
-    from models of expected adjacency matrix, expected Laplacian and 
-    gradients of expected laplacian. It defines the behaviour of model 
+    GraphModel is the base class that defines all the operations inherited
+    from models of expected adjacency matrix, expected Laplacian, gradients of
+    expected laplacian and random graph models. It defines the behaviour of model
     operations such as addition or multiplication.
     """
     def __init__(self, **kwargs):
@@ -53,7 +50,7 @@ class ExpectedModel():
         super().__init__()
         self.N = kwargs['N']
         self.args_mapping = None
-        self.num_classes = len(ExpectedModel.__subclasses__())
+        self.num_classes = len(GraphModel.__subclasses__())
         self.model_type = kwargs.get('model_type', None)
         self.parameters = kwargs
         self.bounds = None
@@ -66,25 +63,25 @@ class ExpectedModel():
 
     def __add__(self, other):
         """
-        Returns a ExpectedModel object that when called returns the entrywise sum of the expected adjacency matrices
+        Returns a GraphModel object that when called returns the entrywise sum of the expected adjacency matrices
         """
         return Add(self, other)
 
     def __mul__(self, other):
         """
-        Returns a ExpectedModel object that when called returns the entrywise multiplication of the expected adjacency matrices
+        Returns a GraphModel object that when called returns the entrywise multiplication of the expected adjacency matrices
         """
         return Mul(self, other)
 
     def __truediv__(self, other):
         """
-        Returns a ExpectedModel object that when called returns the entrywise division of the expected adjacency matrices
+        Returns a GraphModel object that when called returns the entrywise division of the expected adjacency matrices
         """
         return Div(self, other)
 
     def __floordiv__(self, other):
         """
-        Returns a ExpectedModel object that when called returns the entrywise division of the expected adjacency matrices
+        Returns a GraphModel object that when called returns the entrywise division of the expected adjacency matrices
         """
         return Div(self, other)
 
@@ -149,7 +146,7 @@ class ExpectedModel():
         raise NotImplementedError
 
     
-class Operator(ExpectedModel):
+class Operator(GraphModel):
     def __init__(self, left, right):
         super().__init__()
         self.left = left
@@ -207,7 +204,7 @@ class Div(Operator):
         return '/'
 
 
-class ErdosRenyi(ExpectedModel):
+class ErdosRenyi(GraphModel):
     """
     Erdos-Renyi expected model.
     When called it returns an adjacency matrix that is constant everywhere and zero on the diagonal.
@@ -245,7 +242,7 @@ class ErdosRenyi(ExpectedModel):
         return A
 
 
-class IsingModel(ExpectedModel):
+class IsingModel(GraphModel):
     """
     A model of N^2 independent variables
     """
@@ -277,7 +274,7 @@ class IsingModel(ExpectedModel):
         A += np.transpose(A,axes=[0,2,1])
         return A
 
-class Edr(ExpectedModel):
+class Edr(GraphModel):
     """
     Exponential Distance Rule model.
     The pairwise spatial distance matrix must be specified as a kwargs argument.
@@ -308,7 +305,7 @@ class Edr(ExpectedModel):
         dL[:,0,:] = (np.eye(n)-1)*np.exp(-mu*dij) + np.diag(np.exp(-mu*dij).sum(axis=0)-1)
         return dL
 
-class EdrTruncated(ExpectedModel):
+class EdrTruncated(GraphModel):
     """
     Truncate Exponential Distance Rule model
     """
@@ -330,7 +327,7 @@ class EdrTruncated(ExpectedModel):
         return P
 
 
-class PowerLawDistance(ExpectedModel):
+class PowerLawDistance(GraphModel):
     """
     Distance rule based on power law
     """
@@ -348,7 +345,7 @@ class PowerLawDistance(ExpectedModel):
         return P
 
 
-class Weibull(ExpectedModel):
+class Weibull(GraphModel):
     """
     Weibull distribution
     Eq. 4.33 Barabasi - Network Science (advanced topis, power laws)
@@ -367,7 +364,7 @@ class Weibull(ExpectedModel):
         return P
 
 
-class EdrSum(ExpectedModel):
+class EdrSum(GraphModel):
     """
     Sum of exponential distance rules
     """
@@ -396,7 +393,7 @@ class EdrSum(ExpectedModel):
         return P#/np.sum(args[0:int(nargs/2)])  # divide by sum of all constants
 
 
-class LevyFligth(ExpectedModel):
+class LevyFligth(GraphModel):
     """
     Levy law for mobile phone users (Gonzalez et al, 2009)
     Understanding individual human mobility patterns, Nature 453 (2009) 779–782
@@ -418,7 +415,7 @@ class LevyFligth(ExpectedModel):
         return P
 
 
-class TopoIdentity(ExpectedModel):
+class TopoIdentity(GraphModel):
     def __init__(self, **kwargs):
         if kwargs is not None:
             super().__init__(**kwargs)
@@ -431,7 +428,7 @@ class TopoIdentity(ExpectedModel):
         return 1-np.eye(self.parameters['num_nodes'])
 
 
-class HiddenVariables(ExpectedModel):
+class HiddenVariables(GraphModel):
     def __init__(self, **kwargs):
         if kwargs is not None:
             super().__init__(**kwargs)
@@ -449,7 +446,7 @@ class HiddenVariables(ExpectedModel):
         return np.outer([*args],[*args])
 
         
-class TopoDegreeProd(ExpectedModel):
+class TopoDegreeProd(GraphModel):
     """
     Topological product of graph degrees (strengths) with powerlaw
     """
@@ -467,7 +464,7 @@ class TopoDegreeProd(ExpectedModel):
         return args[0]*(np.outer(k, k)**(-args[1]))
 
 
-class TopoDegreeAvg(ExpectedModel):
+class TopoDegreeAvg(GraphModel):
     """
     Topological average of graph degrees (strength) with powerlaw
     """
@@ -486,7 +483,7 @@ class TopoDegreeAvg(ExpectedModel):
         return args[0]*((T + T.T)/2)**(-args[1])
 
 
-class TopoDegreeDiff(ExpectedModel):
+class TopoDegreeDiff(GraphModel):
     """
     Topological absolute difference of graph degrees (strengths) with powerlaw
     pij = c (ki - kj)^mu
@@ -505,7 +502,7 @@ class TopoDegreeDiff(ExpectedModel):
         T = np.outer(k, np.ones([1, len(k)]))
         return args[0]*(np.abs(T-T.T))**(-args[1])
 
-class TopoJaccard(ExpectedModel):
+class TopoJaccard(GraphModel):
     """
     Topological models with probability link given by Jaccard coefficient
     For weighted graphs it automatically uses the Weighted Jaccard similarity.
@@ -542,7 +539,7 @@ class TopoJaccard(ExpectedModel):
     def expected_adjacency(self, *args):
         return args[0]*(self.M)**(-args[1])
 
-#class S1(ExpectedModel):
+#class S1(GraphModel):
 #    def __init__(self, **kwargs):
 #        if kwargs is not None:
 #            super().__init__(**kwargs)
@@ -578,7 +575,7 @@ class ModelFactory():
         return self.__next__()
 
     def __next__(self):
-        for m in ExpectedModel.__subclasses__():
+        for m in GraphModel.__subclasses__():
             if self.model_type is None:
                 yield m
                 #self.n = self.n+1
