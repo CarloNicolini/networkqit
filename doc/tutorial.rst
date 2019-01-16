@@ -66,12 +66,12 @@ This returns the expected adjacency matrix, a 34x34 matrix with 0.5 off diagonal
    >>> print(ermodel.expected_laplacian_grad([0.5]))
 
 
-Once the `ermodel` object is defined, we can use it within the `ExpectedModelOptimizer`. We initialize the observed adjacency matrix as `A` and the initial solution `x0=np.array([0.2])`. It is important to define `x0` as a numpy array.
+Once the `ermodel` object is defined, we can use it within the `ContinuousOptimizer`. We initialize the observed adjacency matrix as `A` and the initial solution `x0=np.array([0.2])`. It is important to define `x0` as a numpy array.
 Finally the `beta_range` is a numpy array with the range of `beta` over which to optimize the model.
 
 .. nbplot::
 
-   >>> solver = nq.ExpectedModelOptimizer(A=A, x0=np.array([0.2]), beta_range=beta_range)
+   >>> solver = nq.ContinuousOptimizer(A=A, x0=np.array([0.2]), beta_range=beta_range)
    >>> solver.setup(ermodel, ermodel.expected_laplacian_grad, step_callback=None)
    >>> sol = solver.run()
    >>> print(sol)

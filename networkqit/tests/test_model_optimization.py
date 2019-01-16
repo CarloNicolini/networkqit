@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import sys
-sys.path.append('/home/carlo2/workspace/networkqit/')
+sys.path.append('/home/carlo/workspace/networkqit/')
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -54,9 +54,9 @@ def plot(G,pij,wij):
 
 if __name__=='__main__':
 
-    filename = '/home/carlo2/workspace/communityalg/data/Coactivation_matrix_weighted.adj'
+    filename = '/home/carlo/workspace/communityalg/data/Coactivation_matrix_weighted.adj'
     G = np.loadtxt(filename)[0:32, 0:32]
-    threshold = 0.1
+    threshold = 0.01
     W = bct.threshold_absolute(G, threshold)
     A = (G>0).astype(float)
     k = A.sum(axis=0)
@@ -68,28 +68,27 @@ if __name__=='__main__':
 
 
     M = CWTECM(N=len(W), threshold=threshold)
-    #x0 = (np.concatenate([k,s])+1E-5)*1E-3 #+ (np.random.random([2*len(W),])*2-1)*1E-5
-    x0 = np.random.random([2*len(W),])*1E-1
+    x0 = (np.concatenate([k,s])+1E-5)*1E-3 #+ (np.random.random([2*len(W),])*2-1)*1E-5
+    #x0 = np.random.random([2*len(W),])*1E-3
 
     # Optimize by L-BFGS-B
-    opt = nq.MLEOptimizer(W, x0=x0)
-
-    sol = opt.run(model=M, gtol=1E-8)
+    opt = nq.MLEOptimizer(W, x0=x0, model=M)
+    sol = opt.run(model=M, gtol=1E-8, method='MLE')
     print('Loglikelihood = ', M.loglikelihood(G,sol['x']))
 
-    import numdifftools as nd
-    grad = nd.Gradient(lambda x: M.loglikelihood(G,[x[i] for i in range(2*n)]))
-    print(sol)
-    print('Gradient at x0=\n',grad(x0))
-    print('Gradient at L-BFGS-B solution=\n',grad(sol['x']))
+    pij = M.expected_adjacency(sol['x'])
+    wij = M.expected_weighted_adjacency(sol['x'])
+    plot(W,pij,wij)
 
-    # pij = M.expected_adjacency(sol['x'])
-    # wij = M.expected_weighted_adjacency(sol['x'])
-    # plot(W,pij,wij)
+    nq.MLEOptimizer(W, x0=sol['x'], model=M)
+    sol = opt.run(method='saddle_point', xtol=1E-12, gtol=1E-9)
+    print('Loglikelihood = ', M.loglikelihood(G,sol['x']))
+    pij = M.expected_adjacency(sol['x'])
+    wij = M.expected_weighted_adjacency(sol['x'])
+    plot(W,pij,wij)
 
-    #opt = nq.MLEOptimizer(W, x0=x0)
-    sol = opt.runfsolve(model=M, basinhopping = True, basin_hopping_niter=10, xtol=1E-9, gtol=1E-9)
-    print('Gradient at Least squares solution=\n',grad(sol['x']))
+    sol = opt.run(method='saddle_point', basinhopping = True, basin_hopping_niter=10, xtol=1E-9, gtol=1E-9)
+    #print('Gradient at Least squares solution=\n',grad(sol['x']))
     print('Loglikelihood = ', M.loglikelihood(G,sol['x']))
     pij = M.expected_adjacency(sol['x'])
     wij = M.expected_weighted_adjacency(sol['x'])

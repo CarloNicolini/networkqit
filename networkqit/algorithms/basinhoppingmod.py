@@ -706,12 +706,14 @@ def basinhopping(func, x0, niter=100, T=1.0, stepsize=0.5,
 
 
 class BHBounds(object):
-    def __init__(self, xmin):
+    def __init__(self, xmin, xmax):
         self.xmin = xmin
+        self.xmax = xmax
     def __call__(self, **kwargs):
         x = kwargs["x_new"]
         tmin = bool(np.all(x > self.xmin))
-        return tmin
+        tmax = bool(np.all(x < self.xmax))
+        return tmin and tmax
     
     
 class BHRandStepBounded(object):

@@ -158,13 +158,13 @@ def find_beta_logc(L, c, a=1E-5, b=1E5):
         return np.log(Z) + b * (l * lrho).sum() / Z
     return bisect(lambda x: s(x, lambd) - np.log(c), a, b)
 
-
-class VonNeumannDensity(object):
-    def __init__(self, A, L, beta, **kwargs):
-        self.L = L
-        self.A = A
-        self.beta = beta
-        self.density = compute_vonneuman_density(self.L, beta)
+#
+# class VonNeumannDensity(object):
+#     def __init__(self, A, L, beta, **kwargs):
+#         self.L = L
+#         self.A = A
+#         self.beta = beta
+#         self.density = compute_vonneuman_density(self.L, beta)
 
 
 class SpectralDivergence(object):
