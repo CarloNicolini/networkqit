@@ -245,10 +245,9 @@ class ErdosRenyi(ExpectedModel):
         return A
 
 
-class FreeModel(ExpectedModel):
+class IsingModel(ExpectedModel):
     """
-    Erdos-Renyi expected model.
-    When called it returns an adjacency matrix that is constant everywhere and zero on the diagonal.
+    A model of N^2 independent variables
     """
 
     def __init__(self, **kwargs):
@@ -257,7 +256,7 @@ class FreeModel(ExpectedModel):
         #self.args_mapping = ['c_er']
         self.model_type = 'topological'
         #self.formula = '$c_{er}$'
-        self.bounds = [(0, None)]
+        self.bounds = [(0, None)] * self.N
 
     def expected_adjacency(self, *args):
         return np.reshape(*args,[self.N,self.N])

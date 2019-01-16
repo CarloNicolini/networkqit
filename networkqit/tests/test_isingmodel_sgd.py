@@ -6,14 +6,14 @@ import matplotlib.pyplot as plt
 import autograd
 from autograd import numpy as np
 import networkqit as nq
-from networkqit.algorithms.stochastic_optimize_autograd import StochasticGradientDescent, Adam
+from networkqit import Adam
 import networkx as nx
 
 #A = np.loadtxt('/home/carlo2/workspace/communityalg/data/karate.adj')
 
 A = nq.ring_of_custom_cliques([12,8,4,2])
 N = len(A)
-M = nq.FreeModel(N=N)
+M = nq.IsingModel(N=N)
 p = A.sum() / (N*(N-1))
 L = nq.graph_laplacian(A)
 

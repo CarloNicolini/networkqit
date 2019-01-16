@@ -54,14 +54,15 @@ Finally, the `MLEOptimizer` maximizes the standard likelihood of a model and it 
 #    BSD license.
 
 from abc import ABC, abstractmethod
+import autograd
 import autograd.numpy as np
-from scipy.linalg import eigvalsh
-from scipy.misc import logsumexp
+from scipy.linalg import eigvalsh # a different routine, with no autograd support
+from autograd.numpy.linalg import eigh
+from autograd.scipy.misc import logsumexp
 from scipy.optimize import minimize, least_squares, fsolve
 from networkqit.graphtheory import *
-from networkqit.graphtheory import graph_laplacian as graph_laplacian
-from networkqit.infotheory.density import VonNeumannDensity, SpectralDivergence, compute_vonneuman_density
 
+from networkqit.infotheory.density import *
 
 class ModelOptimizer(ABC):
     def __init__(self, A, **kwargs):
@@ -128,7 +129,7 @@ class MLEOptimizer(ModelOptimizer):
         """
         pass
 
-    def run(self, model, **kwargs):
+    def run(self, **kwargs):
         """
         Maximimize the likelihood of the model given the observed network G. 
         """
@@ -138,10 +139,10 @@ class MLEOptimizer(ModelOptimizer):
                 'eps': kwargs.get('eps',1E-10),
                 }
 
-        self.sol = minimize(fun=lambda z : -model.loglikelihood(self.G,z),
+        self.sol = minimize(fun=lambda z : -self.model.loglikelihood(self.G,z),
                             x0=np.squeeze(self.x0),
                             method='L-BFGS-B', # L-BFGS-B finds the saddle point well
-                            bounds=model.bounds,
+                            bounds=self.model.bounds,
                             options=opts)
         if self.sol['status'] != 0:
             raise Exception('Method did not converge to maximum likelihood')
@@ -426,3 +427,159 @@ class ExpectedModelOptimizer(ModelOptimizer):
                 print(s.format(self.sol[i]['beta'], *row))
 
 
+################################################
+## Stochastic optimzation from random samples ##
+################################################
+class StochasticOptimizer(ModelOptimizer):
+    """
+    This class is at the base of possible implementation of methods based
+    on stochastic gradient descent.
+    The idea behind this class is to help the user in designing a nice stochastic gradient descent method,
+    such as ADAM, AdaGrad or older methods, like the Munro-Robbins stochastic gradients optimizer.
+    Working out the expression for the gradients of the relative entropy, one remains with the following:
+
+    :math: `\nabla_{\theta}S(\rho \| \sigma) = \beta \textrm\biggl \lbrack \rho \nabla_{\theta}\mathbb{E}_{\theta}[L]} \biggr \rbrack`
+        
+    :math: `\frac{\partial S(\rho \| \sigma)}{\partial \theta_k} = \beta \textrm{Tr}\lbrack \rho \frac{\partial}{\partial \theta_k} \rbrack + \frac{\partial}{\partial \theta_k}\mathbb{E}_{\theta}\log \textrm{Tr} e^{-\beta L(\theta)}\lbrack \rbrack`
+    
+    This class requires either Tensorflow or Pytorch to support backpropagation in the eigenvalues routines.
+    Alternatively you can use github.com/HIPS/autograd method for full CPU support.
+    """
+
+    def __init__(self, A, x0, beta_range, **kwargs):
+        self.A = A
+        self.L = graph_laplacian(self.A)
+        self.x0 = x0
+        self.beta_range = beta_range
+
+    def setup(self, model, step_callback=None):
+        """
+        Setup the optimizer. Must specify the model.
+
+        args:
+            adj_fun: a function in the form f(x) that once called returns the adjacency matrix of a random graph. Not to be confused with the expected adjacency matrix.
+            expected_laplacian_grad: a function in the form f(x) that once called returns the expected gradients of the laplacian of the random graph.
+            step_callback: a callback function to control the current status of optimization.
+        """
+        self.expected_adj_fun = model.expected_adjacency
+        self.sample_adjacency_fun = model.sample_adjacency
+        self.expected_laplacian_grad_fun = model.expected_laplacian_grad
+        self.step_callback = step_callback
+        self.bounds = model.bounds
+
+    def gradient(self, x, rho, beta, batch_size=1):
+        # Compute the relative entropy between rho and sigma, using tensors with autograd support
+        # TODO: Fix because now it has no multiple samples support
+        Eobs = np.sum(self.L*rho) # = Tr[rho Lobs]
+        lambd_obs = eigh(self.L)[0] # eigh is a batched operation
+        Fobs = - logsumexp(-beta*lambd_obs) / beta
+        entropy = beta*(Eobs-Fobs)
+
+        def rel_entropy(z):
+            N = len(self.A)
+            # advanced broadcasting here!
+            # Sample 'batch_size' adjacency matrices shape=[batch_size,N,N]
+            Amodel = self.sample_adjacency_fun(z, batch_size=batch_size)
+            Dmodel = np.eye(N) * np.transpose(np.zeros([1,1,N]) + np.einsum('ijk->ik', Amodel),[1,0,2])
+            Lmodel =  Dmodel - Amodel # returns a batch_size x N x N tensor
+            # do average over batches of the sum of product of matrix elements (done with * operator)
+            Emodel = np.mean(np.sum(np.sum(Lmodel*rho,axis=2), axis=1))
+            lambd_model = eigh(Lmodel)[0] # eigh is a batched operation, 
+            Fmodel = - np.mean(logsumexp(-beta*lambd_model, axis=1) / beta)
+            loglike = beta * (Emodel - Fmodel)
+            dkl = loglike - entropy
+            return dkl
+
+        # value and gradient of relative entropy as a function
+        dkl_and_dkldx = autograd.value_and_grad(rel_entropy)
+        return dkl_and_dkldx(x)
+
+        f_and_df = autograd.value_and_grad(rel_entropy_batched) # gradient of relative entropy as a function
+        return f_and_df(x)
+
+    def run(self, model, **kwargs):
+        """
+        Start the optimization process
+        """
+        raise NotImplementedError
+
+class Adam(StochasticOptimizer):
+    """
+    Implements the ADAM stochastic gradient descent.
+    Adam: A Method for Stochastic Optimization
+    Diederik P. Kingma, Jimmy Ba
+
+    https://arxiv.org/abs/1412.6980
+    """
+
+    def run(self, **kwargs):
+        x = self.x0
+        batch_size = kwargs.get('batch_size', 1)
+        max_iters = kwargs.get('max_iters', 1000)
+        # ADAM parameters
+        eta = kwargs.get('eta', 1E-3)
+        gtol = kwargs.get('gtol', 1E-4)
+        xtol = kwargs.get('xtol', 1E-3)
+        beta1 = 0.9
+        beta2 = 0.999
+        epsilon = 1E-8
+        # visualization options
+        refresh_frames = 10
+        from drawnow import drawnow, figure
+        import matplotlib.pyplot as plt
+        # if global namespace, import plt.figure before drawnow.figure
+        figure(figsize=(8, 4))
+        # Populate the solution list as function of beta
+        # the list sol contains all optimization points
+        sol = []
+        # Iterate over all beta provided by the user
+        mt, vt = np.zeros(self.x0.shape), np.zeros(self.x0.shape)
+        all_dkl = []
+        # TODO implement model boundaries in Adam
+        # bounds = np.array(np.ravel(self.model.bounds),dtype=float)
+        for beta in self.beta_range:
+            # if rho is provided, user rho is used, otherwise is computed at every beta
+            rho = kwargs.get('rho', compute_vonneuman_density(L=self.L, beta=beta))
+            # initialize at x0
+            x = self.x0
+            converged = False
+            opt_message = ''
+            t = 0 # t is the iteration number
+            while not converged:
+                t += 1
+                # get the relative entropy value and its gradient w.r.t. variables
+                dkl, grad_t =  self.gradient(x, rho, beta, batch_size=batch_size)
+                # Convergence status
+                if np.linalg.norm(grad_t) < gtol:
+                    converged, opt_message = True, 'gradient tolerance exceeded'
+                if t > max_iters:
+                    converged, opt_message = True, 'maximum iterations exceed'
+                # TODO implement check boundaries in Adam
+                #if np.any(np.ravel(self.model.bounds)):
+                #    raise RuntimeError('variable bounds exceeded')
+                mt = beta1 * mt + (1.0 - beta1) * grad_t
+                vt = beta2 * vt + (1.0 - beta2) * grad_t * grad_t
+                mttilde = mt / (1.0 - (beta1 ** t))  # compute bias corrected first moment estimate
+                vttilde = vt / (1.0 - (beta2 ** t))  # compute bias-corrected second raw moment estimate
+                x_old = x.copy()
+                x -= eta * mttilde / np.sqrt(vttilde + epsilon)
+                
+                all_dkl.append(dkl)
+                if t % refresh_frames == 0:
+                    def draw_fig():
+                        sol.append({'x': x.copy()})
+                        A0 = np.mean(self.sample_adjacency_fun(x, batch_size=batch_size),axis=0)
+                        plt.subplot(2,2,1)
+                        plt.imshow(self.A)
+                        plt.subplot(2,2,2)
+                        plt.imshow(A0)
+                        plt.subplot(2,2,3)
+                        plt.plot(all_dkl)
+                        plt.subplot(2,2,4)
+                        plt.semilogx(self.beta_range,batch_compute_vonneumann_entropy(self.L, self.beta_range),'.-')
+                        plt.semilogx(self.beta_range,batch_compute_vonneumann_entropy(graph_laplacian(A0), self.beta_range),'.-')
+                        #plt.legend(loc='best')
+                        plt.tight_layout()
+                    drawnow(draw_fig)
+        self.sol = sol
+        return sol

@@ -184,7 +184,7 @@ class StochasticGradientDescent(StochasticOptimizer):
                 if t > max_iters:
                     converged, opt_message = True, 'max_iters_exceed'
                 if np.any(x[0]<0):
-                    raise RuntimeError('bounds_exceeded')
+                    raise RuntimeError('variable bounds exceeded')
                 x_old = x.copy()
                 x -= eta * grad_t
                 #print('x=', x, '|grad|=', np.linalg.norm(grad_t), ' m=', self.expected_adj_fun(x).sum() / 2, 'beta=', beta)
@@ -258,8 +258,7 @@ class Adam(StochasticOptimizer):
                 x_old = x.copy()
                 x -= alpha * mttilde / np.sqrt(vttilde + epsilon)
                 if t % 10 == 0:
-                    print('iter=',t, '|grad|=', np.linalg.norm(grad_t))#, ' m=', self.expected_adj_fun(x).sum() / 2, 'beta=', beta)
-                #print(' m=', self.expected_adj_fun(x).sum() / 2)
+                    print('iter=',t, 'beta=', beta, '|grad|=', np.linalg.norm(grad_t))#, ' m=', self.expected_adj_fun(x).sum() / 2, 'beta=', beta)
                 if self.step_callback is not None:
                     self.step_callback(beta, x)
                 all_x.append(x[0])
