@@ -245,7 +245,7 @@ class ContinuousOptimizer(ModelOptimizer):
         sigma = compute_vonneuman_density(graph_laplacian(self.model.expected_adjacency(x)), beta)
         # Here instead of tracing over the matrix product, we just sum over the entrywise product of the two matrices
         # (rho-sigma) and the ∂E_θ[L]/.
-        return np.array([np.sum(np.multiply(rho - sigma, self.self.model.expected_laplaplacian_grad(x)[:, i, :].T)) for i in
+        return np.array([np.sum(np.multiply(rho - sigma, self.model.expected_laplaplacian_grad(x)[:, i, :].T)) for i in
                          range(0, len(self.x0))])
 
     def run(self, **kwargs):
@@ -330,13 +330,9 @@ class ContinuousOptimizer(ModelOptimizer):
             sol[-1]['DeltaL'] = (np.trace(self.L) - np.trace(graph_laplacian(self.model.expected_adjacency(sol[-1].x)))) / 2
             if kwargs.get('compute_sigma', False):
                 Lmodel = graph_laplacian(self.model.expected_adjacency(sol[-1].x))
-                rho = VonNeumannDensity(A=None, L=self.L, beta=beta).density
-                sigma = VonNeumannDensity(A=None, L=Lmodel, beta=beta).density
-                sol[-1]['<DeltaL>'] = np.trace(np.dot(rho, Lmodel)) - np.trace(np.dot(sigma, Lmodel))
-                # from scipy.integrate import quad
-                # from numpy import vectorize
-                # Q1 = vectorize(quad)(lambda x : expm(-x*beta*self.L)@(self.L-Lmodel)@expm(x*beta*self.L),0,1)
-                # sol[-1]['<DeltaL>_1'] = beta*( np.trace(rho@Q1@Lmodel) - np.trace(rho@Q1)*np.trace(rho@Lmodel) )
+                rho = compute_vonneuman_density(L=self.L, beta=beta)
+                sigma = compute_vonneuman_density(L=Lmodel, beta=beta)
+                sol[-1]['<DeltaL>'] = np.sum((rho-sigma)*Lmodel)
             sol[-1]['T'] = 1 / beta
             sol[-1]['beta'] = beta
             sol[-1]['loglike'] = spect_div.loglike
@@ -396,8 +392,7 @@ class ContinuousOptimizer(ModelOptimizer):
 ################################################
 class StochasticOptimizer(ModelOptimizer):
     """
-    This class is at the base of possible implementation of methods based
-    on stochastic gradient descent.
+    This class is at the base of implementation of methods based on stochastic gradient descent.
     The idea behind this class is to help the user in designing a nice stochastic gradient descent method,
     such as ADAM, AdaGrad or older methods, like the Munro-Robbins stochastic gradients optimizer.
     Working out the expression for the gradients of the relative entropy, one remains with the following:
@@ -419,9 +414,9 @@ class StochasticOptimizer(ModelOptimizer):
 
     def gradient(self, x, rho, beta, batch_size=1):
         # Compute the relative entropy between rho and sigma, using tensors with autograd support
-        # TODO: Fix because now it has no multiple samples support
+        # These variable are dependent on rho, thus are constant
         Eobs = np.sum(self.L * rho)  # = Tr[rho Lobs]
-        lambd_obs = eigh(self.L)[0]  # eigh is a batched operation
+        lambd_obs = eigh(self.L)[0]  # eigh is a batched operation, take the eigenvalues only
         Fobs = - logsumexp(-beta * lambd_obs) / beta
         entropy = beta * (Eobs - Fobs)
 
@@ -468,9 +463,9 @@ class Adam(StochasticOptimizer):
         epsilon = 1E-8
         # visualization options
         refresh_frames = 100
-        from drawnow import drawnow, figure
+        #from drawnow import drawnow, figure
         import matplotlib.pyplot as plt
-        figure(figsize=(8, 4))
+        #figure(figsize=(8, 4))
         # Populate the solution list as function of beta
         # the list sol contains all optimization points
         sol = []
@@ -485,7 +480,6 @@ class Adam(StochasticOptimizer):
             # initialize at x0
             x = self.x0
             converged = False
-            opt_message = ''
             t = 0  # t is the iteration number
             while not converged:
                 t += 1
@@ -493,9 +487,9 @@ class Adam(StochasticOptimizer):
                 dkl, grad_t = self.gradient(x, rho, beta, batch_size=batch_size)
                 # Convergence status
                 if np.linalg.norm(grad_t) < gtol:
-                    converged, opt_message = True, 'gradient tolerance exceeded'
+                    converged = True
                 if t > max_iters:
-                    converged, opt_message = True, 'maximum iterations exceed'
+                    converged = True
                 # TODO implement check boundaries in Adam
                 # if np.any(np.ravel(self.model.bounds)):
                 #    raise RuntimeError('variable bounds exceeded')
@@ -503,42 +497,41 @@ class Adam(StochasticOptimizer):
                 vt = beta2 * vt + (1.0 - beta2) * (grad_t * grad_t)
                 mttilde = mt / (1.0 - (beta1 ** t))  # compute bias corrected first moment estimate
                 vttilde = vt / (1.0 - (beta2 ** t))  # compute bias-corrected second raw moment estimate
-                x_old = x.copy()
                 x -= eta * mttilde / np.sqrt(vttilde + epsilon)
 
-                all_dkl.append(dkl)
-                if t % refresh_frames == 0:
-                    def draw_fig():
-                        sol.append({'x': x.copy()})
-                        #plt.cla()
-                        #plt.figure(figsize=(8, 4))
-                        A0 = np.mean(self.model.sample_adjacency(x, batch_size=batch_size), axis=0)
-                        plt.subplot(2, 2, 1)
-                        plt.imshow(self.A)
-                        plt.title('Data')
-                        plt.subplot(2, 2, 2)
-                        plt.imshow(A0)
-                        plt.title('<Model>')
-                        plt.subplot(2, 2, 3)
-                        plt.plot(all_dkl)
-                        plt.xlabel('iteration')
-                        plt.ylabel('$S(\\rho,\\sigma)$')
-                        plt.subplot(2, 2, 4)
-                        plt.semilogx(self.beta_range, batch_compute_vonneumann_entropy(self.L, self.beta_range), '.-',
-                                     label='data')
-                        plt.semilogx(self.beta_range,
-                                     batch_compute_vonneumann_entropy(graph_laplacian(A0), self.beta_range), '.-',
-                                     label='model')
-                        plt.semilogx(beta, batch_compute_vonneumann_entropy(graph_laplacian(A0), [beta]), 'ko',
-                                     label='model')
-                        plt.xlabel('$\\beta$')
-                        plt.ylabel('$S$')
-                        plt.title('Entropy')
-                        plt.legend(loc='best')
-                        plt.tight_layout()
-                        #plt.savefig('frame_' + '{0:0>5}'.format(t) + '.png')
-
-                    #draw_fig()
-                    drawnow(draw_fig)
+                # all_dkl.append(dkl)
+                # if t % refresh_frames == 0:
+                #     def draw_fig():
+                #         sol.append({'x': x.copy()})
+                #         #plt.cla()
+                #         #plt.figure(figsize=(8, 4))
+                #         A0 = np.mean(self.model.sample_adjacency(x, batch_size=batch_size), axis=0)
+                #         plt.subplot(2, 2, 1)
+                #         plt.imshow(self.A)
+                #         plt.title('Data')
+                #         plt.subplot(2, 2, 2)
+                #         plt.imshow(A0)
+                #         plt.title('<Model>')
+                #         plt.subplot(2, 2, 3)
+                #         plt.plot(all_dkl)
+                #         plt.xlabel('iteration')
+                #         plt.ylabel('$S(\\rho,\\sigma)$')
+                #         plt.subplot(2, 2, 4)
+                #         plt.semilogx(self.beta_range, batch_compute_vonneumann_entropy(self.L, self.beta_range), '.-',
+                #                      label='data')
+                #         plt.semilogx(self.beta_range,
+                #                      batch_compute_vonneumann_entropy(graph_laplacian(A0), self.beta_range), '.-',
+                #                      label='model')
+                #         plt.semilogx(beta, batch_compute_vonneumann_entropy(graph_laplacian(A0), [beta]), 'ko',
+                #                      label='model')
+                #         plt.xlabel('$\\beta$')
+                #         plt.ylabel('$S$')
+                #         plt.title('Entropy')
+                #         plt.legend(loc='best')
+                #         plt.tight_layout()
+                #         #plt.savefig('frame_' + '{0:0>5}'.format(t) + '.png')
+                #
+                #     #draw_fig()
+                #     #drawnow(draw_fig)
         self.sol = sol
         return sol
