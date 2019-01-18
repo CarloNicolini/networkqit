@@ -269,7 +269,7 @@ class IsingModel(GraphModel):
         rij += np.transpose(rij,axes=[0,2,1]) # batched transposition
         slope = kwargs.get('slope', 200)
         P = np.reshape(np.tile(np.reshape(*args,[self.N,self.N]), [batch_size,1]),[batch_size, self.N, self.N])
-        A = 1.0 / (1.0 + np.exp(-slope*(P-rij)) )
+        A = 1.0 / (1.0 + np.exp(-slope*(P-rij)) ) # TODO try to avoid under/overflows here
         A = np.triu(A, 1)
         A += np.transpose(A,axes=[0,2,1])
         return A

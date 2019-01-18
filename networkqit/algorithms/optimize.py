@@ -66,9 +66,9 @@ from autograd.numpy.linalg import eigh
 from autograd.scipy.misc import logsumexp
 from scipy.optimize import minimize, least_squares
 from networkqit.graphtheory import *
-
 from networkqit.infotheory.density import *
 
+import logging
 
 class ModelOptimizer:
     def __init__(self, **kwargs):
@@ -414,11 +414,10 @@ class StochasticOptimizer(ModelOptimizer):
 
     def gradient(self, x, rho, beta, batch_size=1):
         # Compute the relative entropy between rho and sigma, using tensors with autograd support
-        # These variable are dependent on rho, thus are constant
-        Eobs = np.sum(self.L * rho)  # = Tr[rho Lobs]
-        lambd_obs = eigh(self.L)[0]  # eigh is a batched operation, take the eigenvalues only
-        Fobs = - logsumexp(-beta * lambd_obs) / beta
-        entropy = beta * (Eobs - Fobs)
+        # Entropy of rho is constant over the iterations
+        # if beta is kept constant, otherwise a specific rho can be passed
+        #lambd_rho = eigh(rho)[0]
+        #entropy = -np.sum(lambd_rho * np.log(lambd_rho))
 
         def rel_entropy(z):
             N = len(self.A)
@@ -430,10 +429,16 @@ class StochasticOptimizer(ModelOptimizer):
             Lmodel = Dmodel - Amodel  # returns a batch_size x N x N tensor
             # do average over batches of the sum of product of matrix elements (done with * operator)
             Emodel = np.mean(np.sum(np.sum(Lmodel * rho, axis=2), axis=1))
-            lambd_model = eigh(Lmodel)[0]  # eigh is a batched operation, take the eigenvalues only
+            try:
+                lambd_model = eigh(Lmodel)[0]  # eigh is a batched operation, take the eigenvalues only
+            except:
+                print('nan?=',np.any(np.isnan(Lmodel)))
+                print('nan?=',np.any(np.isinf(Lmodel)))
+                print(x)
+                pass
             Fmodel = - np.mean(logsumexp(-beta * lambd_model, axis=1) / beta)
-            loglike = beta * (Emodel - Fmodel)
-            dkl = loglike - entropy
+            loglike = beta * (Emodel - Fmodel) # - Tr[rho log(sigma)]
+            dkl = loglike# - entropy # Tr[rho log(rho)] - Tr[rho log(sigma)]
             return dkl
 
         # value and gradient of relative entropy as a function
@@ -460,10 +465,14 @@ class Adam(StochasticOptimizer):
         xtol = kwargs.get('xtol', 1E-3)
         beta1 = 0.9
         beta2 = 0.999
-        epsilon = 1E-8
-        
+        epsilon = 1E-8 # avoid nan with large learning rates
+        # Use quasi-hyperbolic adam by default
+        # https://arxiv.org/pdf/1810.06801.pdf
+        quasi_hyperbolic = kwargs.get('quasi_hyperbolic', True)
+        nu1 = 0.7 # for quasi-hyperbolic adam
+        nu2 = 1.0 # for quasi-hyperbolic adam
         # visualization options
-        refresh_frames = 10
+        refresh_frames = kwargs.get('refresh_frames',100)
         from drawnow import drawnow, figure
         import matplotlib.pyplot as plt
         figure(figsize=(8, 8))
@@ -477,6 +486,7 @@ class Adam(StochasticOptimizer):
         # TODO implement model boundaries in Adam
         # bounds = np.array(np.ravel(self.model.bounds),dtype=float)
         for beta in self.beta_range:
+            logging.info('Changed beta to %g' % beta)
             # if rho is provided, user rho is used, otherwise is computed at every beta
             rho = kwargs.get('rho', compute_vonneuman_density(L=self.L, beta=beta))
             # initialize at x0
@@ -499,7 +509,10 @@ class Adam(StochasticOptimizer):
                 vt = beta2 * vt + (1.0 - beta2) * (grad_t * grad_t)
                 mttilde = mt / (1.0 - (beta1 ** t))  # compute bias corrected first moment estimate
                 vttilde = vt / (1.0 - (beta2 ** t))  # compute bias-corrected second raw moment estimate
-                x -= eta * mttilde / np.sqrt(vttilde + epsilon)
+                if quasi_hyperbolic: # quasi hyperbolic adam
+                    x -= eta * ((1-nu1) * grad_t + nu1 * mttilde)/(np.sqrt((1-nu2) * (grad_t**2) + nu2 * vttilde ) + epsilon)
+                else: # vanilla Adam
+                    x -= eta * mttilde / np.sqrt(vttilde + epsilon)
 
                 all_dkl.append(dkl)
                 if t % refresh_frames == 0:
@@ -535,3 +548,4 @@ class Adam(StochasticOptimizer):
                     drawnow(draw_fig)
         self.sol = sol
         return sol
+
