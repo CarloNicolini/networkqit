@@ -461,11 +461,13 @@ class Adam(StochasticOptimizer):
         beta1 = 0.9
         beta2 = 0.999
         epsilon = 1E-8
+        
         # visualization options
-        refresh_frames = 100
-        #from drawnow import drawnow, figure
+        refresh_frames = 10
+        from drawnow import drawnow, figure
         import matplotlib.pyplot as plt
-        #figure(figsize=(8, 4))
+        figure(figsize=(8, 8))
+
         # Populate the solution list as function of beta
         # the list sol contains all optimization points
         sol = []
@@ -499,39 +501,37 @@ class Adam(StochasticOptimizer):
                 vttilde = vt / (1.0 - (beta2 ** t))  # compute bias-corrected second raw moment estimate
                 x -= eta * mttilde / np.sqrt(vttilde + epsilon)
 
-                # all_dkl.append(dkl)
-                # if t % refresh_frames == 0:
-                #     def draw_fig():
-                #         sol.append({'x': x.copy()})
-                #         #plt.cla()
-                #         #plt.figure(figsize=(8, 4))
-                #         A0 = np.mean(self.model.sample_adjacency(x, batch_size=batch_size), axis=0)
-                #         plt.subplot(2, 2, 1)
-                #         plt.imshow(self.A)
-                #         plt.title('Data')
-                #         plt.subplot(2, 2, 2)
-                #         plt.imshow(A0)
-                #         plt.title('<Model>')
-                #         plt.subplot(2, 2, 3)
-                #         plt.plot(all_dkl)
-                #         plt.xlabel('iteration')
-                #         plt.ylabel('$S(\\rho,\\sigma)$')
-                #         plt.subplot(2, 2, 4)
-                #         plt.semilogx(self.beta_range, batch_compute_vonneumann_entropy(self.L, self.beta_range), '.-',
-                #                      label='data')
-                #         plt.semilogx(self.beta_range,
-                #                      batch_compute_vonneumann_entropy(graph_laplacian(A0), self.beta_range), '.-',
-                #                      label='model')
-                #         plt.semilogx(beta, batch_compute_vonneumann_entropy(graph_laplacian(A0), [beta]), 'ko',
-                #                      label='model')
-                #         plt.xlabel('$\\beta$')
-                #         plt.ylabel('$S$')
-                #         plt.title('Entropy')
-                #         plt.legend(loc='best')
-                #         plt.tight_layout()
-                #         #plt.savefig('frame_' + '{0:0>5}'.format(t) + '.png')
-                #
-                #     #draw_fig()
-                #     #drawnow(draw_fig)
+                all_dkl.append(dkl)
+                if t % refresh_frames == 0:
+                    def draw_fig():
+                        sol.append({'x': x.copy()})
+                        #plt.cla()
+                        #plt.figure(figsize=(8, 4))
+                        A0 = np.mean(self.model.sample_adjacency(x, batch_size=batch_size), axis=0)
+                        plt.subplot(2, 2, 1)
+                        plt.imshow(self.A)
+                        plt.title('Data')
+                        plt.subplot(2, 2, 2)
+                        plt.imshow(A0)
+                        plt.title('<Model>')
+                        plt.subplot(2, 2, 3)
+                        plt.plot(all_dkl)
+                        plt.xlabel('iteration')
+                        plt.ylabel('$S(\\rho,\\sigma)$')
+                        plt.subplot(2, 2, 4)
+                        plt.semilogx(self.beta_range, batch_compute_vonneumann_entropy(self.L, self.beta_range), '.-',
+                                     label='data')
+                        plt.semilogx(self.beta_range,
+                                     batch_compute_vonneumann_entropy(graph_laplacian(A0), self.beta_range), '.-',
+                                     label='model')
+                        plt.semilogx(beta, batch_compute_vonneumann_entropy(graph_laplacian(A0), [beta]), 'ko',
+                                     label='model')
+                        plt.xlabel('$\\beta$')
+                        plt.ylabel('$S$')
+                        plt.title('Entropy')
+                        plt.legend(loc='best')
+                        #plt.tight_layout()
+                        #plt.savefig('frame_' + '{0:0>5}'.format(t) + '.png')
+                    drawnow(draw_fig)
         self.sol = sol
         return sol

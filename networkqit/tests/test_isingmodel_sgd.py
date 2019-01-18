@@ -11,28 +11,21 @@ import networkx as nx
 
 #A = np.loadtxt('/home/carlo2/workspace/communityalg/data/karate.adj')
 
-A = nq.ring_of_custom_cliques([12,8,4,2])
+A = nq.ring_of_custom_cliques([24,12,8,4,2])
 N = len(A)
 M = nq.IsingModel(N=N)
 p = A.sum() / (N*(N-1))
 L = nq.graph_laplacian(A)
 
 beta = 1
-opt = Adam(A=A, L=L, x0=np.random.random([N*N,]), beta_range=np.logspace(1,-3,1), model=M)
+opt = Adam(A=A, L=L, x0=np.random.random([N*N,]), beta_range=np.logspace(1,-3,100), model=M)
 rho = nq.compute_vonneuman_density(L=L, beta=beta)
 
 #G = autograd.grad(lambda x : np.sum(M.sample_adjacency(x)))
 #x0 = np.random.random([34,])
 
-import cProfile
-pr = cProfile.Profile()
-pr.enable()
 #G = opt.gradient(x=np.random.random([N,1]), rho=rho, beta=beta, num_samples=1)
-sol = opt.run(eta=1E-3, max_iters=100, gtol=1E-5, batch_size=32)
-
-pr.disable()
-# after your program ends
-pr.dump_stats(file='profile.pstat')
+sol = opt.run(eta=1E-3, max_iters=1000, gtol=1E-5, batch_size=32)
 
 plt.pause(5)
 plt.show()

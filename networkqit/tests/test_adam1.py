@@ -26,9 +26,8 @@ plt.show()
 
 beta = 1
 x0 = np.random.random([N,])
-opt = Adam(A=A, L=L, x0=x0, beta_range=np.logspace(0,-2,50))
-rho = nq.VonNeumannDensity(A=None, L=L, beta=0.1).density
-opt.setup(model=M)
+opt = Adam(A=A, L=L, x0=x0, beta_range=np.logspace(0,-2,50), model=M)
+rho = nq.compute_vonneuman_density(A=None, L=L, beta=0.1)
 sol = opt.run(eta=1E-3, max_iters=np.inf, gtol=1E-4, batch_size=16)
 plt.pause(5)
 plt.show()
