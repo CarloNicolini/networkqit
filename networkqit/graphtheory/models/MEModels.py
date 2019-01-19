@@ -31,6 +31,7 @@ G here is the graph adjacency matrix, A is the binary adjacency, W is the weight
 
 import autograd.numpy as np
 from .GraphModel import GraphModel
+from .GraphModel import expit, batched_symmetric_random
 
 EPS = np.finfo(float).eps
 
@@ -105,14 +106,12 @@ class UBCM(GraphModel):
 
     def sample_adjacency(self, *args, **kwargs):
         batch_size = kwargs.get('batch_size', 1)
-        rij = np.random.random([batch_size, self.N, self.N])
-        rij = np.triu(rij, 1)
-        rij += np.transpose(rij,[0,2,1]) # transpose last axis
-        slope = kwargs.get('slope', 200.0)
+        rij = batched_symmetric_random(batch_size, self.N)
+        slope = kwargs.get('slope', 50.0)
         batch_args = np.tile(*args,[batch_size, 1]) # replicate
         xixj = np.einsum('ij,ik->ijk', batch_args, batch_args)
         P = xixj / (1.0 + xixj)
-        A = 1.0 / (1.0 + np.exp(-slope*(P-rij))) # sampling, approximates binomial with continuos
+        A = expit(slope*(P-rij)) # sampling, approximates binomial with continuos
         A = np.triu(A, 1) # make it symmetric
         A += np.transpose(A, axes=[0, 2, 1])
         return A
@@ -176,16 +175,15 @@ class UWCM(GraphModel):
 
     def sample_adjacency(self, *args, **kwargs):
         batch_size = kwargs.get('batch_size', 1)
-        rij = np.random.random([batch_size, self.N, self.N])
-        rij = np.triu(rij, 1)
-        rij += np.transpose(rij, [0, 2, 1])  # transpose last axis
-        slope = kwargs.get('slope', 200.0)
-        batch_args = np.tile(*args, [batch_size, 1])  # replicate
-        yiyj = np.einsum('ij,ik->ijk', batch_args, batch_args)
-        P = yiyj / (1.0 - yiyj)
-        # TODO IMPLEMENT GEOMETRIC SAMPLING
-        A = 1.0 / (1.0 + np.exp(-slope * (P - rij)))  # sampling, approximates binomial with continuos
-        A = np.triu(A, 1)  # make it symmetric
+        slope = kwargs.get('slope', 50.0)
+        rij = batched_symmetric_random(batch_size, self.N)
+        batch_args = np.tile(*args,[batch_size, 1]) # replicate
+        xixj = np.einsum('ij,ik->ijk', batch_args, batch_args)
+        P = xixj
+        # then must extract from a geometric distribution with probability P
+        A = expit(slope*(P-rij)) # sampling, approximates binomial with continuos        
+        # then add weights over links
+        A = np.triu(A, 1) # make it symmetric
         A += np.transpose(A, axes=[0, 2, 1])
         return A
 

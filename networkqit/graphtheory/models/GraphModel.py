@@ -26,7 +26,8 @@ dependency on some input parameters.
 
 import autograd.numpy as np
 from networkqit.graphtheory import graph_laplacian as graph_laplacian
-
+from autograd.scipy.special import expit
+from ..matrices import batched_symmetric_random
 
 class GraphModel:
     """
@@ -229,18 +230,14 @@ class ErdosRenyi(GraphModel):
         return G
 
     def sample_adjacency(self, *args, **kwargs):
-        from autograd import numpy as anp
-        def sigmoid(x):
-            rij = anp.random.random([self.N, self.N])
-            rij = anp.triu(rij,1)
-            rij += rij.T
-            slope = kwargs.get('slope', 500)
-            P = x * (1.0 - anp.eye(self.N))
-            return 1.0 / (1.0 + anp.exp(-slope*(P-rij)) )
-        A = anp.triu(sigmoid(x), 1)
-        A += A.T
+        batch_size = kwargs.get('batch_size', 1)
+        slope = kwargs.get('slope', 200.0)
+        rij = batched_symmetric_random(batch_size, self.N)
+        P = (args) * (1.0-np.eye(self.N))
+        A = expit(slope*(P-rij)) # broadcasting of P over rij
+        A = np.triu(A, 1)
+        A += np.transpose(A,axes=[0,2,1])
         return A
-
 
 class IsingModel(GraphModel):
     """
@@ -260,7 +257,7 @@ class IsingModel(GraphModel):
     
     def expected_laplacian_grad(self, x):
         raise NotImplementedError
-
+    
     def sample_adjacency(self, *args, **kwargs):
         batch_size = kwargs.get('batch_size', 1)
         # sample symmetric random uniforms
@@ -269,7 +266,8 @@ class IsingModel(GraphModel):
         rij += np.transpose(rij,axes=[0,2,1]) # batched transposition
         slope = kwargs.get('slope', 200)
         P = np.reshape(np.tile(np.reshape(*args,[self.N,self.N]), [batch_size,1]),[batch_size, self.N, self.N])
-        A = 1.0 / (1.0 + np.exp(-slope*(P-rij)) ) # TODO try to avoid under/overflows here
+        A = expit(slope*(P-rij))
+        #A = 1.0 / (1.0 + np.exp(-slope*(P-rij)) ) # TODO try to avoid under/overflows here
         A = np.triu(A, 1)
         A += np.transpose(A,axes=[0,2,1])
         return A

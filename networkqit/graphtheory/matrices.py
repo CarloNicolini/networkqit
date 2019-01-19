@@ -151,3 +151,10 @@ def wsbm(ers, nr, dist):
     A = np.triu(A, 1)
     A += A.T
     return A
+
+def batched_symmetric_random(batch_size, N):
+    rij = np.random.random([batch_size, N, N])
+    rij = np.triu(rij, 1)
+    rij += np.transpose(rij,[0,2,1]) # transpose last axis
+    return rij
+    

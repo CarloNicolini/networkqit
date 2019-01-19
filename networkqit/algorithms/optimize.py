@@ -69,7 +69,8 @@ from networkqit.graphtheory import *
 from networkqit.infotheory.density import *
 
 import logging
-
+logger = logging.getLogger('optimize')
+logger.setLevel(logging.INFO)
 class ModelOptimizer:
     def __init__(self, **kwargs):
         """
@@ -424,18 +425,13 @@ class StochasticOptimizer(ModelOptimizer):
             # advanced broadcasting here!
             # Sample 'batch_size' adjacency matrices shape=[batch_size,N,N]
             Amodel = self.model.sample_adjacency(z, batch_size=batch_size)
+            #print('Amodel nan?:', np.any(np.isnan(Amodel.ravel())))
             # Here exploit broadcasting to create batch_size diagonal matrices with the degrees
             Dmodel = np.eye(N) * np.transpose(np.zeros([1, 1, N]) + np.einsum('ijk->ik', Amodel), [1, 0, 2])
             Lmodel = Dmodel - Amodel  # returns a batch_size x N x N tensor
             # do average over batches of the sum of product of matrix elements (done with * operator)
             Emodel = np.mean(np.sum(np.sum(Lmodel * rho, axis=2), axis=1))
-            try:
-                lambd_model = eigh(Lmodel)[0]  # eigh is a batched operation, take the eigenvalues only
-            except:
-                print('nan?=',np.any(np.isnan(Lmodel)))
-                print('nan?=',np.any(np.isinf(Lmodel)))
-                print(x)
-                pass
+            lambd_model = eigh(Lmodel)[0]  # eigh is a batched operation, take the eigenvalues only
             Fmodel = - np.mean(logsumexp(-beta * lambd_model, axis=1) / beta)
             loglike = beta * (Emodel - Fmodel) # - Tr[rho log(sigma)]
             dkl = loglike# - entropy # Tr[rho log(rho)] - Tr[rho log(sigma)]
@@ -469,7 +465,7 @@ class Adam(StochasticOptimizer):
         # Use quasi-hyperbolic adam by default
         # https://arxiv.org/pdf/1810.06801.pdf
         quasi_hyperbolic = kwargs.get('quasi_hyperbolic', True)
-        nu1 = 0.7 # for quasi-hyperbolic adam
+        nu1 = 0.9 # for quasi-hyperbolic adam
         nu2 = 1.0 # for quasi-hyperbolic adam
         # visualization options
         refresh_frames = kwargs.get('refresh_frames',100)
@@ -484,9 +480,8 @@ class Adam(StochasticOptimizer):
         mt, vt = np.zeros(self.x0.shape), np.zeros(self.x0.shape)
         all_dkl = []
         # TODO implement model boundaries in Adam
-        # bounds = np.array(np.ravel(self.model.bounds),dtype=float)
         for beta in self.beta_range:
-            logging.info('Changed beta to %g' % beta)
+            logger.info('Changed beta to %g' % beta)
             # if rho is provided, user rho is used, otherwise is computed at every beta
             rho = kwargs.get('rho', compute_vonneuman_density(L=self.L, beta=beta))
             # initialize at x0
@@ -500,7 +495,9 @@ class Adam(StochasticOptimizer):
                 # Convergence status
                 if np.linalg.norm(grad_t) < gtol:
                     converged = True
+                    logger.info('Exceeded minimum gradient |grad|<%g' % gtol)
                 if t > max_iters:
+                    logger.info('Exceeded maximum iterations')
                     converged = True
                 # TODO implement check boundaries in Adam
                 # if np.any(np.ravel(self.model.bounds)):
@@ -510,10 +507,10 @@ class Adam(StochasticOptimizer):
                 mttilde = mt / (1.0 - (beta1 ** t))  # compute bias corrected first moment estimate
                 vttilde = vt / (1.0 - (beta2 ** t))  # compute bias-corrected second raw moment estimate
                 if quasi_hyperbolic: # quasi hyperbolic adam
-                    x -= eta * ((1-nu1) * grad_t + nu1 * mttilde)/(np.sqrt((1-nu2) * (grad_t**2) + nu2 * vttilde ) + epsilon)
+                    deltax = ((1-nu1) * grad_t + nu1 * mttilde)/(np.sqrt((1-nu2) * (grad_t**2) + nu2 * vttilde ) + epsilon)
                 else: # vanilla Adam
-                    x -= eta * mttilde / np.sqrt(vttilde + epsilon)
-
+                    deltax = mttilde / np.sqrt(vttilde + epsilon)
+                x -= eta * deltax
                 all_dkl.append(dkl)
                 if t % refresh_frames == 0:
                     def draw_fig():
