@@ -169,10 +169,12 @@ class MLEOptimizer(ModelOptimizer):
 
         elif kwargs.get('method', 'saddle_point') is 'saddle_point':
             # Use the Dogbox method to optimize likelihood
+            ls_bounds = [np.min(np.ravel(self.model.bounds)), np.max(np.ravel(self.model.bounds))]
             def basin_opt(*basin_opt_args, **basin_opt_kwargs):
                 opt_result = least_squares(fun=basin_opt_args[0],
                                            x0=np.squeeze(basin_opt_args[1]),
-                                           bounds=[EPS, 1E16],
+                                           # TODO implement same bounds method as accepted by LBFGSB
+                                           bounds=ls_bounds,
                                            method='dogbox',
                                            xtol=opts['xtol'],
                                            gtol=opts['gtol'],

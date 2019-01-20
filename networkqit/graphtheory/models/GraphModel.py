@@ -27,7 +27,7 @@ dependency on some input parameters.
 import autograd.numpy as np
 from networkqit.graphtheory import graph_laplacian as graph_laplacian
 from autograd.scipy.special import expit
-from ..matrices import batched_symmetric_random
+from ..matrices import batched_symmetric_random, multiexpit
 
 class GraphModel:
     """

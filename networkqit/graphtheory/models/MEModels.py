@@ -31,7 +31,7 @@ G here is the graph adjacency matrix, A is the binary adjacency, W is the weight
 
 import autograd.numpy as np
 from .GraphModel import GraphModel
-from .GraphModel import expit, batched_symmetric_random
+from .GraphModel import expit, batched_symmetric_random, multiexpit
 
 EPS = np.finfo(float).eps
 
@@ -151,7 +151,9 @@ class UWCM(GraphModel):
         self.args_mapping = ['y_' + str(i) for i in range(0, kwargs['N'])]
         self.model_type = 'topological'
         #self.formula = '$<w_{ij}> = \frac{y_i y_j}{1-y_i y_j}$'
-        self.bounds = [(EPS, None) for i in range(0, self.N)]
+        # WARNING: when maximizing, this model has variables bounded in [0,1]
+        # see Oleguer Sagarra thesis
+        self.bounds = [(EPS, 1.0-EPS) for i in range(0, self.N)]
 
     def expected_adjacency(self, *args):
         self.pij = np.outer(args, args)
@@ -178,11 +180,10 @@ class UWCM(GraphModel):
         slope = kwargs.get('slope', 50.0)
         rij = batched_symmetric_random(batch_size, self.N)
         batch_args = np.tile(*args,[batch_size, 1]) # replicate
-        xixj = np.einsum('ij,ik->ijk', batch_args, batch_args)
-        P = xixj
+        yiyj = np.einsum('ij,ik->ijk', batch_args, batch_args)
         # then must extract from a geometric distribution with probability P
-        A = expit(slope*(P-rij)) # sampling, approximates binomial with continuos        
-        # then add weights over links
+        # https://math.stackexchange.com/questions/580901/r-generate-sample-that-follows-a-geometric-distribution
+        A = multiexpit(slope*(np.log(1.0-rij)/np.log(1-yiyj)-1.0)) 
         A = np.triu(A, 1) # make it symmetric
         A += np.transpose(A, axes=[0, 2, 1])
         return A

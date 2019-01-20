@@ -27,7 +27,7 @@ The normalized graph Laplacian is computed as $\\mathcal{L}=I - D^{-1/2} A D^{-1
 """
 
 import autograd.numpy as np
-
+from autograd.scipy.special import expit
 
 def graph_laplacian(A):
     """
@@ -157,4 +157,8 @@ def batched_symmetric_random(batch_size, N):
     rij = np.triu(rij, 1)
     rij += np.transpose(rij,[0,2,1]) # transpose last axis
     return rij
-    
+
+
+def multiexpit(x, slope=50):
+    y = np.asarray([ expit(slope*(x-i)) for i in range(int(np.max(x))) ])
+    return np.sum(y,axis=0)
