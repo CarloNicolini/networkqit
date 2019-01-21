@@ -61,16 +61,16 @@ framework introduced in the paper on which **networkqit** is based.
 
 import autograd
 import autograd.numpy as np
-from scipy.linalg import eigvalsh  # a different routine, with no autograd support
 from autograd.numpy.linalg import eigh
 from autograd.scipy.misc import logsumexp
 from scipy.optimize import minimize, least_squares
 from networkqit.graphtheory import *
 from networkqit.infotheory.density import *
-
 import logging
 logger = logging.getLogger('optimize')
 logger.setLevel(logging.INFO)
+
+
 class ModelOptimizer:
     def __init__(self, **kwargs):
         """
@@ -155,16 +155,25 @@ class MLEOptimizer(ModelOptimizer):
                 }
 
         if kwargs.get('method', 'MLE') is 'MLE':
-            # Optimize using L-BFGS-B which typically returns good results
-            self.sol = minimize(fun=lambda z: -self.model.loglikelihood(self.G, z),
-                                x0=np.squeeze(self.x0),
-                                method='L-BFGS-B',
-                                bounds=self.model.bounds, #np.array(np.ravel(self.model.bounds),dtype=float),
-                                options=opts)
+            # The model has non-linear constraints, must use Sequential Linear Square Programming SLSQP
+            if hasattr(self.model, 'constraints'):
+                self.sol = minimize(fun=lambda z: -self.model.loglikelihood(self.G, z),
+                                    x0=np.squeeze(self.x0),
+                                    method='SLSQP',
+                                    constraints={'fun':self.model.constraints, 'type':'ineq'},
+                                    bounds=self.model.bounds, #np.array(np.ravel(self.model.bounds),dtype=float),
+                                    options=opts)
+            else: # the model has only bound-constraints, hence use L-BFGS-B
+                # Optimize using L-BFGS-B which typically returns good results
+                self.sol = minimize(fun=lambda z: -self.model.loglikelihood(self.G, z),
+                                    x0=np.squeeze(self.x0),
+                                    method='L-BFGS-B',
+                                    bounds=self.model.bounds, #np.array(np.ravel(self.model.bounds),dtype=float),
+                                    options=opts)
 
-            if self.sol['status'] != 0:
-                print(self.sol['message'])
-                raise Exception('Method did not converge to maximum likelihood: ')
+            #if self.sol['status'] != 0:
+            #    print(self.sol['message'])
+            #    raise Exception('Method did not converge to maximum likelihood: ')
             return self.sol
 
         elif kwargs.get('method', 'saddle_point') is 'saddle_point':
@@ -173,7 +182,6 @@ class MLEOptimizer(ModelOptimizer):
             def basin_opt(*basin_opt_args, **basin_opt_kwargs):
                 opt_result = least_squares(fun=basin_opt_args[0],
                                            x0=np.squeeze(basin_opt_args[1]),
-                                           # TODO implement same bounds method as accepted by LBFGSB
                                            bounds=ls_bounds,
                                            method='dogbox',
                                            xtol=opts['xtol'],
@@ -309,7 +317,6 @@ class ContinuousOptimizer(ModelOptimizer):
             # The least_squares approach requires the gradients of the model, if they are not implemented 
             # in the model, the algorithmic differentiation is used, which is slower
 
-
             sol.append(minimize(fun=self.rel_entropy_fun,
                                 x0=self.x0,
                                 jac=fgrad,
@@ -390,9 +397,6 @@ class ContinuousOptimizer(ModelOptimizer):
                 print(s.format(self.sol[i]['beta'], *row))
 
 
-################################################
-## Stochastic optimzation from random samples ##
-################################################
 class StochasticOptimizer(ModelOptimizer):
     """
     This class is at the base of implementation of methods based on stochastic gradient descent.
@@ -422,7 +426,7 @@ class StochasticOptimizer(ModelOptimizer):
         #lambd_rho = eigh(rho)[0]
         #entropy = -np.sum(lambd_rho * np.log(lambd_rho))
 
-        def rel_entropy(z):
+        def log_likelihood(z):
             N = len(self.A)
             # advanced broadcasting here!
             # Sample 'batch_size' adjacency matrices shape=[batch_size,N,N]
@@ -436,11 +440,11 @@ class StochasticOptimizer(ModelOptimizer):
             lambd_model = eigh(Lmodel)[0]  # eigh is a batched operation, take the eigenvalues only
             Fmodel = - np.mean(logsumexp(-beta * lambd_model, axis=1) / beta)
             loglike = beta * (Emodel - Fmodel) # - Tr[rho log(sigma)]
-            dkl = loglike# - entropy # Tr[rho log(rho)] - Tr[rho log(sigma)]
+            dkl = loglike # - entropy # Tr[rho log(rho)] - Tr[rho log(sigma)]
             return dkl
 
         # value and gradient of relative entropy as a function
-        dkl_and_dkldx = autograd.value_and_grad(rel_entropy)
+        dkl_and_dkldx = autograd.value_and_grad(log_likelihood)
         return dkl_and_dkldx(x)
 
 

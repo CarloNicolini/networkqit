@@ -141,7 +141,10 @@ class UWCM(GraphModel):
     8. LogLikelihood logP:
         logP = sum_{i<j} w_{ij}*log(pij) + log(1-pij)
     
-    9. Reference:
+    9. Parameters bounds
+        0 < yij < 1
+
+    Reference:
         Squartini thesis page 110
     """
     
@@ -213,6 +216,10 @@ class UBWRG(GraphModel):
     
     8. Loglikelihood logP:
         logP = L(A)log(x) +  Wtot(W)log(y) + N(N-1)/2 log( (1-y)/(1-y + xy) )
+
+    9. Parameters bounds
+        x > 0
+        0 < y < 1
         
     Reference: Squartini thesis page 122
     """
@@ -221,7 +228,7 @@ class UBWRG(GraphModel):
         self.args_mapping =   ['x','y']
         # TODO self.formula = '$\frac{x  y_i y_j)}{(1 - y_iy_j + x y_i y_j)(1 - y_i y_j)}$'
         self.N = kwargs['N']
-        self.bounds = [(EPS, None)]*(self.N+1)
+        self.bounds = [(EPS, None), (EPS, 1)]
         
     def expected_adjacency(self, *args):
         x,y = args[0], args[1]
@@ -276,7 +283,14 @@ class UECM3(GraphModel):
     8. LogLikelihood logP:
         logP = sum_i k_i(A) log(x_i) + sum_i s_i(W) log(y_i) + sum_{i<j} log( (1-yiyj) / (1-yiyj+xixj*yiyj) )
 
-    9. Reference:
+    9. Parameters bounds
+        very complicated
+        1. xi > 0
+        2. yi > 0
+        3. yi < 1
+        4. 0 < xi yi < 1
+
+    Reference:
         Squartini thesis page 126
     """
     def __init__(self,**kwargs):
@@ -284,11 +298,17 @@ class UECM3(GraphModel):
         self.args_mapping =   ['x_' + str(i) for i in range(0, kwargs['N'])] + ['y_' + str(i) for i in range(0, kwargs['N'])]
         #self.formula = '$\frac{x_i x_j  y_i y_j)}{(1 - y_iy_j + x_i x_j y_i y_j)(1 - y_i y_j)}$' TODO
         self.N = kwargs['N']
-        self.bounds = [(EPS ,None)] * (2*self.N)
+        self.bounds = [(EPS ,None)] * self.N + [(EPS, 1)] * self.N
+        # specify non-linear constraints
+        def constraints(z):
+            x, y  = z[0:self.N], z[self.N:]
+            c = np.concatenate([x > 0, y>0, y < 1])
+            return np.atleast_1d(c).astype(float)
+        self.constraints = constraints
         
 
     def expected_adjacency(self, *args):
-        x,y = args[0:self.N], args[(self.N):]
+        x,y = args[0][0:self.N], args[0][(self.N):]
         xixj = np.outer(x,x)
         yiyj = np.outer(y,y)
         pij = np.nan_to_num((xixj * yiyj) / ((1 - yiyj + xixj * yiyj)))
@@ -296,18 +316,18 @@ class UECM3(GraphModel):
         return pij
 
     def expected_weighted_adjacency(self, *args):
-        y = args[(self.N):]
+        x,y = args[0][0:self.N], args[0][(self.N):]
         pij = self.expected_adjacency(*args)
         yiyj = np.outer(y,y)
         return pij / (1.0-yiyj)
 
     def loglikelihood(self, observed_adj, *args):
-        x,y = args[0:self.N], args[(self.N):]
+        x,y = args[0][0:self.N], args[0][(self.N):]
         k = (observed_adj > 0).sum(axis=0)
         s = observed_adj.sum(axis=0)
         xixj = np.outer(x,x)
         yiyj = np.outer(y,y)
-        loglike = (x*k).sum() + (y*s).sum() + np.triu(np.log( (1-yiyj)/(1-yiyj + xixj*yiyj) ) ,1).sum()
+        loglike = (k*np.log(x)).sum() + (s*np.log(y)).sum() + np.triu(np.log( (1-yiyj)/(1-yiyj + xixj*yiyj) ) ,1).sum()
         return loglike
 
 
@@ -332,21 +352,29 @@ class CWTECM(GraphModel):
     
     6. Link probability <aij>
         
-
     7. Expected link weight <wij>
-        
 
     8. LogLikelihood logP:
         sum_{i<j} a_{ij}*log(pij) + (1-aij)*log(1-pij)
+
+    9. Constraints:
+        1. xi > 0
+        2. 0 < yi < 1
 
     """
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
         self.args_mapping =   ['x_' + str(i) for i in range(0, kwargs['N'])] + ['y_' + str(i) for i in range(0, kwargs['N'])]
         #self.formula = '$\frac{x_i x_j (y_i y_j)^t}{t \log(yi y_j) + x_i x_j (y_i y_j)^t}$'
-        self.bounds = [(EPS, None) for i in range(0, 2*self.N ) ]
         self.N = kwargs['N']
         self.threshold = kwargs['threshold']
+        self.bounds = [(EPS ,None)] * self.N + [(EPS, 1)] * self.N
+        # specify non-linear constraints
+        def constraints(z):
+            x, y  = z[0:self.N], z[self.N:]
+            c = np.concatenate([x > 0, y**self.threshold > 0, y**self.threshold < 1])
+            return np.atleast_1d(c).astype(float)
+        self.constraints = constraints
 
     def expected_adjacency(self, *args):
         x,y = args[0][0:self.N], args[0][(self.N):]
