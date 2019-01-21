@@ -59,7 +59,7 @@ if __name__=='__main__':
     filename = home + '/workspace/communityalg/data/Coactivation_matrix_weighted.adj'
     G = np.loadtxt(filename)[0:64, 0:64]
     #G = np.round(G*50)
-    W = bct.threshold_absolute(G, 0.02)
+    W = bct.threshold_absolute(G, 0.04)
     A = (G>0).astype(float)
     k = A.sum(axis=0)
     m = k.sum()

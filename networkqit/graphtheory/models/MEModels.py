@@ -372,7 +372,7 @@ class CWTECM(GraphModel):
         # specify non-linear constraints
         def constraints(z):
             x, y  = z[0:self.N], z[self.N:]
-            c = np.concatenate([x > 0, y**self.threshold > 0, y**self.threshold < 1])
+            c = np.concatenate([x > 0, y**self.threshold > 0, y**self.threshold < 1, x*y > 0, x*y < 1])
             return np.atleast_1d(c).astype(float)
         self.constraints = constraints
 
