@@ -45,8 +45,6 @@ Ubuntu
 
 
 
-
-
 Install the development version
 -------------------------------
 
@@ -97,7 +95,7 @@ To install **networkqit** and all optional packages, do::
 
 To explicitly install all optional packages, do::
 
-    pip install numpy scipy pandas matplotlib seaborn numdifftools drawnow
+    pip install numpy autograd scipy pandas matplotlib seaborn numdifftools drawnow
 
 Or, install any optional package (e.g., ``numpy``) individually::
 

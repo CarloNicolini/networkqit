@@ -29,6 +29,7 @@ from networkqit.graphtheory import graph_laplacian as graph_laplacian
 from autograd.scipy.special import expit
 from ..matrices import batched_symmetric_random, multiexpit
 
+
 class GraphModel:
     """
     GraphModel is the base class that defines all the operations inherited
@@ -98,13 +99,6 @@ class GraphModel:
         """
         raise NotImplementedError        
 
-    def _expected_laplacian_grad_autodiff(self, *args):
-        """
-        If the user does not provide an implementation of the method
-        """
-        import numdifftools as nd
-        return nd.Gradient(lambda x : graph_laplacian(self(x)))(np.array([*args]))
-
     def expected_laplacian(self, *args):
         """
         Returns the expected laplacian from the parameters of the model provided as a variable number of inputs.
@@ -136,8 +130,8 @@ class GraphModel:
         """
         return self._expected_laplacian_grad_autodiff(*x)
 
-    def loglikelihood(self, G, *args):
-        # implement here where G is the adjacency matrix (Weighted or binary)
+    def loglikelihood(self, observed_adj, *args):
+        # implement here where observed_adj is the adjacency matrix (Weighted or binary)
         raise NotImplementedError
 
     def saddle_point(self, G, *args):
@@ -145,64 +139,6 @@ class GraphModel:
 
     def sample_adjacency(self, *args, **kwargs):
         raise NotImplementedError
-
-    
-class Operator(GraphModel):
-    def __init__(self, left, right):
-        super().__init__()
-        self.left = left
-        self.right = right
-        # unique elements, order preserving
-
-        def unique_ordered(seq):
-            seen = set()
-            seen_add = seen.add
-            return [x for x in seq if not (x in seen or seen_add(x))]
-        self.args_mapping = unique_ordered(
-            left.args_mapping + right.args_mapping)
-        self.n = self.args_mapping
-        self.idx_args_left = [i for i, e in enumerate(
-            self.args_mapping) if e in set(left.args_mapping)]
-        self.idx_args_right = [i for i, e in enumerate(
-            self.args_mapping) if e in set(right.args_mapping)]
-        self.bounds = left.bounds + right.bounds
-        self.formula = left.formula[0:-1] + str(self) + right.formula[1:]
-        # print(self.args_mapping,self.idx_args_left,self.idx_args_right,self.right.args_mapping)
-    def loglikelihood(self, G, *args):
-        pass
-    
-    def saddle_point(self, G, *args):
-        pass
-    
-    def expected_adjacency(self,*args):
-        pass
-    
-    def expected_laplacian(self,*args):
-        pass
-    
-    
-class Mul(Operator):
-    def __call__(self, x):
-        return self.left(x[self.idx_args_left]) * self.right(x[self.idx_args_right])
-
-    def __str__(self):
-        return '*'
-
-
-class Add(Operator):
-    def __call__(self, x):
-        return self.left(x[self.idx_args_left]) + self.right(x[self.idx_args_right])
-
-    def __str__(self):
-        return '+'
-
-
-class Div(Operator):
-    def __call__(self, x):
-        return self.left(x[self.idx_args_left]) / self.right(x[self.idx_args_right])
-
-    def __str__(self):
-        return '/'
 
 
 class ErdosRenyi(GraphModel):
@@ -220,7 +156,7 @@ class ErdosRenyi(GraphModel):
         self.bounds = [(0, None)]
 
     def expected_adjacency(self, *args):
-        P = args[0]*(1-  np.eye(self.parameters['N']))
+        P = args[0]*(1 - np.eye(self.parameters['N']))
         return P
     
     def expected_laplacian_grad(self, x):

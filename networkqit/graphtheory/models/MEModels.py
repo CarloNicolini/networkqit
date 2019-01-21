@@ -92,9 +92,9 @@ class UBCM(GraphModel):
                 g[:,l,l] = g[l,:,l]
         return g
 
-    def loglikelihood(self, G, *args):
+    def loglikelihood(self, observed_adj, *args):
         pij = self.expected_adjacency(*args)
-        loglike = G * np.log(pij + EPS) + (1 - G)*np.log(1 - pij - EPS)
+        loglike = observed_adj * np.log(pij + EPS) + (1 - observed_adj) * np.log(1 - pij - EPS)
         loglike[np.logical_or(np.isnan(loglike), np.isinf(loglike))] = 0
         return np.triu(loglike, 1).sum()
     
@@ -164,9 +164,9 @@ class UWCM(GraphModel):
         self.wij = pij / (1 - pij)
         return self.wij
     
-    def loglikelihood(self, G, *args):
+    def loglikelihood(self, observed_adj, *args):
         pij = self.expected_adjacency(args)
-        loglike = G*np.log(pij) + (np.log(1-pij))
+        loglike = observed_adj * np.log(pij) + (np.log(1 - pij))
         loglike[np.logical_or(np.isnan(loglike), np.isinf(loglike))] = 0
         return np.triu(loglike,1).sum()
 
@@ -234,10 +234,10 @@ class UBWRG(GraphModel):
         pij = self.expected_adjacency(*args)
         return pij / (1-y)
 
-    def loglikelihood(self, G, *args):
+    def loglikelihood(self, observed_adj, *args):
         x,y = args[0], args[1]
-        L = (np.triu(G,1)>0).sum()
-        Wtot = (np.triu(G,1)).sum()
+        L = (np.triu(observed_adj, 1) > 0).sum()
+        Wtot = (np.triu(observed_adj, 1)).sum()
         loglike = L*np.log(x) + Wtot*np.log(y) + self.N*(self.N-1)/2 * np.log( (1-y)/(1-y+x*y))
         return loglike
     
@@ -301,10 +301,10 @@ class UECM3(GraphModel):
         yiyj = np.outer(y,y)
         return pij / (1.0-yiyj)
 
-    def loglikelihood(self, G, *args):
+    def loglikelihood(self, observed_adj, *args):
         x,y = args[0:self.N], args[(self.N):]
-        k = (G>0).sum(axis=0)
-        s = G.sum(axis=0)
+        k = (observed_adj > 0).sum(axis=0)
+        s = observed_adj.sum(axis=0)
         xixj = np.outer(x,x)
         yiyj = np.outer(y,y)
         loglike = (x*k).sum() + (y*s).sum() + np.triu(np.log( (1-yiyj)/(1-yiyj + xixj*yiyj) ) ,1).sum()
@@ -376,14 +376,14 @@ class CWTECM(GraphModel):
         avgw = wij.sum(axis=0) #- wij.diagonal()
         return np.hstack([k-avgk,w-avgw])
 
-    def loglikelihood(self, G, *args):
+    def loglikelihood(self, observed_adj, *args):
         x,y = args[0][0:self.N], args[0][(self.N):]
         t = self.threshold
         xixj = np.abs(np.outer(x,x)) # these variables are always > 0
         yiyj = np.abs(np.outer(y,y)) # these variables are always > 0
         yiyjt = yiyj**t
-        A = (G>0).astype(float)
-        loglike = np.log(-np.log(yiyj)) + A*np.log(xixj) + G*np.log(yiyj) - np.log(xixj*(yiyj**t) - t*np.log(yiyj))
+        A = (observed_adj > 0).astype(float)
+        loglike = np.log(-np.log(yiyj)) + A * np.log(xixj) + observed_adj * np.log(yiyj) - np.log(xixj * (yiyj ** t) - t * np.log(yiyj))
         loglike = np.nan_to_num(loglike)
         return np.triu(loglike,1).sum()
 

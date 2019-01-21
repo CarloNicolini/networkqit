@@ -87,9 +87,9 @@ copyright = '2017-{}, networkqit Developers'.format(date.today().year)
 #
 # The short X.Y version.
 #import networkqit
-version = '0.1'
+version = '0.2'
 # The full version, including dev info
-release = 'alpha'
+release = 'beta'
 
 # There are two options for replacing |today|: either, you set today to some
 # non-false value, then it is used:
