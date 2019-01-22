@@ -151,7 +151,8 @@ class MLEOptimizer(ModelOptimizer):
                 'maxfun': kwargs.get('maxfun', 1E10),
                 'maxiter': kwargs.get('maxiter', 1E4),
                 'verbose' : kwargs.get('verbose', 2),
-                'disp':True
+                'disp':True,
+                'iprint':2
                 }
 
         if kwargs.get('method', 'MLE') is 'MLE':
@@ -161,7 +162,7 @@ class MLEOptimizer(ModelOptimizer):
                                     x0=np.squeeze(self.x0),
                                     method='SLSQP',
                                     constraints={'fun':self.model.constraints, 'type':'ineq'},
-                                    bounds=self.model.bounds, #np.array(np.ravel(self.model.bounds),dtype=float),
+                                    bounds=self.model.bounds,
                                     options=opts)
             else: # the model has only bound-constraints, hence use L-BFGS-B
                 # Optimize using L-BFGS-B which typically returns good results

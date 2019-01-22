@@ -57,7 +57,8 @@ def plot(G,pij,wij):
 if __name__=='__main__':
 
     filename = home + '/workspace/communityalg/data/Coactivation_matrix_weighted.adj'
-    G = np.loadtxt(filename)[0:32, 0:32]
+    G = np.round(np.loadtxt(filename)[0:32, 0:32]*100)
+    print(G.max())
     t = 0.04
     W = bct.threshold_absolute(G, t)
     A = (W>0).astype(float)
@@ -69,11 +70,11 @@ if __name__=='__main__':
     pairs = n*(n-1)/2
 
     M = CWTECM(N=len(W),threshold=t)
-    x0 = (np.concatenate([k,s])) * 1E-3
+    x0 = (np.concatenate([k,s]))/max(k.max(),s.max())
 
     # # Optimize by L-BFGS-B
     opt = nq.MLEOptimizer(W, x0=x0, model=M)
-    sol = opt.run(model=M, verbose=2, gtol=1E-8, method='MLE')
+    sol = opt.run(model=M, verbose=2, gtol=1E-12, method='MLE')
     print('Loglikelihood = ', M.loglikelihood(G,sol['x']))
     
     pij = M.expected_adjacency(sol['x'])
