@@ -350,16 +350,19 @@ class CWTECM(GraphModel):
     5. Number of parameters:
         2N
     
-    6. Link probability <aij>
+    6. Link probability pij=<aij>
+        (xixj*yiyjt )/ (xixj*yiyjt - t*log(yiyj))
         
     7. Expected link weight <wij>
+        wij = (t*log(yiyj)-1)/(t*log(yiyj))* <aij>
 
     8. LogLikelihood logP:
-        sum_{i<j} a_{ij}*log(pij) + (1-aij)*log(1-pij)
+        sum_{i<j}  log(-log(yiyj)) + aij*np.log(xixj) + aij*log(yiyj) - log(xixj * (yiyj ** t) - t * log(yiyj))
 
     9. Constraints:
         1. xi > 0
         2. 0 < yi < 1
+        3  0 < xi yi < 1
 
     """
     def __init__(self,**kwargs):
@@ -368,11 +371,11 @@ class CWTECM(GraphModel):
         #self.formula = '$\frac{x_i x_j (y_i y_j)^t}{t \log(yi y_j) + x_i x_j (y_i y_j)^t}$'
         self.N = kwargs['N']
         self.threshold = kwargs['threshold']
-        self.bounds = [(EPS ,None)] * self.N + [(EPS, 1)] * self.N
+        self.bounds = [(EPS ,np.inf)] * self.N + [(EPS, 1)] * self.N
         # specify non-linear constraints
         def constraints(z):
             x, y  = z[0:self.N], z[self.N:]
-            c = np.concatenate([x > 0, y**self.threshold > 0, y**self.threshold < 1, x*y > 0, x*y < 1])
+            c = np.concatenate([x > 0, y > 0, y < 1, x*y > 0, x*y < 1])
             return np.atleast_1d(c).astype(float)
         self.constraints = constraints
 
@@ -410,8 +413,11 @@ class CWTECM(GraphModel):
         xixj = np.abs(np.outer(x,x)) # these variables are always > 0
         yiyj = np.abs(np.outer(y,y)) # these variables are always > 0
         yiyjt = yiyj**t
-        A = (observed_adj > 0).astype(float)
-        loglike = np.log(-np.log(yiyj)) + A * np.log(xixj) + observed_adj * np.log(yiyj) - np.log(xixj * (yiyj ** t) - t * np.log(yiyj))
+        W = observed_adj
+        A = (W > 0).astype(float)
+        # computed from sciipy
+        loglike = -(xixj**A + yiyj**W) - np.log(-xixj*yiyjt + np.log(yiyjt)) + np.log(np.log(yiyj))
+        #loglike = np.log(np.log(yiyj)) + A * np.log(xixj) + observed_adj * np.log(yiyj) - np.log(xixj * (yiyj ** t) - t * np.log(yiyj))
         loglike = np.nan_to_num(loglike)
         return np.triu(loglike,1).sum()
 

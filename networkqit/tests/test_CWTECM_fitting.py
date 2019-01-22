@@ -57,10 +57,10 @@ def plot(G,pij,wij):
 if __name__=='__main__':
 
     filename = home + '/workspace/communityalg/data/Coactivation_matrix_weighted.adj'
-    G = np.loadtxt(filename)[0:64, 0:64]
-    #G = np.round(G*50)
-    W = bct.threshold_absolute(G, 0.04)
-    A = (G>0).astype(float)
+    G = np.loadtxt(filename)[0:32, 0:32]
+    t = 0.04
+    W = bct.threshold_absolute(G, t)
+    A = (W>0).astype(float)
     k = A.sum(axis=0)
     m = k.sum()
     s = W.sum(axis=0)
@@ -68,8 +68,8 @@ if __name__=='__main__':
     n = len(W)
     pairs = n*(n-1)/2
 
-    M = CWTECM(N=len(W),threshold=0.02)
-    x0 = (np.concatenate([k,s]) + 1E-5) * 1E-3
+    M = CWTECM(N=len(W),threshold=t)
+    x0 = (np.concatenate([k,s])) * 1E-3
 
     # # Optimize by L-BFGS-B
     opt = nq.MLEOptimizer(W, x0=x0, model=M)
@@ -80,16 +80,16 @@ if __name__=='__main__':
     wij = M.expected_weighted_adjacency(sol['x'])
     plot(W,pij,wij)
 
-    nq.MLEOptimizer(W, x0=sol['x'], model=M)
-    sol = opt.run(method='saddle_point', xtol=1E-12, gtol=1E-9)
-    print('Loglikelihood = ', M.loglikelihood(G,sol['x']))
-    pij = M.expected_adjacency(sol['x'])
-    wij = M.expected_weighted_adjacency(sol['x'])
-    plot(W,pij,wij)
+    # nq.MLEOptimizer(W, x0=sol['x'], model=M)
+    # sol = opt.run(method='saddle_point', xtol=1E-12, gtol=1E-9)
+    # print('Loglikelihood = ', M.loglikelihood(G,sol['x']))
+    # pij = M.expected_adjacency(sol['x'])
+    # wij = M.expected_weighted_adjacency(sol['x'])
+    # plot(W,pij,wij)
 
-    sol = opt.run(method='saddle_point', basinhopping = True, basin_hopping_niter=10, xtol=1E-9, gtol=1E-9)
-    #print('Gradient at Least squares solution=\n',grad(sol['x']))
-    print('Loglikelihood = ', M.loglikelihood(G,sol['x']))
-    pij = M.expected_adjacency(sol['x'])
-    wij = M.expected_weighted_adjacency(sol['x'])
-    plot(W,pij,wij)
+    # sol = opt.run(method='saddle_point', basinhopping = True, basin_hopping_niter=10, xtol=1E-9, gtol=1E-9)
+    # #print('Gradient at Least squares solution=\n',grad(sol['x']))
+    # print('Loglikelihood = ', M.loglikelihood(G,sol['x']))
+    # pij = M.expected_adjacency(sol['x'])
+    # wij = M.expected_weighted_adjacency(sol['x'])
+    # plot(W,pij,wij)
