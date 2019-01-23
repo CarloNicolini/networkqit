@@ -15,4 +15,5 @@ They are mostly based on optimization algorithms for model fitting.
    
    optimize
    community
-
+   basinhoppingmod
+   

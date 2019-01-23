@@ -186,7 +186,10 @@ class UWCM(GraphModel):
         yiyj = np.einsum('ij,ik->ijk', batch_args, batch_args)
         # then must extract from a geometric distribution with probability P
         # https://math.stackexchange.com/questions/580901/r-generate-sample-that-follows-a-geometric-distribution
-        A = multiexpit(slope*(np.log(1.0-rij)/np.log(1-yiyj)-1.0)) 
+        q = np.log(rij)/np.log(1.0-yiyj + EPS)
+        # must take floor to generate geometric random variables
+        # equivalent to floor but continuos is multiexpit(x-1)
+        A = multiexpit(slope*(q-1.0))
         A = np.triu(A, 1) # make it symmetric
         A += np.transpose(A, axes=[0, 2, 1])
         return A
