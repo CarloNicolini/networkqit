@@ -56,12 +56,12 @@ def plot(G,pij,wij):
 
 if __name__=='__main__':
 
-    filename = home + '/workspace/communityalg/data/Coactivation_matrix_weighted.adj'
-    G = np.round(np.loadtxt(filename)[0:32, 0:32]*100)
-    print(G.max())
-    t = 0.04
+    filename = home + '/workspace/communityalg/data/GroupAverage_rsfMRI_weighted.adj'
+    G = np.loadtxt(filename)[0:32, 0:32]
+    W = G
+    t = 0.1
     W = bct.threshold_absolute(G, t)
-    A = (W>0).astype(float)
+    A = (W > 0).astype(float)
     k = A.sum(axis=0)
     m = k.sum()
     s = W.sum(axis=0)
@@ -71,15 +71,15 @@ if __name__=='__main__':
 
     M = CWTECM(N=len(W),threshold=t)
     x0 = (np.concatenate([k,s]))/max(k.max(),s.max())
-
+    #x0 = np.random.random([64,])
     # # Optimize by L-BFGS-B
-    opt = nq.MLEOptimizer(W, x0=x0, model=M)
-    sol = opt.run(model=M, verbose=2, gtol=1E-12, method='MLE')
+    opt = nq.MLEOptimizer(G, x0=x0, model=M)
+    sol = opt.run(model=M, verbose=1, gtol=1E-8, method='MLE')
     print('Loglikelihood = ', M.loglikelihood(G,sol['x']))
     
     pij = M.expected_adjacency(sol['x'])
     wij = M.expected_weighted_adjacency(sol['x'])
-    plot(W,pij,wij)
+    plot(G,pij,wij)
 
     # nq.MLEOptimizer(W, x0=sol['x'], model=M)
     # sol = opt.run(method='saddle_point', xtol=1E-12, gtol=1E-9)

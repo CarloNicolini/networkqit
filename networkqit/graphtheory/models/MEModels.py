@@ -378,9 +378,9 @@ class CWTECM(GraphModel):
             xixj = np.abs(np.outer(x,x)) # these variables are always > 0
             yiyj = np.abs(np.outer(y,y)) # these variables are always > 0
             t = self.threshold
-            c = np.concatenate([x > 0, y > 0, y < 1, x*y < t, x*y > 0])
+            c = np.concatenate([x > 0, y > 0, y < 1,  x<1])# x*y < t, x*y > 0, np.abs(yiyj**t).ravel() < 1 ])
             return np.atleast_1d(c).astype(float)
-        #self.constraints = constraints
+        self.constraints = constraints
 
     def expected_adjacency(self, *args):
         x,y = args[0][0:self.N], args[0][(self.N):]
@@ -417,9 +417,13 @@ class CWTECM(GraphModel):
         yiyj = np.outer(y,y) # these variables are always > 0
         yiyjt = yiyj**t
         W = observed_adj
-        A = (W > 0).astype(float)
-        loglike = A*np.log(xixj) + (W*A)*np.log(yiyj) - np.log(t - (xixj*yiyjt)/(np.log(yiyj)))
-        loglike = np.nan_to_num(loglike)
+        A = (W > t).astype(float)
+        k = A.sum(axis=0)
+        s = W.sum(axis=0)
+        loglike = A*np.log(xixj) + (W*A)*np.log(yiyj) - np.log(t - (xixj*yiyj)/(np.log(yiyj)))
+        #loglike = (k * np.log(x)).sum() + (s*np.log(y)).sum() - np.triu(np.log(t - (xixj*yiyjt)/(np.log(yiyj))),1).sum()
+        #return loglike
+        #loglike = np.nan_to_num(loglike)
         return np.triu(loglike,1).sum()
 
 class SpatialCM(GraphModel):
