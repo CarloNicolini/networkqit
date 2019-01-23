@@ -9,6 +9,11 @@ Overview
     :Release: |version|
     :Date: |today|
 
+================ =================== ==================  ==========  ===============
+   **Date**      **Python Versions**   **Main Author**   **GitHub**      **pypl**
+|date|                3.5+      `Carlo Nicolini`_  `Source`_   `Distribution`_
+================ =================== ==================  ==========  ===============
+
 **networkqit** is a Python package for working within the spectral entropy framework of complex networks.
 However networkqit is of huge help also in developing, testing and using other Maximum Entropy network
 models, such as the Erdos-Renyi, Configuration model and other complex variants of them.
