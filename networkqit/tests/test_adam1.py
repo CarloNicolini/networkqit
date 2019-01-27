@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 from pathlib import Path
 home = str(Path.home())
 import sys
@@ -28,6 +29,6 @@ plt.show()
 x0 = np.random.random([N,])
 opt = Adam(A=A, L=L, x0=x0, beta_range=beta_sweep, model=M)
 rho = nq.compute_vonneuman_density(L=L, beta=0.1)
-sol = opt.run(refresh_frames=100, eta=0.001, max_iters=5000, gtol=1E-5, batch_size=128)
+sol = opt.run(refresh_frames=10, eta=0.01, max_iters=1500, gtol=1E-5, batch_size=32)
 plt.pause(5)
 plt.show()
