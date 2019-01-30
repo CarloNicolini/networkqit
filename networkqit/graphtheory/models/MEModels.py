@@ -153,7 +153,7 @@ class UWCM(GraphModel):
             super().__init__(**kwargs)
         self.args_mapping = ['y_' + str(i) for i in range(0, kwargs['N'])]
         self.model_type = 'topological'
-        #self.formula = '$<w_{ij}> = \frac{y_i y_j}{1-y_i y_j}$'
+        self.formula = '$<w_{ij}> = \frac{y_i y_j}{1-y_i y_j}$'
         # WARNING: when maximizing, this model has variables bounded in [0,1]
         # see Oleguer Sagarra thesis
         self.bounds = [(EPS, 1.0-EPS) for i in range(0, self.N)]
@@ -186,7 +186,10 @@ class UWCM(GraphModel):
         yiyj = np.einsum('ij,ik->ijk', batch_args, batch_args)
         # then must extract from a geometric distribution with probability P
         # https://math.stackexchange.com/questions/580901/r-generate-sample-that-follows-a-geometric-distribution
-        A = multiexpit(slope*(np.log(1.0-rij)/np.log(1-yiyj)-1.0)) 
+        q = np.log(rij)/np.log(1.0-yiyj + EPS)
+        # must take floor to generate geometric random variables
+        # equivalent to floor but continuos is multiexpit(x-1)
+        A = multiexpit(slope*(q-1.0))
         A = np.triu(A, 1) # make it symmetric
         A += np.transpose(A, axes=[0, 2, 1])
         return A
@@ -228,7 +231,7 @@ class UBWRG(GraphModel):
         self.args_mapping =   ['x','y']
         # TODO self.formula = '$\frac{x  y_i y_j)}{(1 - y_iy_j + x y_i y_j)(1 - y_i y_j)}$'
         self.N = kwargs['N']
-        self.bounds = [(EPS, None), (EPS, 1)]
+        self.bounds = [(EPS, None), (EPS, 1-EPS)] # bounds of the variables
         
     def expected_adjacency(self, *args):
         x,y = args[0], args[1]
@@ -239,7 +242,7 @@ class UBWRG(GraphModel):
     def expected_weighted_adjacency(self, *args):
         y = args[1]
         pij = self.expected_adjacency(*args)
-        return pij / (1-y)
+        return pij / (1 - y)
 
     def loglikelihood(self, observed_adj, *args):
         x,y = args[0], args[1]
@@ -357,7 +360,7 @@ class CWTECM(GraphModel):
         wij = (t*log(yiyj)-1)/(t*log(yiyj))* <aij>
 
     8. LogLikelihood logP:
-        sum_{i<j}  log(-log(yiyj)) + aij*np.log(xixj) + aij*log(yiyj) - log(xixj * (yiyj ** t) - t * log(yiyj))
+        sum_{i<j}  xij^{Aij} yij^{Aij wij} - log(t - (xij yij^t/ log (yij)) )
 
     9. Constraints:
         1. xi > 0
@@ -371,11 +374,14 @@ class CWTECM(GraphModel):
         #self.formula = '$\frac{x_i x_j (y_i y_j)^t}{t \log(yi y_j) + x_i x_j (y_i y_j)^t}$'
         self.N = kwargs['N']
         self.threshold = kwargs['threshold']
-        self.bounds = [(EPS ,np.inf)] * self.N + [(EPS, 1)] * self.N
+        self.bounds = [(EPS, None)] * self.N + [(EPS, 1)] * self.N
         # specify non-linear constraints
         def constraints(z):
             x, y  = z[0:self.N], z[self.N:]
-            c = np.concatenate([x > 0, y > 0, y < 1, x*y > 0, x*y < 1])
+            xixj = np.abs(np.outer(x,x)) # these variables are always > 0
+            yiyj = np.abs(np.outer(y,y)) # these variables are always > 0
+            t = self.threshold
+            c = np.concatenate([x > 0, y > 0, y < 1,  x<1])# x*y < t, x*y > 0, np.abs(yiyj**t).ravel() < 1 ])
             return np.atleast_1d(c).astype(float)
         self.constraints = constraints
 
@@ -410,15 +416,17 @@ class CWTECM(GraphModel):
     def loglikelihood(self, observed_adj, *args):
         x,y = args[0][0:self.N], args[0][(self.N):]
         t = self.threshold
-        xixj = np.abs(np.outer(x,x)) # these variables are always > 0
-        yiyj = np.abs(np.outer(y,y)) # these variables are always > 0
+        xixj = np.outer(x,x) # these variables are always > 0
+        yiyj = np.outer(y,y) # these variables are always > 0
         yiyjt = yiyj**t
         W = observed_adj
-        A = (W > 0).astype(float)
-        # computed from sciipy
-        loglike = -(xixj**A + yiyj**W) - np.log(-xixj*yiyjt + np.log(yiyjt)) + np.log(np.log(yiyj))
-        #loglike = np.log(np.log(yiyj)) + A * np.log(xixj) + observed_adj * np.log(yiyj) - np.log(xixj * (yiyj ** t) - t * np.log(yiyj))
-        loglike = np.nan_to_num(loglike)
+        A = (W > t).astype(float)
+        k = A.sum(axis=0)
+        s = W.sum(axis=0)
+        loglike = A*np.log(xixj) + (W*A)*np.log(yiyj) - np.log(t - (xixj*yiyj)/(np.log(yiyj)))
+        #loglike = (k * np.log(x)).sum() + (s*np.log(y)).sum() - np.triu(np.log(t - (xixj*yiyjt)/(np.log(yiyj))),1).sum()
+        #return loglike
+        #loglike = np.nan_to_num(loglike)
         return np.triu(loglike,1).sum()
 
 class SpatialCM(GraphModel):

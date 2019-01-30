@@ -57,8 +57,8 @@ def plot(G,pij,wij):
 if __name__=='__main__':
 
     filename = home + '/workspace/communityalg/data/Coactivation_matrix_weighted.adj'
-    G = np.loadtxt(filename)[0:64, 0:64]
-    G = np.round(G*50)
+    G = np.loadtxt(filename)[0:64, 0:64]*50
+    #G = np.round(G*50)
     W = G
     A = (G>0).astype(float)
     k = A.sum(axis=0)

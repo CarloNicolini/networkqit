@@ -151,7 +151,8 @@ class MLEOptimizer(ModelOptimizer):
                 'maxfun': kwargs.get('maxfun', 1E10),
                 'maxiter': kwargs.get('maxiter', 1E4),
                 'verbose' : kwargs.get('verbose', 2),
-                'disp':True
+                'disp':True,
+                'iprint':2
                 }
 
         if kwargs.get('method', 'MLE') is 'MLE':
@@ -161,7 +162,7 @@ class MLEOptimizer(ModelOptimizer):
                                     x0=np.squeeze(self.x0),
                                     method='SLSQP',
                                     constraints={'fun':self.model.constraints, 'type':'ineq'},
-                                    bounds=self.model.bounds, #np.array(np.ravel(self.model.bounds),dtype=float),
+                                    bounds=self.model.bounds,
                                     options=opts)
             else: # the model has only bound-constraints, hence use L-BFGS-B
                 # Optimize using L-BFGS-B which typically returns good results
@@ -473,13 +474,13 @@ class Adam(StochasticOptimizer):
         # Use quasi-hyperbolic adam by default
         # https://arxiv.org/pdf/1810.06801.pdf
         quasi_hyperbolic = kwargs.get('quasi_hyperbolic', True)
-        nu1 = 0.9 # for quasi-hyperbolic adam
+        nu1 = 0.7 # for quasi-hyperbolic adam
         nu2 = 1.0 # for quasi-hyperbolic adam
         # visualization options
-        refresh_frames = kwargs.get('refresh_frames',100)
-        from drawnow import drawnow, figure
+        refresh_frames = kwargs.get('refresh_frames', 100)
+        #from drawnow import drawnow, figure
         import matplotlib.pyplot as plt
-        figure(figsize=(8, 8))
+        plt.figure(figsize=(8, 8))
 
         # Populate the solution list as function of beta
         # the list sol contains all optimization points
@@ -488,6 +489,7 @@ class Adam(StochasticOptimizer):
         mt, vt = np.zeros(self.x0.shape), np.zeros(self.x0.shape)
         all_dkl = []
         # TODO implement model boundaries in Adam
+        frames = 0
         for beta in self.beta_range:
             logger.info('Changed beta to %g' % beta)
             # if rho is provided, user rho is used, otherwise is computed at every beta
@@ -521,10 +523,10 @@ class Adam(StochasticOptimizer):
                 x -= eta * deltax
                 all_dkl.append(dkl)
                 if t % refresh_frames == 0:
+                    frames += 1
                     def draw_fig():
                         sol.append({'x': x.copy()})
-                        #plt.cla()
-                        #plt.figure(figsize=(8, 4))
+                        plt.figure(figsize=(8, 8))
                         A0 = np.mean(self.model.sample_adjacency(x, batch_size=batch_size), axis=0)
                         plt.subplot(2, 2, 1)
                         plt.imshow(self.A)
@@ -537,20 +539,20 @@ class Adam(StochasticOptimizer):
                         plt.xlabel('iteration')
                         plt.ylabel('$S(\\rho,\\sigma)$')
                         plt.subplot(2, 2, 4)
-                        plt.semilogx(self.beta_range, batch_compute_vonneumann_entropy(self.L, self.beta_range), '.-',
-                                     label='data')
+                        plt.semilogx(self.beta_range, batch_compute_vonneumann_entropy(self.L, np.logspace(3,-3,100)), '.-', label='data')
                         plt.semilogx(self.beta_range,
-                                     batch_compute_vonneumann_entropy(graph_laplacian(A0), self.beta_range), '.-',
-                                     label='model')
-                        plt.semilogx(beta, batch_compute_vonneumann_entropy(graph_laplacian(A0), [beta]), 'ko',
-                                     label='model')
+                                     batch_compute_vonneumann_entropy(graph_laplacian(A0), np.logspace(3,-3,100)), '.-', label='model')
+                        plt.plot(beta, batch_compute_vonneumann_entropy(graph_laplacian(A0), [beta]), 'ko', label='model')
                         plt.xlabel('$\\beta$')
                         plt.ylabel('$S$')
                         plt.title('Entropy')
                         plt.legend(loc='best')
+                        plt.suptitle('$\\beta=$' + '{0:0>3}'.format(beta))
                         #plt.tight_layout()
-                        #plt.savefig('frame_' + '{0:0>5}'.format(t) + '.png')
-                    drawnow(draw_fig)
+                        print('frame_' + '{0:0>5}'.format(frames) + '.png')
+                        plt.savefig('frame_' + '{0:0>5}'.format(frames) + '.png')
+                        plt.cla()
+                    draw_fig()
         self.sol = sol
         return sol
 
