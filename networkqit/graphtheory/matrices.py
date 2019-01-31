@@ -158,6 +158,34 @@ def batched_symmetric_random(batch_size, N):
     rij += np.transpose(rij,[0,2,1]) # transpose last axis
     return rij
 
+def batched_gumbel(batch_size, N, eps=1E-20):
+  """Sample from Gumbel(0, 1)"""
+  rij = batched_symmetric_random(batch_size,N)
+  return -np.log(-np.log(U + eps) + eps)
+
+def gumbel_softmax_sample(logits, temperature): 
+  """ Draw a sample from the Gumbel-Softmax distribution"""
+  y = logits + batched_gumbel(logits.shape[0],logits.shape[1])
+  return tf.nn.softmax( y / temperature)
+
+def gumbel_softmax(logits, temperature, hard=False):
+  """Sample from the Gumbel-Softmax distribution and optionally discretize.
+  Args:
+    logits: [batch_size, n_class] unnormalized log-probs
+    temperature: non-negative scalar
+    hard: if True, take argmax, but differentiate w.r.t. soft sample y
+  Returns:
+    [batch_size, n_class] sample from the Gumbel-Softmax distribution.
+    If hard=True, then the returned sample will be one-hot, otherwise it will
+    be a probabilitiy distribution that sums to 1 across classes
+  """
+  y = gumbel_softmax_sample(logits, temperature)
+  if hard:
+    k = tf.shape(logits)[-1]
+    #y_hard = tf.cast(tf.one_hot(tf.argmax(y,1),k), y.dtype)
+    y_hard = tf.cast(tf.equal(y,tf.reduce_max(y,1,keep_dims=True)),y.dtype)
+    y = tf.stop_gradient(y_hard - y) + y
+  return y
 
 def multiexpit(x, slope=50):
     y = np.asarray([ expit(slope*(x-i)) for i in range(int(np.max(x))) ])

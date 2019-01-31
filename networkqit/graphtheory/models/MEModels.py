@@ -381,8 +381,8 @@ class UECM3(GraphModel):
         # must take floor to generate geometric random variables
         # equivalent to floor but continuos is multiexpit(x-1)
         # TODO replace the floor with the appropriate multiexpit
-        W = 1 + np.floor(q)
-        #A = multiexpit(slope*(q-1.0))
+        W = 1 + np.floor(q) # +1 because the link already exists
+        #W = multiexpit(slope*(q-1.0))
         return A,W
 
 #################### Continuous models #######################
