@@ -179,6 +179,9 @@ class UWCM(GraphModel):
         return s - wij.sum(axis=0)
 
     def sample_adjacency(self, *args, **kwargs):
+        """
+        Sample the adjacency matrix of the UWCM
+        """
         batch_size = kwargs.get('batch_size', 1)
         slope = kwargs.get('slope', 50.0)
         rij = batched_symmetric_random(batch_size, self.N)
@@ -186,10 +189,12 @@ class UWCM(GraphModel):
         yiyj = np.einsum('ij,ik->ijk', batch_args, batch_args)
         # then must extract from a geometric distribution with probability P
         # https://math.stackexchange.com/questions/580901/r-generate-sample-that-follows-a-geometric-distribution
-        q = np.log(rij)/np.log(1.0-yiyj + EPS)
+        q = np.log(rij+EPS)/np.log(np.abs(1.0-yiyj))
         # must take floor to generate geometric random variables
         # equivalent to floor but continuos is multiexpit(x-1)
-        A = multiexpit(slope*(q-1.0))
+        # TODO replace the floor with the appropriate multiexpit
+        A = np.floor(q)
+        #A = multiexpit(slope*(q-1.0))
         A = np.triu(A, 1) # make it symmetric
         A += np.transpose(A, axes=[0, 2, 1])
         return A
@@ -333,7 +338,52 @@ class UECM3(GraphModel):
         loglike = (k*np.log(x)).sum() + (s*np.log(y)).sum() + np.triu(np.log( (1-yiyj)/(1-yiyj + xixj*yiyj) ) ,1).sum()
         return loglike
 
+    # def sample_adjacency(self, *args, **kwargs):
+    #     batch_size = kwargs.get('batch_size', 1)
+    #     slope = kwargs.get('slope', 50.0)
+    #     rij = batched_symmetric_random(batch_size, self.N)
+    #     #batch_args = np.tile(*args,[batch_size, 1]) # replicate
+    #     x,y = args[0][0:self.N], args[0][(self.N):]
+    #     xixj = np.tile(np.einsum('ij,ik->ijk', x, x),[batch_size,1]).reshape([batch_size,self.N,self.N])
+    #     yiyj = np.tile(np.einsum('ij,ik->ijk', y, y),[batch_size,1]).reshape([batch_size,self.N,self.N])
+    #     # then must extract from a geometric distribution with probability P
+    #     # https://math.stackexchange.com/questions/580901/r-generate-sample-that-follows-a-geometric-distribution
+    #     pij = xixj*yiyj/(1-yiyj+xixj*yiyj)
+    #     qij = np.log(rij+EPS)/np.log(np.abs(1.0-yiyj))
+    #     # must take floor to generate geometric random variables
+    #     # equivalent to floor but continuos is multiexpit(x-1)
+    #     # TODO replace the floor with the appropriate multiexpit
+    #     A = 1 + np.floor(q)
+    #     #A = multiexpit(slope*(q-1.0))
+    #     A = np.triu(A, 1) # make it symmetric
+    #     A += np.transpose(A, axes=[0, 2, 1])
+    #     return A
 
+    def sample_adjacency(self, *args, **kwargs):
+        """
+        Sample the adjacency matrix of the UECM
+        """
+        batch_size = kwargs.get('batch_size', 1)
+        slope = kwargs.get('slope', 50.0)
+        rij = batched_symmetric_random(batch_size, self.N)
+        #batch_args = np.tile(*args,[batch_size, 1]) # replicate
+        x,y = args[0][0:self.N], args[0][(self.N):]
+        xixj = np.outer(x,x)
+        yiyj = np.outer(y,y)
+        pij = xixj*yiyj/(1-yiyj + xixj*yiyj)
+        # use broadcasting heavily here
+        A = expit(slope*(pij-rij)) # sampling, approximates binomial with continuos
+        A = np.triu(A, 1) # make it symmetric
+        A += np.transpose(A, axes=[0, 2, 1])
+        # then must extract from a geometric distribution with probability P
+        # https://math.stackexchange.com/questions/580901/r-generate-sample-that-follows-a-geometric-distribution
+        q = np.log(rij+EPS)/np.log(np.abs(1.0-pij))
+        # must take floor to generate geometric random variables
+        # equivalent to floor but continuos is multiexpit(x-1)
+        # TODO replace the floor with the appropriate multiexpit
+        W = 1 + np.floor(q)
+        #A = multiexpit(slope*(q-1.0))
+        return A,W
 
 #################### Continuous models #######################
 
