@@ -185,7 +185,7 @@ class UWCM(GraphModel):
         batch_size = kwargs.get('batch_size', 1)
         slope = kwargs.get('slope', 50.0)
         rij = batched_symmetric_random(batch_size, self.N)
-        batch_args = np.tile(*args,[batch_size, 1]) # replicate
+        batch_args = np.tile(*args, [batch_size, 1]) # replicate
         yiyj = np.einsum('ij,ik->ijk', batch_args, batch_args)
         # then must extract from a geometric distribution with probability P
         # https://math.stackexchange.com/questions/580901/r-generate-sample-that-follows-a-geometric-distribution
@@ -314,7 +314,6 @@ class UECM3(GraphModel):
             return np.atleast_1d(c).astype(float)
         self.constraints = constraints
         
-
     def expected_adjacency(self, *args):
         x,y = args[0][0:self.N], args[0][(self.N):]
         xixj = np.outer(x,x)
@@ -383,7 +382,9 @@ class UECM3(GraphModel):
         # TODO replace the floor with the appropriate multiexpit
         W = 1 + np.floor(q) # +1 because the link already exists
         #W = multiexpit(slope*(q-1.0))
-        return A,W
+        # Questa è la soluzione corretta
+        W = np.random.geometric(1-yiyj,size=[batch_size,self.N,self.N])
+        return A,np.random.geometric(1-yiyj,size=[batch_size,self.N,self.N])
 
 #################### Continuous models #######################
 
