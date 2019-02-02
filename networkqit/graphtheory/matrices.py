@@ -33,17 +33,31 @@ def graph_laplacian(A):
     """
     Get the graph Laplacian from the adjacency matrix
     :math:`\\mathbf{L} = \\mathbf{D} - \\mathbf{A}`
+    If a batched adjacency matrix of shape [batch_size, N, N] is
+    given, the batched laplacian is returned.
     """
-    return np.diag(A.sum(axis=0)) - A
+    if len(A.shape)==3:
+        N = A.shape[-1] # last dimension is number of nodes
+        D = np.eye(N) * np.transpose(np.zeros([1, 1, N]) + np.einsum('ijk->ik', A), [1, 0, 2])
+        return D - A
+    else:
+        return np.diag(A.sum(axis=0)) - A
 
 
 def normalized_graph_laplacian(A):
     """
     Get the normalized graph laplacian 
     :math:`\\mathcal{L}=I - D^{-1/2} A D^{-1/2}`
+    If a batched adjacency matrix of shape [batch_size, N, N] is
+    given, the batched laplacian is returned.
     """
-    invSqrtT = np.diag(1.0 / np.sqrt(A.sum(axis=0)))
-    return np.eye(A.shape[0]) - invSqrtT @ A @ invSqrtT
+    if len(A.shape)==3:
+        N = A.shape[-1]
+        invSqrtD = np.eye(N) * np.transpose(np.zeros([1, 1, N]) + 1/np.sqrt(np.einsum('ijk->ik', A)), [1, 0, 2])
+        return  np.eye(N) - invSqrtD @ A @ invSqrtD
+    else:
+        invSqrtT = np.diag(1.0 / np.sqrt(A.sum(axis=0)))
+        return np.eye(A.shape[0]) - invSqrtT @ A @ invSqrtT
 
 
 def modularity_matrix(A):
@@ -51,9 +65,17 @@ def modularity_matrix(A):
     Returns the modularity matrix
     :math:`\\mathbf{B} = \\mathbf{A} - \\frac{\\mathbf{k} \\mathbf{k}^T}{2m}`
     """
-    k = A.sum(axis=0)
-    return A - np.outer(k, k) / A.sum()
-
+    if len(A.shape)==3:
+        N = A.shape[-1]
+        b  = A.shape[0]
+        k = np.einsum('ijk->ik', A)
+        kikj = np.einsum('ij,ik->ijk', k, k)
+        m = np.sum(np.sum(A,axis=1), axis=1, keepdims=True)
+        B = A - (kikj/np.broadcast_to(np.expand_dims(m,axis=2),A.shape))    # batched kikj/2m
+        return  B
+    else:
+        k = A.sum(axis=0)
+        return A - np.outer(k, k) / k.sum()
 
 def signed_laplacian(A):
     """
@@ -61,10 +83,12 @@ def signed_laplacian(A):
     :math:`\\mathbf{\\bar{L}} = \\mathbf{\\bar{D}} - \\mathbf{A}
     where the diagonal matrix D is made of the absolute value of the row-sum of A.
     """
-    D = np.diag(np.abs(A.sum(axis=0)))
-    L = D - A
-    return L
-
+    if len(A.shape)==3:
+        N = A.shape[-1] # last dimension is number of nodes
+        D = np.eye(N) * np.transpose(np.zeros([1, 1, N]) + np.einsum('ijk->ik', A), [1, 0, 2])
+        return np.abs(D) - A
+    else:
+        return np.diag(np.abs(A.sum(axis=0))) - A
 
 def planted_partition_graph(n, b, pin, pout):
     nb = int(n / b)

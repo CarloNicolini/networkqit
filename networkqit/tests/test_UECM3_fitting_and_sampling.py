@@ -57,8 +57,9 @@ def plot(G,pij,wij):
 if __name__=='__main__':
 
     filename = home + '/workspace/communityalg/data/Coactivation_matrix_weighted.adj'
-    G = np.loadtxt(filename)#[0:256, 0:256]
-    G = np.round(G*50)
+    G = np.loadtxt(filename)[0:32, 0:32]
+    G = np.round(G*100)
+    print(np.unique(G))
     print(np.unique(G))
     W = G
     A = (G>0).astype(float)
@@ -70,33 +71,38 @@ if __name__=='__main__':
     pairs = n*(n-1)/2
 
     M = UECM3(N=len(W))
-    x0 = (np.concatenate([k,s])+1E-5)*1E-3 #+ (np.random.random([2*len(W),])*2-1)*1E-5
+    x0 = (np.concatenate([k,s])+1E-5) * 1E-3 #+ (np.random.random([2*len(W),])*2-1)*1E-5
 
     # Optimize by L-BFGS-B
     opt = nq.MLEOptimizer(W, x0=x0, model=M)
-    sol = opt.run(model=M, verbose=0,gtol=1E-8, method='MLE')
+    sol = opt.run(model=M, verbose=0, gtol=1E-3, method='MLE')
     print('Loglikelihood = ', M.loglikelihood(G,sol['x']))
     
     pij = M.expected_adjacency(sol['x'])
     wij = M.expected_weighted_adjacency(sol['x'])
     plot(W,pij,wij)
 
-    Asample,Wsample = M.sample_adjacency(sol['x'],batch_size=100)
-    plt.plot(np.mean(np.sum(Asample,axis=1), axis=0),np.sum(A,axis=0),'.r')
+    Asample,Wsample = M.sample_adjacency(sol['x'],batch_size=1000)
+    plt.plot(np.sum(A,axis=0),np.mean(np.sum(Asample,axis=1), axis=0),'.r')
     plt.plot(np.sum(A,axis=0),np.sum(A,axis=0),'-r')
+    plt.title('Sampled degrees')
+    plt.xlabel('Empirical')
+    plt.ylabel('Model')
     plt.show()
 
     plt.plot(np.mean(np.sum(Asample*(Wsample),axis=1), axis=0),np.sum(W,axis=0),'.r')
     plt.plot(np.sum(W,axis=0),np.sum(W,axis=0),'-r')
+    plt.title('Sampled strengths')
+    plt.xlabel('Empirical')
+    plt.ylabel('Model')
     plt.show()
-    
-    beta_range=np.logspace(-3,3,100)
-    plt.semilogx(beta_range,nq.batch_compute_vonneumann_entropy(nq.graph_laplacian(W),beta_range))
+
+    beta_range=np.logspace(-2,1,100)
     Lsample = np.zeros_like(Asample)
-    for i in range(100):
+    for i in range(Asample.shape[0]):
         Lsample[i,:,:] = nq.graph_laplacian(Asample[i,:,:]*Wsample[i,:,:])
         plt.semilogx(beta_range,nq.batch_compute_vonneumann_entropy(Lsample[i,:,:],beta_range),color='r',alpha=0.2)
-
+    plt.semilogx(beta_range,nq.batch_compute_vonneumann_entropy(nq.graph_laplacian(W),beta_range),color='b',linewidth=2)
     plt.show()
 
     # nq.MLEOptimizer(W, x0=sol['x'], model=M)
