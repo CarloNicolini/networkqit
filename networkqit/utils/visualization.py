@@ -21,6 +21,53 @@ from networkqit.graphtheory import graph_laplacian as graph_laplacian
 
 import matplotlib.gridspec as gridspec
 
+def plot_mle(G,pij,wij=None):
+    plt.figure(figsize=(12,8))
+    plt.subplot(2,3,1)
+    im = plt.imshow(pij)
+    plt.colorbar(im,fraction=0.046, pad=0.04)
+    plt.grid(False)
+    plt.title('$p_{ij}$')
+
+    if wij is not None:
+        plt.subplot(2,3,2)
+        im = plt.imshow(wij)
+        plt.colorbar(im,fraction=0.046, pad=0.04)
+        plt.grid(False)
+        plt.title('$<w_{ij}>$')
+
+    plt.subplot(2,3,3)
+    im = plt.imshow(G)
+    plt.colorbar(im,fraction=0.046, pad=0.04)
+    plt.grid(False)
+    plt.title('Weighted empirical')
+
+    plt.subplot(2,3,4)
+    plt.plot((G>0).sum(axis=0),pij.sum(axis=0), 'b.')
+    plt.plot(np.linspace(0,pij.sum(axis=0).max()),np.linspace(0,pij.sum(axis=0).max()),'r-')
+    plt.grid(True)
+    plt.axis('equal')
+    plt.title('Degrees reconstruction')
+    plt.ylabel('model')
+    plt.xlabel('empirical')
+
+    if wij is not None:
+        plt.subplot(2,3,5)
+        plt.plot(G.sum(axis=0),wij.sum(axis=0), 'b.')
+        plt.plot(np.linspace(0,wij.sum(axis=0).max()),np.linspace(0,wij.sum(axis=0).max()),'r-')
+        plt.title('Strength reconstruction')
+        plt.axis('equal')
+        plt.grid(True)
+        plt.ylabel('model')
+        plt.xlabel('empirical')
+
+    plt.subplot(2,3,6)
+    plt.imshow(G>0)
+    plt.title('Binary empirical')
+
+    plt.tight_layout()
+    plt.show()
+
 def step_callback(A, beta, model, x, **kwargs):
     def drawfig1():
         P = model(x)

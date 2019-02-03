@@ -149,10 +149,10 @@ class MLEOptimizer(ModelOptimizer):
                 'eps': kwargs.get('eps', 1E-10),
                 'xtol': kwargs.get('xtol', 1E-10),
                 'maxfun': kwargs.get('maxfun', 1E10),
-                'maxiter': kwargs.get('maxiter', 1E4),
+                'maxiter': kwargs.get('maxiter', 1E5),
                 'verbose' : kwargs.get('verbose', 2),
-                'disp':True,
-                'iprint':2
+                'disp':  bool(kwargs.get('verbose', 2)),
+                'iprint': kwargs.get('verbose', 1)
                 }
 
         if kwargs.get('method', 'MLE') is 'MLE':

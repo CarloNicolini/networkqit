@@ -310,7 +310,7 @@ class UECM3(GraphModel):
         # specify non-linear constraints
         def constraints(z):
             x, y  = z[0:self.N], z[self.N:]
-            c = np.concatenate([x > 0, y>0, y < 1])
+            c = np.concatenate([x > 0, y>0, y <= 1])
             return np.atleast_1d(c).astype(float)
         self.constraints = constraints
         
@@ -371,20 +371,28 @@ class UECM3(GraphModel):
         yiyj = np.outer(y,y)
         pij = xixj*yiyj/(1-yiyj + xixj*yiyj)
         # use broadcasting heavily here
-        A = expit(slope*(pij-rij)) # sampling, approximates binomial with continuos
-        A = np.triu(A, 1) # make it symmetric
-        A += np.transpose(A, axes=[0, 2, 1])
-        # then must extract from a geometric distribution with probability P
-        # https://math.stackexchange.com/questions/580901/r-generate-sample-that-follows-a-geometric-distribution
-        q = np.log(rij+EPS)/np.log(np.abs(1.0-pij))
-        # must take floor to generate geometric random variables
-        # equivalent to floor but continuos is multiexpit(x-1)
-        # TODO replace the floor with the appropriate multiexpit
-        W = 1 + np.floor(q) # +1 because the link already exists
-        #W = multiexpit(slope*(q-1.0))
-        # Questa è la soluzione corretta
-        W = np.random.geometric(1-yiyj,size=[batch_size,self.N,self.N])
-        return A,np.random.geometric(1-yiyj,size=[batch_size,self.N,self.N])
+        if kwargs.get('with_grads',False):
+            A = expit(slope*(pij-rij)) # sampling, approximates binomial with continuos
+            A = np.triu(A, 1) # make it symmetric
+            A += np.transpose(A, axes=[0, 2, 1])
+            # then must extract from a geometric distribution with probability P
+            # https://math.stackexchange.com/questions/580901/r-generate-sample-that-follows-a-geometric-distribution
+            q = np.log(rij+EPS)/np.log(np.abs(1.0-pij))
+            # must take floor to generate geometric random variables
+            # equivalent to floor but continuos is multiexpit(x-1)
+            # TODO replace the floor with the appropriate multiexpit
+            #W = multiexpit(slope*(q-1.0)) non è derivabile da fixare
+            W = 1 + np.floor(q) # +1 because the link already exists
+            return W*A
+        else:
+            # Questa è la soluzione corretta
+            A = expit(slope*(pij-rij)) # sampling, approximates binomial with continuos
+            A = np.triu(A, 1) # make it symmetric
+            A += np.transpose(A, axes=[0, 2, 1])
+            W = np.random.geometric(1-yiyj,size=[batch_size,self.N,self.N])
+            W = np.triu(W,1)
+            W += np.transpose(W, axes=[0, 2, 1])
+            return W*A
 
 #################### Continuous models #######################
 
@@ -425,14 +433,12 @@ class CWTECM(GraphModel):
         #self.formula = '$\frac{x_i x_j (y_i y_j)^t}{t \log(yi y_j) + x_i x_j (y_i y_j)^t}$'
         self.N = kwargs['N']
         self.threshold = kwargs['threshold']
-        self.bounds = [(EPS, None)] * self.N + [(EPS, 1)] * self.N
+        self.bounds = [(0, None)] * self.N + [(0, 1)] * self.N
         # specify non-linear constraints
         def constraints(z):
             x, y  = z[0:self.N], z[self.N:]
-            xixj = np.abs(np.outer(x,x)) # these variables are always > 0
-            yiyj = np.abs(np.outer(y,y)) # these variables are always > 0
             t = self.threshold
-            c = np.concatenate([x > 0, y > 0, y < 1,  x<1])# x*y < t, x*y > 0, np.abs(yiyj**t).ravel() < 1 ])
+            c = np.concatenate([x > 0, y>0, y <= 1])
             return np.atleast_1d(c).astype(float)
         self.constraints = constraints
 
@@ -442,16 +448,18 @@ class CWTECM(GraphModel):
         xixj = np.abs(np.outer(x,x)) # these variables are always > 0
         yiyj = np.abs(np.outer(y,y)) # these variables are always > 0
         yiyjt = yiyj**t
-        pij = (xixj*yiyjt )/ (xixj*yiyjt - t*np.log(yiyj)) # <aij>
+        pij = (xixj*yiyjt) / (xixj*yiyjt - t*np.log(yiyj)) # <aij>
         return np.nan_to_num(pij)
     
     def expected_weighted_adjacency(self, *args):
         x,y = args[0][0:self.N], args[0][(self.N):]
         t = self.threshold
-        xixj = np.abs(np.outer(x,x)) # these variables are always > 0
-        yiyj = np.abs(np.outer(y,y)) # these variables are always > 0
+        xixj = np.outer(x,x) # these variables are always > 0
+        yiyj = np.outer(y,y) # these variables are always > 0
         yiyjt = yiyj**t
-        wij = ((t*np.log(yiyj)-1)/(t*np.log(yiyj)))
+        # EXACT FULL FORMULA 
+        # wij = (xixj*(yiyj**t) - t*xixj*(yiyj)**t*np.log(yiyj)) / (np.log(yiyj)*(t*np.log(yiyj) - xixj*(yiyj**t)))
+        wij = ((t*np.log(yiyj)-1.0) / (np.log(yiyj)))
         wij *= ((xixj*yiyjt )/ (xixj*yiyjt - t*np.log(yiyj))) # <aij>
         return np.nan_to_num(wij)
     
@@ -464,21 +472,18 @@ class CWTECM(GraphModel):
         avgw = wij.sum(axis=0) #- wij.diagonal()
         return np.hstack([k-avgk,w-avgw])
 
-    def loglikelihood(self, observed_adj, *args):
-        x,y = args[0][0:self.N], args[0][(self.N):]
+    def loglikelihood(self, wij, *args):
         t = self.threshold
-        xixj = np.outer(x,x) # these variables are always > 0
-        yiyj = np.outer(y,y) # these variables are always > 0
-        yiyjt = yiyj**t
-        W = observed_adj
-        A = (W > t).astype(float)
-        k = A.sum(axis=0)
-        s = W.sum(axis=0)
-        loglike = A*np.log(xixj) + (W*A)*np.log(yiyj) - np.log(t - (xixj*yiyj)/(np.log(yiyj)))
-        #loglike = (k * np.log(x)).sum() + (s*np.log(y)).sum() - np.triu(np.log(t - (xixj*yiyjt)/(np.log(yiyj))),1).sum()
-        #return loglike
-        #loglike = np.nan_to_num(loglike)
-        return np.triu(loglike,1).sum()
+        x,y = args[0][0:self.N], args[0][(self.N):]
+        xixj = np.outer(x,x)
+        yiyj = np.outer(y,y)
+        aij = (wij>t).astype(float)
+        #k = (observed_adj>=t).sum(axis=0)
+        #s = observed_adj.sum(axis=0)
+        # la migliore per ora loglike = (k*np.log(x)).sum() + (s*np.log(y)).sum() - np.triu(np.log(t - (xixj*(yiyj**t))/(np.log(yiyj))),1).sum()
+        loglike = (wij*(np.log(yiyj)) + np.log(xixj))*aij + np.log(-np.log(yiyj)/(xixj*(yiyj**t) -t*(np.log(yiyj)) ) )
+        loglike = np.triu(loglike,1).sum()
+        return loglike
 
 class SpatialCM(GraphModel):
     """
