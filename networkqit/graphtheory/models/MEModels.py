@@ -433,12 +433,12 @@ class CWTECM(GraphModel):
         #self.formula = '$\frac{x_i x_j (y_i y_j)^t}{t \log(yi y_j) + x_i x_j (y_i y_j)^t}$'
         self.N = kwargs['N']
         self.threshold = kwargs['threshold']
-        self.bounds = [(0, None)] * self.N + [(0, 1)] * self.N
+        self.bounds = [(EPS, None)] * self.N + [(EPS, 1-EPS)] * self.N
         # specify non-linear constraints
         def constraints(z):
             x, y  = z[0:self.N], z[self.N:]
             t = self.threshold
-            c = np.concatenate([x > 0, y>0, y <= 1])
+            c = np.concatenate([x > 0, y>0, y < 1])
             return np.atleast_1d(c).astype(float)
         self.constraints = constraints
 
@@ -471,19 +471,21 @@ class CWTECM(GraphModel):
         wij = self.expected_weighted_adjacency(*args)
         avgw = wij.sum(axis=0) #- wij.diagonal()
         return np.hstack([k-avgk,w-avgw])
-
+    
     def loglikelihood(self, wij, *args):
         t = self.threshold
         x,y = args[0][0:self.N], args[0][(self.N):]
-        xixj = np.outer(x,x)
-        yiyj = np.outer(y,y)
+        xixj = np.outer(x,x)+EPS
+        yiyj = np.outer(y,y)+EPS
         aij = (wij>t).astype(float)
-        #k = (observed_adj>=t).sum(axis=0)
-        #s = observed_adj.sum(axis=0)
-        # la migliore per ora loglike = (k*np.log(x)).sum() + (s*np.log(y)).sum() - np.triu(np.log(t - (xixj*(yiyj**t))/(np.log(yiyj))),1).sum()
-        loglike = (wij*(np.log(yiyj)) + np.log(xixj))*aij + np.log(-np.log(yiyj)/(xixj*(yiyj**t) -t*(np.log(yiyj)) ) )
-        loglike = np.triu(loglike,1).sum()
+        k = aij.sum(axis=0)
+        s = wij.sum(axis=0)
+        loglike = (s*np.log(y) + k*np.log(x)).sum() + np.triu(np.log(-np.log(yiyj)/(xixj*(yiyj**t) -t*(np.log(yiyj)) ) ),1).sum()
         return loglike
+        # FULL FORMULA, a bit slower
+        #loglike = (wij*(np.log(yiyj)) + np.log(xixj))*aij + np.log(-np.log(yiyj)/(xixj*(yiyj**t) -t*(np.log(yiyj)) ) )
+        #loglike = np.triu(loglike,1).sum()
+        #return loglike
 
 class SpatialCM(GraphModel):
     """

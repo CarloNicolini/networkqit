@@ -144,10 +144,10 @@ class MLEOptimizer(ModelOptimizer):
             sol: (scipy.optimize.OptimizeResult) parameters at optimal likelihood
         """
 
-        opts = {'ftol': kwargs.get('ftol', 1E-10),
-                'gtol': kwargs.get('gtol', 1E-10),
-                'eps': kwargs.get('eps', 1E-10),
-                'xtol': kwargs.get('xtol', 1E-10),
+        opts = {'ftol': kwargs.get('ftol', 1E-6),
+                'gtol': kwargs.get('gtol', 1E-8),
+                #'eps': kwargs.get('eps', 1E-12),
+                'xtol': kwargs.get('xtol', 1E-8),
                 'maxfun': kwargs.get('maxfun', 1E10),
                 'maxiter': kwargs.get('maxiter', 1E5),
                 'verbose' : kwargs.get('verbose', 2),
@@ -158,11 +158,18 @@ class MLEOptimizer(ModelOptimizer):
         if kwargs.get('method', 'MLE') is 'MLE':
             # The model has non-linear constraints, must use Sequential Linear Square Programming SLSQP
             if hasattr(self.model, 'constraints'):
+                from autograd import jacobian, hessian
+                J=jacobian(lambda z : -self.model.loglikelihood(self.G,z))
+                #H=hessian(lambda z : -self.model.loglikelihood(self.G,z))
+                # to avoid warnings
+                opts.pop('gtol'), opts.pop('verbose'), opts.pop('xtol'),opts.pop('maxfun')
                 self.sol = minimize(fun=lambda z: -self.model.loglikelihood(self.G, z),
                                     x0=np.squeeze(self.x0),
                                     method='SLSQP',
                                     constraints={'fun':self.model.constraints, 'type':'ineq'},
                                     bounds=self.model.bounds,
+                                    jac=J,
+                                    tol=opts['ftol'],
                                     options=opts)
             else: # the model has only bound-constraints, hence use L-BFGS-B
                 # Optimize using L-BFGS-B which typically returns good results
@@ -172,9 +179,10 @@ class MLEOptimizer(ModelOptimizer):
                                     bounds=self.model.bounds, #np.array(np.ravel(self.model.bounds),dtype=float),
                                     options=opts)
 
-            #if self.sol['status'] != 0:
-            #    print(self.sol['message'])
-            #    raise Exception('Method did not converge to maximum likelihood: ')
+            print(self.sol['message'])
+            if self.sol['status'] != 0:
+                RuntimeWarning(self.sol['message'])
+                #raise Exception('Method did not converge to maximum likelihood: ')
             return self.sol
 
         elif kwargs.get('method', 'saddle_point') is 'saddle_point':
