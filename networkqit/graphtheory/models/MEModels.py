@@ -154,8 +154,6 @@ class UWCM(GraphModel):
         self.args_mapping = ['y_' + str(i) for i in range(0, kwargs['N'])]
         self.model_type = 'topological'
         self.formula = '$<w_{ij}> = \frac{y_i y_j}{1-y_i y_j}$'
-        # WARNING: when maximizing, this model has variables bounded in [0,1]
-        # see Oleguer Sagarra thesis
         self.bounds = [(EPS, 1.0-EPS) for i in range(0, self.N)]
 
     def expected_adjacency(self, *args):
@@ -240,7 +238,7 @@ class UBWRG(GraphModel):
         
     def expected_adjacency(self, *args):
         x,y = args[0], args[1]
-        pij = np.nan_to_num((x * y) / ((1 - y + x * y)))
+        pij = (x * y) / ((1 - y + x * y))
         pij[pij<0] = EPS
         return pij
 
@@ -306,20 +304,13 @@ class UECM3(GraphModel):
         self.args_mapping =   ['x_' + str(i) for i in range(0, kwargs['N'])] + ['y_' + str(i) for i in range(0, kwargs['N'])]
         #self.formula = '$\frac{x_i x_j  y_i y_j)}{(1 - y_iy_j + x_i x_j y_i y_j)(1 - y_i y_j)}$' TODO
         self.N = kwargs['N']
-        self.bounds = [(EPS ,None)] * self.N + [(EPS, 1)] * self.N
-        # specify non-linear constraints
-        def constraints(z):
-            x, y  = z[0:self.N], z[self.N:]
-            c = np.concatenate([x > 0, y>0, y <= 1])
-            return np.atleast_1d(c).astype(float)
-        self.constraints = constraints
-        
+        self.bounds = [(EPS ,None)] * self.N + [(EPS, 1-EPS)] * self.N
+
     def expected_adjacency(self, *args):
         x,y = args[0][0:self.N], args[0][(self.N):]
         xixj = np.outer(x,x)
         yiyj = np.outer(y,y)
-        pij = np.nan_to_num((xixj * yiyj) / ((1 - yiyj + xixj * yiyj)))
-        pij[pij<0] = EPS
+        pij = (xixj * yiyj) / ((1 - yiyj + xixj * yiyj))
         return pij
 
     def expected_weighted_adjacency(self, *args):
@@ -434,13 +425,6 @@ class CWTECM(GraphModel):
         self.N = kwargs['N']
         self.threshold = kwargs['threshold']
         self.bounds = [(EPS, None)] * self.N + [(EPS, 1-EPS)] * self.N
-        # specify non-linear constraints
-        def constraints(z):
-            x, y  = z[0:self.N], z[self.N:]
-            t = self.threshold
-            c = np.concatenate([x > 0, y>0, y < 1])
-            return np.atleast_1d(c).astype(float)
-        self.constraints = constraints
 
     def expected_adjacency(self, *args):
         x,y = args[0][0:self.N], args[0][(self.N):]
@@ -449,7 +433,7 @@ class CWTECM(GraphModel):
         yiyj = np.abs(np.outer(y,y)) # these variables are always > 0
         yiyjt = yiyj**t
         pij = (xixj*yiyjt) / (xixj*yiyjt - t*np.log(yiyj)) # <aij>
-        return np.nan_to_num(pij)
+        return pij
     
     def expected_weighted_adjacency(self, *args):
         x,y = args[0][0:self.N], args[0][(self.N):]
@@ -459,54 +443,49 @@ class CWTECM(GraphModel):
         yiyjt = yiyj**t
         # EXACT FULL FORMULA 
         # wij = (xixj*(yiyj**t) - t*xixj*(yiyj)**t*np.log(yiyj)) / (np.log(yiyj)*(t*np.log(yiyj) - xixj*(yiyj**t)))
-        wij = ((t*np.log(yiyj)-1.0) / (np.log(yiyj)))
-        wij *= ((xixj*yiyjt )/ (xixj*yiyjt - t*np.log(yiyj))) # <aij>
-        return np.nan_to_num(wij)
+        wij = self.expected_adjacency(*args)*((t*np.log(yiyj)-1.0) / (np.log(yiyj)))
+        return wij
     
     def saddle_point(self, G, *args):
         k = (G>0).sum(axis=0)
         pij = self.expected_adjacency(*args)
-        avgk = pij.sum(axis=0) #- pij.diagonal()
+        avgk = pij.sum(axis=0)
         w = G.sum(axis=0)
         wij = self.expected_weighted_adjacency(*args)
-        avgw = wij.sum(axis=0) #- wij.diagonal()
+        avgw = wij.sum(axis=0)
         return np.hstack([k-avgk,w-avgw])
     
     def loglikelihood(self, wij, *args):
         t = self.threshold
         x,y = args[0][0:self.N], args[0][(self.N):]
-        xixj = np.outer(x,x)+EPS
-        yiyj = np.outer(y,y)+EPS
-        aij = (wij>t).astype(float)
-        k = aij.sum(axis=0)
-        s = wij.sum(axis=0)
-        loglike = (s*np.log(y) + k*np.log(x)).sum() + np.triu(np.log(-np.log(yiyj)/(xixj*(yiyj**t) -t*(np.log(yiyj)) ) ),1).sum()
+        xixj = np.outer(x,x)
+        yiyj = np.outer(y,y)
+        if not hasattr(self, '_k'):
+            self._k =  (wij>t).astype(float).sum(axis=0)
+            self._s = wij.sum(axis=0)
+        loglike = (self._s*np.log(y) + self._k*np.log(x)).sum() + np.triu(np.log(-np.log(yiyj)/(xixj*(yiyj**t) -t*(np.log(yiyj)) ) ),1).sum()
         return loglike
         # FULL FORMULA, a bit slower
         #loglike = (wij*(np.log(yiyj)) + np.log(xixj))*aij + np.log(-np.log(yiyj)/(xixj*(yiyj**t) -t*(np.log(yiyj)) ) )
         #loglike = np.triu(loglike,1).sum()
         #return loglike
 
-class SpatialCM(GraphModel):
-    """
-    Implements the random graph model with spatial constraints from:
-    Ruzzenenti, F., Picciolo, F., Basosi, R., & Garlaschelli, D. (2012). 
-    Spatial effects in real networks: Measures, null models, and applications. 
-    Physical Review E - Statistical, Nonlinear, and Soft Matter Physics, 86(6), 
-    1–13. https://doi.org/10.1103/PhysRevE.86.066110
-    """
-    def __init__(self, **kwargs):
-        if kwargs is not None:
-            super().__init__(**kwargs)
-        self.args_mapping = ['x_' + str(i) for i in range(0, kwargs['N'])] + ['gamma','z']
-        #self.formula = '$\frac{z x_i x_j e^{-\gamma d_{ij}}}{ 1 + z x_i x_j e^{-\gamma d_{ij}}  }$'
-        self.bounds = [(EPS,None) for i in range(0,kwargs['N'])] + [(EPS,None),(EPS,None)]
-        self.dij = kwargs['dij']
-        self.expdij = np.exp(-kwargs['dij'])
-        self.is_weighted = kwargs.get('is_weighted',False)
-    
-    def expected_adjacency(self, *args):        
-        O = args[-1]*np.outer(args[0:-2],args[0:-2]) * self.expdij**(args[-2])
-        if self.is_weighted:
-            return O / (1 + O)
-        return O / (1-O)
+    def sample_adjacency(self, *args, **kwargs):
+        """
+        Sample the adjacency matrix of the UECM
+        """
+        batch_size = kwargs.get('batch_size', 1)
+        slope = kwargs.get('slope', 50.0)
+        rij = batched_symmetric_random(batch_size, self.N)
+        #batch_args = np.tile(*args,[batch_size, 1]) # replicate
+
+        pij = self.expected_adjacency(*args)
+        wij = self.expected_weighted_adjacency(*args)
+        # use broadcasting heavily here
+        A = (pij>rij).astype(float)
+        A = np.triu(A, 1) # make it symmetric
+        A += np.transpose(A, axes=[0, 2, 1])
+        W = np.random.exponential(wij,size=[batch_size,self.N,self.N])
+        W = np.triu(W,1)
+        W += np.transpose(W, axes=[0, 2, 1])
+        return W*A

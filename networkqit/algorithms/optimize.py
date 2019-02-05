@@ -144,12 +144,12 @@ class MLEOptimizer(ModelOptimizer):
             sol: (scipy.optimize.OptimizeResult) parameters at optimal likelihood
         """
 
-        opts = {'ftol': kwargs.get('ftol', 1E-6),
-                'gtol': kwargs.get('gtol', 1E-8),
-                #'eps': kwargs.get('eps', 1E-12),
+        opts = {'ftol': kwargs.get('ftol', 1E-10),
+                'gtol': kwargs.get('gtol', 1E-5), # as default of LBFGSB
+                'eps': kwargs.get('eps', 1E-8), # as default of LBFGSB
                 'xtol': kwargs.get('xtol', 1E-8),
                 'maxfun': kwargs.get('maxfun', 1E10),
-                'maxiter': kwargs.get('maxiter', 1E5),
+                'maxiter': kwargs.get('maxiter', 1E4),
                 'verbose' : kwargs.get('verbose', 2),
                 'disp':  bool(kwargs.get('verbose', 2)),
                 'iprint': kwargs.get('verbose', 1)
@@ -157,11 +157,11 @@ class MLEOptimizer(ModelOptimizer):
 
         if kwargs.get('method', 'MLE') is 'MLE':
             # The model has non-linear constraints, must use Sequential Linear Square Programming SLSQP
+            from autograd import jacobian
+            J = jacobian(lambda z : -self.model.loglikelihood(self.G,z))
             if hasattr(self.model, 'constraints'):
-                from autograd import jacobian, hessian
-                J=jacobian(lambda z : -self.model.loglikelihood(self.G,z))
                 #H=hessian(lambda z : -self.model.loglikelihood(self.G,z))
-                # to avoid warnings
+                # remove some options to avoid warnings
                 opts.pop('gtol'), opts.pop('verbose'), opts.pop('xtol'),opts.pop('maxfun')
                 self.sol = minimize(fun=lambda z: -self.model.loglikelihood(self.G, z),
                                     x0=np.squeeze(self.x0),
@@ -173,10 +173,12 @@ class MLEOptimizer(ModelOptimizer):
                                     options=opts)
             else: # the model has only bound-constraints, hence use L-BFGS-B
                 # Optimize using L-BFGS-B which typically returns good results
+                opts.pop('xtol'), opts.pop('verbose')
                 self.sol = minimize(fun=lambda z: -self.model.loglikelihood(self.G, z),
                                     x0=np.squeeze(self.x0),
                                     method='L-BFGS-B',
-                                    bounds=self.model.bounds, #np.array(np.ravel(self.model.bounds),dtype=float),
+                                    jac=J,
+                                    bounds=self.model.bounds,
                                     options=opts)
 
             print(self.sol['message'])

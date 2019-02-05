@@ -52,12 +52,13 @@ def plot(G,pij,wij):
     plt.xlabel('empirical')
 
     plt.tight_layout()
+    plt.savefig('uecm3_fit_coactivation.png',bbox='tight')
     plt.show()
 
 if __name__=='__main__':
 
     filename = home + '/workspace/communityalg/data/Coactivation_matrix_weighted.adj'
-    G = np.loadtxt(filename)[0:64, 0:64]*50
+    G = np.loadtxt(filename)*50
     #G = np.round(G*50)
     W = G
     A = (G>0).astype(float)
