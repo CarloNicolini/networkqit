@@ -377,11 +377,9 @@ class UECM3(GraphModel):
             return W*A
         else:
             # Questa è la soluzione corretta
-            A = expit(slope*(pij-rij)) # sampling, approximates binomial with continuos
-            A = np.triu(A, 1) # make it symmetric
+            A = np.triu(pij>rij,1) # sampling, approximates binomial with continuos
             A += np.transpose(A, axes=[0, 2, 1])
-            W = np.random.geometric(1-yiyj,size=[batch_size,self.N,self.N])
-            W = np.triu(W,1)
+            W = np.triu(np.random.geometric(1-yiyj,size=[batch_size,self.N,self.N]),1)
             W += np.transpose(W, axes=[0, 2, 1])
             return W*A
 
@@ -466,20 +464,19 @@ class CWTECM(GraphModel):
 
     def sample_adjacency(self, *args, **kwargs):
         """
-        Sample the adjacency matrix of the UECM
+        Sample the adjacency matrix of the CWTECM
         """
         batch_size = kwargs.get('batch_size', 1)
         slope = kwargs.get('slope', 50.0)
         rij = batched_symmetric_random(batch_size, self.N)
         #batch_args = np.tile(*args,[batch_size, 1]) # replicate
-
         pij = self.expected_adjacency(*args)
         wij = self.expected_weighted_adjacency(*args)
         # use broadcasting heavily here
+        t = self.threshold
         A = (pij>rij).astype(float)
         A = np.triu(A, 1) # make it symmetric
         A += np.transpose(A, axes=[0, 2, 1])
-        W = np.random.exponential(pij,size=[batch_size,self.N,self.N])
-        W = np.triu(W,1)
-        W += np.transpose(W, axes=[0, 2, 1])
-        return W*A
+        W = np.triu(np.random.exponential(wij/pij,size=[batch_size,self.N,self.N]),1)
+        W +=  np.transpose(W, axes=[0, 2, 1])
+        return A*W
