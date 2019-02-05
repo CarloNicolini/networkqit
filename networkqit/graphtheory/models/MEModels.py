@@ -441,9 +441,7 @@ class CWTECM(GraphModel):
         xixj = np.outer(x,x) # these variables are always > 0
         yiyj = np.outer(y,y) # these variables are always > 0
         yiyjt = yiyj**t
-        # EXACT FULL FORMULA 
-        # wij = (xixj*(yiyj**t) - t*xixj*(yiyj)**t*np.log(yiyj)) / (np.log(yiyj)*(t*np.log(yiyj) - xixj*(yiyj**t)))
-        wij = self.expected_adjacency(*args)*((t*np.log(yiyj)-1.0) / (np.log(yiyj)))
+        wij = self.expected_adjacency(*args) * ((t*np.log(yiyj)-1.0) / (np.log(yiyj)))
         return wij
     
     def saddle_point(self, G, *args):
@@ -465,10 +463,6 @@ class CWTECM(GraphModel):
             self._s = wij.sum(axis=0)
         loglike = (self._s*np.log(y) + self._k*np.log(x)).sum() + np.triu(np.log(-np.log(yiyj)/(xixj*(yiyj**t) -t*(np.log(yiyj)) ) ),1).sum()
         return loglike
-        # FULL FORMULA, a bit slower
-        #loglike = (wij*(np.log(yiyj)) + np.log(xixj))*aij + np.log(-np.log(yiyj)/(xixj*(yiyj**t) -t*(np.log(yiyj)) ) )
-        #loglike = np.triu(loglike,1).sum()
-        #return loglike
 
     def sample_adjacency(self, *args, **kwargs):
         """
@@ -485,7 +479,7 @@ class CWTECM(GraphModel):
         A = (pij>rij).astype(float)
         A = np.triu(A, 1) # make it symmetric
         A += np.transpose(A, axes=[0, 2, 1])
-        W = np.random.exponential(wij,size=[batch_size,self.N,self.N])
+        W = np.random.exponential(pij,size=[batch_size,self.N,self.N])
         W = np.triu(W,1)
         W += np.transpose(W, axes=[0, 2, 1])
         return W*A
