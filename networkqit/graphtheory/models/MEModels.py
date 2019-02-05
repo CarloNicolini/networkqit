@@ -467,16 +467,24 @@ class CWTECM(GraphModel):
         Sample the adjacency matrix of the CWTECM
         """
         batch_size = kwargs.get('batch_size', 1)
-        slope = kwargs.get('slope', 50.0)
+        slope = kwargs.get('slope', 500000.0)
         rij = batched_symmetric_random(batch_size, self.N)
-        #batch_args = np.tile(*args,[batch_size, 1]) # replicate
         pij = self.expected_adjacency(*args)
         wij = self.expected_weighted_adjacency(*args)
-        # use broadcasting heavily here
-        t = self.threshold
-        A = (pij>rij).astype(float)
-        A = np.triu(A, 1) # make it symmetric
-        A += np.transpose(A, axes=[0, 2, 1])
-        W = np.triu(np.random.exponential(wij/pij,size=[batch_size,self.N,self.N]),1)
-        W +=  np.transpose(W, axes=[0, 2, 1])
+        requires_grads = kwargs.get('with_grads',False)
+        if requires_grads:
+            A = expit(slope*(pij-rij)) # it needs a gigantic slope to reduce error
+            rij = batched_symmetric_random(batch_size, self.N)
+            rij[rij<EPS]=EPS
+            A = np.triu(A, 1)
+            A += np.transpose(A, axes=[0, 2, 1])
+            W = np.triu(-np.log(rij)/(pij/wij), 1)
+            W +=  np.transpose(W, axes=[0, 2, 1])
+        else:
+            A = (pij>rij).astype(float)
+            A = np.triu(A, 1) # make it symmetric
+            A += np.transpose(A, axes=[0, 2, 1])
+            W = np.triu(np.random.exponential(wij/pij,size=[batch_size,self.N,self.N]),1)
+            W +=  np.transpose(W, axes=[0, 2, 1])
         return A*W
+
