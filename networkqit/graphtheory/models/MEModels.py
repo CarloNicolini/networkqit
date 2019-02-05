@@ -459,8 +459,9 @@ class CWTECM(GraphModel):
         yiyjt = yiyj**t
         # EXACT FULL FORMULA 
         # wij = (xixj*(yiyj**t) - t*xixj*(yiyj)**t*np.log(yiyj)) / (np.log(yiyj)*(t*np.log(yiyj) - xixj*(yiyj**t)))
-        wij = ((t*np.log(yiyj)-1.0) / (np.log(yiyj)))
-        wij *= ((xixj*yiyjt )/ (xixj*yiyjt - t*np.log(yiyj))) # <aij>
+        #wij = ((t*np.log(yiyj)-1.0) / (np.log(yiyj)))
+        #wij *= ((xixj*yiyjt )/ (xixj*yiyjt - t*np.log(yiyj))) # <aij>
+        wij = self.expected_adjacency(*args) * ((t*np.log(yiyj)-1.0) / (np.log(yiyj)))
         return np.nan_to_num(wij)
     
     def saddle_point(self, G, *args):
@@ -475,8 +476,8 @@ class CWTECM(GraphModel):
     def loglikelihood(self, wij, *args):
         t = self.threshold
         x,y = args[0][0:self.N], args[0][(self.N):]
-        xixj = np.outer(x,x)+EPS
-        yiyj = np.outer(y,y)+EPS
+        xixj = np.outer(x,x) + EPS
+        yiyj = np.outer(y,y) + EPS
         aij = (wij>t).astype(float)
         k = aij.sum(axis=0)
         s = wij.sum(axis=0)
@@ -486,6 +487,29 @@ class CWTECM(GraphModel):
         #loglike = (wij*(np.log(yiyj)) + np.log(xixj))*aij + np.log(-np.log(yiyj)/(xixj*(yiyj**t) -t*(np.log(yiyj)) ) )
         #loglike = np.triu(loglike,1).sum()
         #return loglike
+
+    def sample_adjacency(self, *args, **kwargs):
+        """
+        Sample the adjacency matrix of the UECM
+        """
+        batch_size = kwargs.get('batch_size', 1)
+        slope = kwargs.get('slope', 50.0)
+        rij = batched_symmetric_random(batch_size, self.N)
+        #batch_args = np.tile(*args,[batch_size, 1]) # replicate
+        x,y = args[0][0:self.N], args[0][(self.N):]
+        xixj = np.outer(x,x)
+        yiyj = np.outer(y,y)
+        pij = self.expected_adjacency(*args)
+        wij = self.expected_weighted_adjacency(*args)
+        # use broadcasting heavily here
+        # Questa è la soluzione corretta
+        A = expit(slope*(pij-rij)) # sampling, approximates binomial with continuos
+        A = np.triu(A, 1) # make it symmetric
+        A += np.transpose(A, axes=[0, 2, 1])
+        W = np.random.exponential(pij, size=[batch_size,self.N,self.N])
+        W = np.triu(W,1)
+        W += np.transpose(W, axes=[0, 2, 1])
+        return W*A
 
 class SpatialCM(GraphModel):
     """
