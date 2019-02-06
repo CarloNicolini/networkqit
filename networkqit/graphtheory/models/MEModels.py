@@ -94,8 +94,8 @@ class UBCM(GraphModel):
 
     def loglikelihood(self, observed_adj, *args):
         pij = self.expected_adjacency(*args)
-        loglike = observed_adj * np.log(pij + EPS) + (1 - observed_adj) * np.log(1 - pij - EPS)
-        loglike[np.logical_or(np.isnan(loglike), np.isinf(loglike))] = 0
+        loglike = observed_adj * np.log(pij) + (1.0 - observed_adj) * np.log(1.0 - pij)
+        #loglike[np.logical_or(np.isnan(loglike), np.isinf(loglike))] = 0
         return np.triu(loglike, 1).sum()
     
     def saddle_point(self, G, *args):
@@ -183,8 +183,7 @@ class UWCM(GraphModel):
         batch_size = kwargs.get('batch_size', 1)
         slope = kwargs.get('slope', 50.0)
         rij = batched_symmetric_random(batch_size, self.N)
-        batch_args = np.tile(*args, [batch_size, 1]) # replicate
-        yiyj = np.einsum('ij,ik->ijk', batch_args, batch_args)
+        yiyj = np.einsum('ij,ik->ijk', args, args)
         # then must extract from a geometric distribution with probability P
         # https://math.stackexchange.com/questions/580901/r-generate-sample-that-follows-a-geometric-distribution
         q = np.log(rij+EPS)/np.log(np.abs(1.0-yiyj))

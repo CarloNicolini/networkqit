@@ -180,10 +180,10 @@ class MLEOptimizer(ModelOptimizer):
                                     jac=J,
                                     bounds=self.model.bounds,
                                     options=opts)
-
-            print(self.sol['message'])
-            if self.sol['status'] != 0:
-                RuntimeWarning(self.sol['message'])
+            if kwargs.get('verbose',0)>0:
+                print(self.sol['message'])
+                if self.sol['status'] != 0:
+                    RuntimeWarning(self.sol['message'])
                 #raise Exception('Method did not converge to maximum likelihood: ')
             return self.sol
 

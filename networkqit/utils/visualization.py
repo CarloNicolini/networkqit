@@ -21,7 +21,7 @@ from networkqit.graphtheory import graph_laplacian as graph_laplacian
 
 import matplotlib.gridspec as gridspec
 
-def plot_mle(G,pij,wij=None):
+def plot_mle(G,pij,wij=None, **kwargs):
     fig, ax = plt.subplots(nrows=2,ncols=3,figsize=(12,8))
     im = ax[0,0].imshow(G)
     plt.colorbar(im,ax=ax[0,0],fraction=0.046, pad=0.04)
@@ -59,6 +59,8 @@ def plot_mle(G,pij,wij=None):
         ax[0,2].set_ylabel('model')
         ax[0,2].set_xlabel('empirical')
 
+    if kwargs.get('title',None) is not None:
+        plt.suptitle(kwargs.get('title',None))
     plt.tight_layout()
     plt.show()
 

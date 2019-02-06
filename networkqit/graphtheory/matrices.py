@@ -214,3 +214,8 @@ def gumbel_softmax(logits, temperature, hard=False):
 def multiexpit(x, slope=50):
     y = np.asarray([ expit(slope*(x-i)) for i in range(int(np.max(x))) ])
     return np.sum(y,axis=0)
+
+def multiexpit2(x, slope=50):
+    i = np.arange(int(min(x)//1),int(max(x)//1)+1)
+    X, I = np.meshgrid(x,i)
+    return np.sum(expit(slope*(X-I)),axis=0)+min(x)//1-1
