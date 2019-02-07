@@ -30,6 +30,7 @@ def plot_mle(G,pij,wij=None, **kwargs):
 
     im = ax[1,0].imshow((G>0).astype(float))
     plt.colorbar(im,ax=ax[1,0],fraction=0.046, pad=0.04)
+    ax[1,0].grid(False)
     ax[1,0].set_title('Binary empirical')
 
     if wij is not None:
