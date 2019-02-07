@@ -71,7 +71,7 @@ if __name__=='__main__':
 
     M = UWCM(N=len(W))
     x0 = (np.concatenate([s])+1E-5)*1E-3 #+ (np.random.random([2*len(W),])*2-1)*1E-5
-
+    print(x0.shape)
     # Optimize by L-BFGS-B
     opt = nq.MLEOptimizer(W, x0=x0, model=M)
     sol = opt.run(model=M, verbose=0,gtol=1E-8, method='MLE')
@@ -81,16 +81,16 @@ if __name__=='__main__':
     wij = M.expected_weighted_adjacency(sol['x'])
     plot(W,pij,wij)
 
-    nq.MLEOptimizer(W, x0=sol['x'], model=M)
-    sol = opt.run(method='saddle_point', xtol=1E-12, gtol=1E-9)
-    print('Loglikelihood = ', M.loglikelihood(G,sol['x']))
-    pij = M.expected_adjacency(sol['x'])
-    wij = M.expected_weighted_adjacency(sol['x'])
-    plot(W,pij,wij)
+    # opt = nq.MLEOptimizer(W, x0=x0, model=M)
+    # sol = opt.run(method='saddle_point', xtol=1E-12, gtol=1E-9)
+    # print('Loglikelihood = ', M.loglikelihood(G,sol['x']))
+    # pij = M.expected_adjacency(sol['x'])
+    # wij = M.expected_weighted_adjacency(sol['x'])
+    # plot(W,pij,wij)
 
-    sol = opt.run(method='saddle_point', basinhopping = True, basin_hopping_niter=10, xtol=1E-9, gtol=1E-9)
-    #print('Gradient at Least squares solution=\n',grad(sol['x']))
-    print('Loglikelihood = ', M.loglikelihood(G,sol['x']))
-    pij = M.expected_adjacency(sol['x'])
-    wij = M.expected_weighted_adjacency(sol['x'])
-    plot(W,pij,wij)
+    # sol = opt.run(method='saddle_point', basinhopping = True, basin_hopping_niter=10, xtol=1E-9, gtol=1E-9)
+    # #print('Gradient at Least squares solution=\n',grad(sol['x']))
+    # print('Loglikelihood = ', M.loglikelihood(G,sol['x']))
+    # pij = M.expected_adjacency(sol['x'])
+    # wij = M.expected_weighted_adjacency(sol['x'])
+    # plot(W,pij,wij)

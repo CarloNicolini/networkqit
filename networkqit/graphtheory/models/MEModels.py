@@ -142,11 +142,11 @@ class UWCM(GraphModel):
         self.bounds = [(EPS, 1.0-EPS) for i in range(0, self.N)]
 
     def expected_adjacency(self, *args):
-        pij = np.outer(args, args)
+        pij = np.outer(*args, *args)
         return pij
     
     def expected_weighted_adjacency(self, *args):
-        pij = self.expected_adjacency(args)
+        pij = self.expected_adjacency(*args)
         wij = pij / (1.0 - pij)
         return wij
     

@@ -179,7 +179,7 @@ class MLEOptimizer(ModelOptimizer):
                 self.sol = minimize(fun=lambda z: -self.model.loglikelihood(self.G, z),
                                     x0=np.squeeze(self.x0),
                                     method='L-BFGS-B',
-                                    #jac=J,
+                                    jac=J,
                                     bounds=self.model.bounds,
                                     options=opts)
             if kwargs.get('verbose',0)>0:
