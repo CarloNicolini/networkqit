@@ -128,7 +128,7 @@ class GraphModel:
         args:
             x (numpy.array): parameters vector.
         """
-        return self._expected_laplacian_grad_autodiff(*x)
+        raise NotImplementedError
 
     def loglikelihood(self, observed_adj, *args):
         # implement here where observed_adj is the adjacency matrix (Weighted or binary)
@@ -190,9 +190,6 @@ class IsingModel(GraphModel):
 
     def expected_adjacency(self, *args):
         return np.reshape(*args,[self.N,self.N])
-    
-    def expected_laplacian_grad(self, x):
-        raise NotImplementedError
     
     def sample_adjacency(self, *args, **kwargs):
         batch_size = kwargs.get('batch_size', 1)

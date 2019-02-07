@@ -75,7 +75,7 @@ class UBCM(GraphModel):
     def expected_adjacency(self, *args):
         xixj = np.outer(*args, *args)
         return xixj / (1.0 + xixj)
-        
+
     def loglikelihood(self, observed_adj, *args):
         pij = self.expected_adjacency(*args)
         loglike = np.sum(np.triu(observed_adj * np.log(pij) + (1.0 - observed_adj) * np.log(1.0 - pij),1))
@@ -84,17 +84,19 @@ class UBCM(GraphModel):
     def saddle_point(self, G, *args):
         k = (G>0).sum(axis=0)
         pij = self.expected_adjacency(*args)
-        avgk = pij.sum(axis=0)
+        avgk = pij.sum(axis=0) - np.diag(pij)
         return k - avgk
 
     def sample_adjacency(self, *args, **kwargs):
         batch_size = kwargs.get('batch_size', 1)
-        rij = batched_symmetric_random(batch_size, self.N)
-        slope = kwargs.get('slope', 50.0)
         xixj = np.outer(*args, *args)
-        #xixj = np.einsum('ij,ik->ijk', *args, *args)
-        P = xixj / (1.0 + xixj)
-        A = expit(slope*(P-rij)) # sampling, approximates binomial with continuos
+        pij = xixj / (1.0 + xixj)
+        rij = batched_symmetric_random(batch_size, self.N)
+        if kwargs.get('with_grads',False):
+            slope = kwargs.get('slope', 50.0)
+            A = expit(slope*(pij-rij)) # sampling, approximates binomial with continuos
+        else:
+            A = (pij>rij).astype(float)
         A = np.triu(A, 1) # make it symmetric
         A += np.transpose(A, axes=[0, 2, 1])
         return A
@@ -140,44 +142,40 @@ class UWCM(GraphModel):
         self.bounds = [(EPS, 1.0-EPS) for i in range(0, self.N)]
 
     def expected_adjacency(self, *args):
-        self.pij = np.outer(args, args)
-        return self.pij
+        pij = np.outer(args, args)
+        return pij
     
     def expected_weighted_adjacency(self, *args):
         pij = self.expected_adjacency(args)
-        self.wij = pij / (1 - pij)
-        return self.wij
+        wij = pij / (1.0 - pij)
+        return wij
     
     def loglikelihood(self, observed_adj, *args):
-        pij = self.expected_adjacency(args)
-        loglike = observed_adj * np.log(pij) + (np.log(1 - pij))
-        loglike[np.logical_or(np.isnan(loglike), np.isinf(loglike))] = 0
-        return np.triu(loglike,1).sum()
+        pij = self.expected_adjacency(*args)
+        loglike = observed_adj * np.log(pij) + np.log(1.0 - pij)
+        return np.sum(np.triu(loglike,1))
 
     def saddle_point(self, G, *args):
         s = G.sum(axis=0)
-        wij = self.expected_weighted_adjacency(args)
-        return s - wij.sum(axis=0)
+        wij = self.expected_weighted_adjacency(*args)
+        return s - (wij.sum(axis=0) - np.diag(wij))
 
     def sample_adjacency(self, *args, **kwargs):
         """
         Sample the adjacency matrix of the UWCM
         """
         batch_size = kwargs.get('batch_size', 1)
-        slope = kwargs.get('slope', 50.0)
+        yiyj = np.outer(*args, *args)
         rij = batched_symmetric_random(batch_size, self.N)
-        yiyj = np.einsum('ij,ik->ijk', args, args)
-        # then must extract from a geometric distribution with probability P
-        # https://math.stackexchange.com/questions/580901/r-generate-sample-that-follows-a-geometric-distribution
-        q = np.log(rij+EPS)/np.log(np.abs(1.0-yiyj))
-        # must take floor to generate geometric random variables
-        # equivalent to floor but continuos is multiexpit(x-1)
-        # TODO replace the floor with the appropriate multiexpit
-        A = np.floor(q)
-        #A = multiexpit(slope*(q-1.0))
-        A = np.triu(A, 1) # make it symmetric
-        A += np.transpose(A, axes=[0, 2, 1])
-        return A
+        if kwargs.get('with_grads',False):
+            slope = kwargs.get('slope', 50.0)
+            qij = np.log(rij+EPS)/np.log(np.abs(1.0 - yiyj))
+            W = multiexpit(qij)
+        else:
+            W = np.random.geometric(yiyj,size=[batch_size,self.N,self.N])
+        W = np.triu(W, 1) # make it symmetric
+        W += np.transpose(W, axes=[0, 2, 1])
+        return W
 
 
 class UBWRG(GraphModel):
@@ -310,26 +308,15 @@ class UECM3(GraphModel):
         loglike = (k*np.log(x)).sum() + (s*np.log(y)).sum() + np.triu(np.log( (1-yiyj)/(1-yiyj + xixj*yiyj) ) ,1).sum()
         return loglike
 
-    # def sample_adjacency(self, *args, **kwargs):
-    #     batch_size = kwargs.get('batch_size', 1)
-    #     slope = kwargs.get('slope', 50.0)
-    #     rij = batched_symmetric_random(batch_size, self.N)
-    #     #batch_args = np.tile(*args,[batch_size, 1]) # replicate
-    #     x,y = args[0][0:self.N], args[0][(self.N):]
-    #     xixj = np.tile(np.einsum('ij,ik->ijk', x, x),[batch_size,1]).reshape([batch_size,self.N,self.N])
-    #     yiyj = np.tile(np.einsum('ij,ik->ijk', y, y),[batch_size,1]).reshape([batch_size,self.N,self.N])
-    #     # then must extract from a geometric distribution with probability P
-    #     # https://math.stackexchange.com/questions/580901/r-generate-sample-that-follows-a-geometric-distribution
-    #     pij = xixj*yiyj/(1-yiyj+xixj*yiyj)
-    #     qij = np.log(rij+EPS)/np.log(np.abs(1.0-yiyj))
-    #     # must take floor to generate geometric random variables
-    #     # equivalent to floor but continuos is multiexpit(x-1)
-    #     # TODO replace the floor with the appropriate multiexpit
-    #     A = 1 + np.floor(q)
-    #     #A = multiexpit(slope*(q-1.0))
-    #     A = np.triu(A, 1) # make it symmetric
-    #     A += np.transpose(A, axes=[0, 2, 1])
-    #     return A
+    def saddle_point(self, G, *args):
+        k = (G>self.threshold).sum(axis=0)
+        pij = self.expected_adjacency(*args)
+        avgk = pij.sum(axis=0) - np.diag(pij)
+        w = G.sum(axis=0)
+        wij = self.expected_weighted_adjacency(*args)
+        avgw = wij.sum(axis=0) - np.diag(wij)
+        return np.hstack([k-avgk,w-avgw])
+
 
     def sample_adjacency(self, *args, **kwargs):
         """
@@ -338,32 +325,26 @@ class UECM3(GraphModel):
         batch_size = kwargs.get('batch_size', 1)
         slope = kwargs.get('slope', 50.0)
         rij = batched_symmetric_random(batch_size, self.N)
-        #batch_args = np.tile(*args,[batch_size, 1]) # replicate
         x,y = args[0][0:self.N], args[0][(self.N):]
         xixj = np.outer(x,x)
         yiyj = np.outer(y,y)
         pij = xixj*yiyj/(1-yiyj + xixj*yiyj)
-        # use broadcasting heavily here
         if kwargs.get('with_grads',False):
+            # broadcasting pij and rij
             A = expit(slope*(pij-rij)) # sampling, approximates binomial with continuos
             A = np.triu(A, 1) # make it symmetric
             A += np.transpose(A, axes=[0, 2, 1])
             # then must extract from a geometric distribution with probability P
             # https://math.stackexchange.com/questions/580901/r-generate-sample-that-follows-a-geometric-distribution
             q = np.log(rij+EPS)/np.log(np.abs(1.0-pij))
-            # must take floor to generate geometric random variables
-            # equivalent to floor but continuos is multiexpit(x-1)
-            # TODO replace the floor with the appropriate multiexpit
-            #W = multiexpit(slope*(q-1.0)) non è derivabile da fixare
-            W = 1 + np.floor(q) # +1 because the link already exists
-            return W*A
+            W = multiexpit(slope*(q-1.0)) # continuous approximation to floor(x)
         else:
             # Questa è la soluzione corretta
-            A = np.triu(pij>rij,1) # sampling, approximates binomial with continuos
+            A = np.triu(pij>rij,1)
             A += np.transpose(A, axes=[0, 2, 1])
             W = np.triu(np.random.geometric(1-yiyj,size=[batch_size,self.N,self.N]),1)
             W += np.transpose(W, axes=[0, 2, 1])
-            return W*A
+        return W*A
 
 #################### Continuous models #######################
 
@@ -427,10 +408,10 @@ class CWTECM(GraphModel):
     def saddle_point(self, G, *args):
         k = (G>0).sum(axis=0)
         pij = self.expected_adjacency(*args)
-        avgk = pij.sum(axis=0)
+        avgk = pij.sum(axis=0) - np.diag(pij)
         w = G.sum(axis=0)
         wij = self.expected_weighted_adjacency(*args)
-        avgw = wij.sum(axis=0)
+        avgw = wij.sum(axis=0) - np.diag(wij)
         return np.hstack([k-avgk,w-avgw])
     
     def loglikelihood(self, wij, *args):
