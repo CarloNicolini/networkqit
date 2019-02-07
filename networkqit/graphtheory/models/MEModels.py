@@ -165,14 +165,14 @@ class UWCM(GraphModel):
         Sample the adjacency matrix of the UWCM
         """
         batch_size = kwargs.get('batch_size', 1)
-        yiyj = np.outer(*args, *args)
+        pij = self.expected_adjacency(*args)
         rij = batched_symmetric_random(batch_size, self.N)
         if kwargs.get('with_grads',False):
             slope = kwargs.get('slope', 50.0)
-            qij = np.log(rij+EPS)/np.log(np.abs(1.0 - yiyj))
+            qij = np.log(rij+EPS)/np.log(np.abs(1.0 - pij))
             W = multiexpit(qij)
         else:
-            W = np.random.geometric(yiyj,size=[batch_size,self.N,self.N])
+            W = np.random.geometric(1-pij,size=[batch_size,self.N,self.N])
         W = np.triu(W, 1) # make it symmetric
         W += np.transpose(W, axes=[0, 2, 1])
         return W
