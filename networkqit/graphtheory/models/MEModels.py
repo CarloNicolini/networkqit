@@ -73,43 +73,26 @@ class UBCM(GraphModel):
         self.bounds = [(EPS, None) for i in range(0, self.N)]
 
     def expected_adjacency(self, *args):
-        xixj = np.outer(args, args)
-        return xixj / (1 + xixj)
-
-    def expected_laplacian_grad(self, x):
-        N = self.N 
-        g = np.zeros([N,N,N])
-        for l in range(0,N):
-            degL = 0
-            v = set(range(0,N))-set([l])
-            for k in v:
-                degL += x[k]/((1+x[l]*x[k])**2)
-            for i in range(0,N):
-                g[i,i,l] = x[i]/((1+x[i]*x[l])**2)
-            g[l,l,l] = degL
-            for i in v:
-                g[l,i,l] = -x[i]/((1+x[i]*x[l])**2)
-                g[:,l,l] = g[l,:,l]
-        return g
-
+        xixj = np.outer(*args, *args)
+        return xixj / (1.0 + xixj)
+        
     def loglikelihood(self, observed_adj, *args):
         pij = self.expected_adjacency(*args)
-        loglike = observed_adj * np.log(pij) + (1.0 - observed_adj) * np.log(1.0 - pij)
-        #loglike[np.logical_or(np.isnan(loglike), np.isinf(loglike))] = 0
-        return np.triu(loglike, 1).sum()
+        loglike = np.sum(np.triu(observed_adj * np.log(pij) + (1.0 - observed_adj) * np.log(1.0 - pij),1))
+        return loglike
     
     def saddle_point(self, G, *args):
         k = (G>0).sum(axis=0)
         pij = self.expected_adjacency(*args)
         avgk = pij.sum(axis=0)
-        return k-avgk
+        return k - avgk
 
     def sample_adjacency(self, *args, **kwargs):
         batch_size = kwargs.get('batch_size', 1)
         rij = batched_symmetric_random(batch_size, self.N)
         slope = kwargs.get('slope', 50.0)
-        batch_args = np.tile(*args,[batch_size, 1]) # replicate
-        xixj = np.einsum('ij,ik->ijk', batch_args, batch_args)
+        xixj = np.outer(*args, *args)
+        #xixj = np.einsum('ij,ik->ijk', *args, *args)
         P = xixj / (1.0 + xixj)
         A = expit(slope*(P-rij)) # sampling, approximates binomial with continuos
         A = np.triu(A, 1) # make it symmetric

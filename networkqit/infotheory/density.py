@@ -26,11 +26,19 @@ from scipy.linalg import expm, logm, eigvalsh
 from scipy.stats import entropy
 from networkqit.graphtheory.matrices import graph_laplacian
 
+from autograd.numpy.linalg import eigh
+from autograd.scipy.misc import logsumexp
+
 
 def compute_vonneuman_density(L, beta):
     """ Get the von neumann density matrix :math:`\\frac{e^{-\\beta L}}{\\mathrm{Tr}[e^{-\\beta L}]}` """
     rho = expm(-beta * L)
     return rho / np.trace(rho)
+
+
+def batch_compute_vonneuman_density(L, beta_range):
+    """ Get the von neumann density matrix :math:`\\frac{e^{-\\beta L}}{\\mathrm{Tr}[e^{-\\beta L}]}` """
+    return np.asarray([compute_vonneuman_density(L,b) for b in beta_range])
 
 
 def compute_vonneumann_entropy(**kwargs):
@@ -117,9 +125,8 @@ def batch_compute_vonneumann_entropy_beta_deriv(L, beta_range):
         lambd_rho = np.exp(-b * lambd)
         Z = lambd_rho.sum()
         return np.log(Z) + b * (lambd * lambd_rho).sum() / Z
-
-    from numdifftools import Derivative
-    dsdb = Derivative(lambda y: entropy(y), n=1)
+    from autograd import grad
+    dsdb = grad(lambda y: entropy(y))
     return np.array([dsdb(x) for x in beta_range])
 
 
@@ -158,13 +165,22 @@ def find_beta_logc(L, c, a=1E-5, b=1E5):
         return np.log(Z) + b * (l * lrho).sum() / Z
     return bisect(lambda x: s(x, lambd) - np.log(c), a, b)
 
-#
-# class VonNeumannDensity(object):
-#     def __init__(self, A, L, beta, **kwargs):
-#         self.L = L
-#         self.A = A
-#         self.beta = beta
-#         self.density = compute_vonneuman_density(self.L, beta)
+
+def batch_relative_entropy(Lobs : np.array, Lmodel: np.array, beta : float):
+    if len(Lobs.shape) != 2:
+        raise RuntimeError('Must provide a square, non batched observed laplacian')
+    Srho = compute_vonneumann_entropy(L=Lobs, beta=beta)
+    rho = compute_vonneuman_density(L=Lobs, beta=beta)
+    if len(Lmodel.shape) == 3: # compute the average relative entropy over batched laplacians
+        Emodel = np.mean(np.sum(np.sum(Lmodel * rho, axis=2), axis=1))
+        lambd_model = eigh(Lmodel)[0] # batched eigenvalues
+        Fmodel = - np.mean(logsumexp(-beta * lambd_model, axis=1) / beta)
+        loglike = beta * (Emodel - Fmodel) # - Tr[rho log(sigma)]
+        dkl = loglike  - Srho # Tr[rho log(rho)] - Tr[rho log(sigma)]
+        return dkl
+    else:
+        return SpectralDivergence(Lobs=Lobs, Lmodel=Lmodel, beta=beta).rel_entropy
+
 
 
 class SpectralDivergence(object):

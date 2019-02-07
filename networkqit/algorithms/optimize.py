@@ -93,11 +93,13 @@ class MLEOptimizer(ModelOptimizer):
 
     def __init__(self, G: np.array, x0: np.array, model: GraphModel, **kwargs):
         """
-        Init the optimizer.
+        Initialize the optimizer with the observed graph, an initial guess and the 
+        model to optimize.
 
         Args:
             G (numpy.array) :is the empirical network to study. A N x N adjacency matrix as numpy.array.
             x0 (numpy.array): is the k-element array of initial parameters estimates. Typically set as random.
+            model (nq.GraphModel): the graph model to optimize the likelihood of.
         """
         self.G = G
         self.x0 = x0
@@ -185,6 +187,14 @@ class MLEOptimizer(ModelOptimizer):
                 if self.sol['status'] != 0:
                     RuntimeWarning(self.sol['message'])
                 #raise Exception('Method did not converge to maximum likelihood: ')
+            # Compute the corrected Akaike information and Bayes information criteria
+            # http://downloads.hindawi.com/journals/complexity/2019/5120581.pdf
+            K = len(self.sol['x'])
+            N = len(self.G)
+            n = N*(N-1)/2 # n is the sample size
+            # Both AIC and BIC are minimum for the best explanatory model
+            self.sol['AIC'] = 2*self.sol['fun'] + 2*K + (2*K*(K+1)) / (n-K+1)
+            self.sol['BIC'] = 2*self.sol['fun'] + K*np.log(n)
             return self.sol
 
         elif kwargs.get('method', 'saddle_point') is 'saddle_point':
