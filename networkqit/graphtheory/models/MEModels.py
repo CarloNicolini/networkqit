@@ -172,7 +172,7 @@ class UWCM(GraphModel):
             qij = np.log(rij+EPS)/np.log(np.abs(1.0 - pij))
             W = multiexpit(qij)
         else:
-            W = np.random.geometric(1-pij,size=[batch_size,self.N,self.N])
+            W = np.random.geometric(1-pij,size=[batch_size,self.N,self.N]) - 1
         W = np.triu(W, 1) # make it symmetric
         W += np.transpose(W, axes=[0, 2, 1])
         return W
