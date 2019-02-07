@@ -33,22 +33,21 @@ if __name__=='__main__':
     sol = opt.run(model=M, verbose=0,gtol=1E-8, method='MLE')
     print('Loglikelihood = ', M.loglikelihood(G,sol['x']))
 
-    # pij = M.expected_adjacency(sol['x'])
-    # wij = M.expected_weighted_adjacency(sol['x'])
-    # plot(W,pij,wij)
+    pij = M.expected_adjacency(sol['x'])
+    wij = M.expected_weighted_adjacency(sol['x'])
+    plot_mle(W,pij,wij,title='Loglikelihood method')
 
-    # opt = nq.MLEOptimizer(W, x0=x0, model=M)
-    # sol = opt.run(method='saddle_point', xtol=1E-12, gtol=1E-9)
-    # print('Loglikelihood = ', M.loglikelihood(G,sol['x']))
-    # pij = M.expected_adjacency(sol['x'])
-    # wij = M.expected_weighted_adjacency(sol['x'])
-    # plot(W,pij,wij)
+    opt = nq.MLEOptimizer(W, x0=x0, model=M)
+    sol = opt.run(method='saddle_point', xtol=1E-12, gtol=1E-9)
+    print('Loglikelihood = ', M.loglikelihood(G,sol['x']))
+    pij = M.expected_adjacency(sol['x'])
+    wij = M.expected_weighted_adjacency(sol['x'])
+    plot_mle(W,pij,wij,title='Saddle point method')
 
 
     # TEST SAMPLING
-    S = M.sample_adjacency(sol['x'],batch_size=10, with_grads=False).mean(axis=0)
-    print(S)
-    plot_mle(W,(S>0).astype(float),S)
+    S = M.sample_adjacency(sol['x'],batch_size=500, with_grads=False).mean(axis=0)
+    plot_mle(W,(S>0).astype(float),S, title='Sampling')
 
     # sol = opt.run(method='saddle_point', basinhopping = True, basin_hopping_niter=10, xtol=1E-9, gtol=1E-9)
     # #print('Gradient at Least squares solution=\n',grad(sol['x']))
