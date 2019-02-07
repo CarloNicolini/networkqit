@@ -171,7 +171,7 @@ class UWCM(GraphModel):
             slope = kwargs.get('slope', 50.0)
             qij = np.log(rij+EPS)/np.log(np.abs(1.0 - pij))
             W = multiexpit(qij)
-        else:
+        else: # differently from matlab, numpy generates random geometric in [1,infinity]
             W = np.random.geometric(1-pij,size=[batch_size,self.N,self.N]) - 1
         W = np.triu(W, 1) # make it symmetric
         W += np.transpose(W, axes=[0, 2, 1])
