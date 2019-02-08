@@ -359,12 +359,11 @@ class CWTECM(GraphModel):
             # to generate random weights, needs a second decorrelated random source
             rij = batched_symmetric_random(batch_size, self.N)
             W = np.triu(-wij*np.log(rij)/pij, 1)
-            W +=  np.transpose(W, axes=[0, 2, 1])
         else:
             A = (pij>rij).astype(float)
             A = np.triu(A, 1) # make it symmetric
             A += np.transpose(A, axes=[0, 2, 1])
             W = np.triu(np.random.exponential(wij/pij,size=[batch_size,self.N,self.N]),1)
-            W +=  np.transpose(W, axes=[0, 2, 1])
+        W +=  np.transpose(W, axes=[0, 2, 1])
         return A*W
 

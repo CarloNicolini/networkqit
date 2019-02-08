@@ -9,7 +9,7 @@ import bct
 import sys
 sys.path.append(home + '/workspace/networkqit')
 import networkqit as nq
-from networkqit.graphtheory.models.MEModels import CWTECM, UBCM, UWCM, UECM3
+from networkqit.graphtheory.models.MEModels import CWTECM
 from networkqit.utils.visualization import plot_mle
 
 if __name__=='__main__':
@@ -24,7 +24,7 @@ if __name__=='__main__':
     print('threshold=',t)
 
     filename = home + '/workspace/communityalg/data/GroupAverage_rsfMRI_weighted.adj'
-    G = np.loadtxt(filename)[0:64, 0:64]
+    G = np.loadtxt(filename)#[0:64, 0:64]
     t = G[np.nonzero(G)].min()
 
     W = G
@@ -42,7 +42,7 @@ if __name__=='__main__':
     x0 = np.clip(x0/x0.max(), np.finfo(float).eps, 1-np.finfo(float).eps ) # to make it in [0,1]
     # TEST LBFGS-B
     opt = nq.MLEOptimizer(W, x0=x0, model=M)
-    sol = opt.run(model=M, verbose=2, gtol=1E-9, method='MLE')
+    sol = opt.run(method='MLE', model=M, maxiter=100, verbose=2, gtol=1E-6)
     print('Loglikelihood = ', M.loglikelihood(G,sol['x']))
 
     pij = M.expected_adjacency(sol['x'])
@@ -55,8 +55,13 @@ if __name__=='__main__':
     print('saddle_point=', np.sqrt((M.saddle_point(G,sol['x'])**2)).sum())
 
     # TEST SAMPLING
-    Sd = (M.sample_adjacency(sol['x'], batch_size=500, with_grads=False)>0).mean(axis=0)
-    S = (M.sample_adjacency(sol['x'], batch_size=500, with_grads=False)).mean(axis=0)
+    Sd = (M.sample_adjacency(sol['x'], batch_size=1, with_grads=False)>0)[0,:,:]#.mean(axis=0)
+    S = (M.sample_adjacency(sol['x'], batch_size=1, with_grads=False))[0,:,:]#.mean(axis=0)
+    plot_mle(W, Sd.astype(float), S, title='Sampling')
+
+    # TEST SAMPLING
+    Sd = (M.sample_adjacency(sol['x'], batch_size=1, with_grads=False)>0).mean(axis=0)
+    S = (M.sample_adjacency(sol['x'], batch_size=1, with_grads=False)).mean(axis=0)
     plot_mle(W, Sd.astype(float), S, title='Sampling')
     
 
