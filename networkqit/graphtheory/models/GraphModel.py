@@ -25,6 +25,7 @@ dependency on some input parameters.
 """
 
 import autograd.numpy as np
+from autograd import grad as agrad
 from networkqit.graphtheory import graph_laplacian as graph_laplacian
 from autograd.scipy.special import expit
 from ..matrices import batched_symmetric_random, multiexpit
@@ -57,11 +58,11 @@ class GraphModel:
         self.parameters = kwargs
         self.bounds = None
 
-    def __call__(self, x):
+    def __call__(self, theta):
         """
-        This redefinition of the __call__ method allows to call any model with parameters x as if it is a standard function.
+        This redefinition of the __call__ method allows to call any model with parameters $\theta$ as if it is a standard function.
         """
-        return self.model(x)
+        return self.model(theta)
 
     def __add__(self, other):
         """
@@ -87,57 +88,80 @@ class GraphModel:
         """
         return Div(self, other)
 
-    def expected_adjacency(self, *args):
+    def expected_adjacency(self, theta):
         """
         In this base class the expected binary adjacency is not implemented and has to be implemented by every single inherited class.
         """
         raise NotImplementedError
 
-    def expected_weighted_adjacency(self, *args):
+    def expected_weighted_adjacency(self, theta):
         """
         In this base class the expected weighted adjacency is not implemented and has to be implemented by every single inherited class.
         """
         raise NotImplementedError        
 
-    def expected_laplacian(self, *args):
+    def expected_laplacian(self, theta):
         """
         Returns the expected laplacian from the parameters of the model provided as a variable number of inputs.
 
         args:
-            args is a list of input variables of any length.
+            theta are the model parameters
         """
-        return graph_laplacian(self.expected_adjacency(*args))
+        return graph_laplacian(self.expected_adjacency(theta))
 
-    def model(self, x):
+    def model(self, theta):
         """
         Returns the expected adjacency matrix of a model with parameters specified in the numpy array x
 
         args:
-            x (numpy.array): the parameters of the model.
+            theta (numpy.array): the parameters of the model.
         """
-        return self.expected_adjacency(*[x[i] for i in range(0, len(self.args_mapping))])
+        return self.expected_adjacency(*[theta[i] for i in range(0, len(self.args_mapping))])
 
-    def expected_laplacian_grad(self, x):
+    def expected_laplacian_grad(self, theta):
         """
         Compute the gradient of the expected laplacian with respect to the parameters,
-        a NxNxk array, where k is the length of the parameters vector.
-        It uses automatic differentiation if this method is not explicitly overridden by inherited classes
-        hence it can be slow to evaluate, but accurate.
-        Automatic differentiation is provided by the Python numdifftools package.
+        a NxNxk array, where k is the length of the parameters vector $\theta$.
+        Automatic differentiation is provided by the Python autograd package.
 
         args:
-            x (numpy.array): parameters vector.
+            theta (numpy.array): parameters vector.
+        """
+        return agrad(lambda z : self.expected_laplacian(z))(theta)
+
+    def loglikelihood(self, observed_adj, theta):
+        """
+        Calculates the loglikelihood of the model given the observed graph
+
+        args:
+            observed_adj (numpy.array): the adjacency matrix of the empirical graph
+            theta (numpy:array): the parameters vector of the model
         """
         raise NotImplementedError
 
-    def loglikelihood(self, observed_adj, *args):
-        # implement here where observed_adj is the adjacency matrix (Weighted or binary)
+    def saddle_point(self, observed_adj, theta):
+        """
+        Returns the saddle point equations for the likelihood. For all models derived from maximum entropy framework
+        this is equivalent to the gradients of the loglikelihood with respect to the model parameters, by the SL-theorem
+
+        args:
+            observed_adj (numpy.array): the adjacency matrix of the empirical graph
+            theta (numpy:array): the parameters vector of the model
+        """
         raise NotImplementedError
 
-    def saddle_point(self, G, *args):
-        raise NotImplementedError
+    def sample_adjacency(self, theta, batch_size=1, with_grads=False, slope=500):
+        """
+        Sample the adjacency matrix of the maximum entropy model with parameters theta.
+        If a batch_size greater than 1 is given, a batch of random adjacency matrices is returned.
+        If with_grads is True, the operation supports backpropagation.
 
-    def sample_adjacency(self, *args, **kwargs):
+        args:
+            theta (numpy:array): the parameters vector of the model
+            batch_size (int): the number of networks to sample
+            with_grads (bool): if True it supports backpropagation over the parameters theta
+            slope (float): the slope of the sigmoid curve that approximates the Heaviside step function.
+        """
         raise NotImplementedError
 
 
@@ -146,7 +170,6 @@ class ErdosRenyi(GraphModel):
     Erdos-Renyi expected model.
     When called it returns an adjacency matrix that is constant everywhere and zero on the diagonal.
     """
-
     def __init__(self, **kwargs):
         if kwargs is not None:
             super().__init__(**kwargs)
@@ -155,11 +178,11 @@ class ErdosRenyi(GraphModel):
         self.formula = '$c_{er}$'
         self.bounds = [(0, None)]
 
-    def expected_adjacency(self, *args):
-        P = args[0]*(1 - np.eye(self.parameters['N']))
+    def expected_adjacency(self, theta):
+        P = theta*(1 - np.eye(self.parameters['N']))
         return P
     
-    def expected_laplacian_grad(self, x):
+    def expected_laplacian_grad(self, theta):
         N = self.parameters['N']
         G = np.zeros([N, 1, N])
         G[:,0,:] = (N-1) * np.eye(N) - (1-np.eye(N))
@@ -177,9 +200,8 @@ class ErdosRenyi(GraphModel):
 
 class IsingModel(GraphModel):
     """
-    A model of N^2 independent variables
+    A model of N^2 independent Bernoulli variables
     """
-
     def __init__(self, **kwargs):
         if kwargs is not None:
             super().__init__(**kwargs)
@@ -188,271 +210,264 @@ class IsingModel(GraphModel):
         #self.formula = '$c_{er}$'
         self.bounds = [(0, None)] * self.N
 
-    def expected_adjacency(self, *args):
-        return np.reshape(*args,[self.N,self.N])
+    def expected_adjacency(self, theta):
+        return np.reshape(theta,[self.N,self.N])
     
-    def sample_adjacency(self, *args, **kwargs):
-        batch_size = kwargs.get('batch_size', 1)
+    def sample_adjacency(self, theta, batch_size=1, with_grads=False, slope=500):
         # sample symmetric random uniforms
-        rij = np.random.random([batch_size, self.N, self.N])
-        rij = np.triu(rij,1) # batched triu!
-        rij += np.transpose(rij,axes=[0,2,1]) # batched transposition
-        slope = kwargs.get('slope', 200)
-        P = np.reshape(np.tile(np.reshape(*args,[self.N,self.N]), [batch_size,1]),[batch_size, self.N, self.N])
-        A = expit(slope*(P-rij))
-        #A = 1.0 / (1.0 + np.exp(-slope*(P-rij)) ) # TODO try to avoid under/overflows here
+        rij = batched_symmetric_random(batch_size, self.N)
+        pij = np.reshape(np.tile(np.reshape(theta,[self.N,self.N]), [batch_size,1]),[batch_size, self.N, self.N])
+        if with_grads:
+            A = expit(slope*(pij-rij))
+        else:
+            A = (pij>rij).astype(float)
         A = np.triu(A, 1)
         A += np.transpose(A,axes=[0,2,1])
         return A
 
-class Edr(GraphModel):
-    """
-    Exponential Distance Rule model.
-    The pairwise spatial distance matrix must be specified as a kwargs argument.
-    For example, `M = Edr(dij=dij)`
-    """
+# class Edr(GraphModel):
+#     """
+#     Exponential Distance Rule model.
+#     The pairwise spatial distance matrix must be specified as a kwargs argument.
+#     For example, `M = Edr(dij=dij)`
+#     """
 
-    def __init__(self, **kwargs):
-        if kwargs is not None:
-            super().__init__(**kwargs)
-        self.args_mapping = ['c_edr', 'mu_edr']
-        self.model_type = 'spatial'
-        self.formula = r'$c_{edr} e^{-\mu_{edr} d_{ij}}$'
-        self.bounds = [(0, None), (0, None)]
+#     def __init__(self, **kwargs):
+#         if kwargs is not None:
+#             super().__init__(**kwargs)
+#         self.args_mapping = ['c_edr', 'mu_edr']
+#         self.model_type = 'spatial'
+#         self.formula = r'$c_{edr} e^{-\mu_{edr} d_{ij}}$'
+#         self.bounds = [(0, None), (0, None)]
 
-    def expected_adjacency(self, *args):
-        P = args[0] * np.exp(-args[1] * self.parameters['dij'])
-        np.fill_diagonal(P, 0)
-        return P
-    # Manualy computation of the gradient function
-    def expected_laplacian_grad(self, x):
-        dij = self.parameters['dij']
-        n = len(dij)
-        dL = np.zeros((n,2,n))
-        c = x[0]
-        mu = x[1]
-        dL[:,1,:] = c*dij*np.exp(-mu*dij)
-        dL[:,1,:] += np.diag(-dL[:,1,:].sum(axis=0))
-        dL[:,0,:] = (np.eye(n)-1)*np.exp(-mu*dij) + np.diag(np.exp(-mu*dij).sum(axis=0)-1)
-        return dL
+#     def expected_adjacency(self, theta):
+#         P = theta[0] * np.exp(-theta[1] * self.parameters['dij'])
+#         np.fill_diagonal(P, 0)
+#         return P
 
-class EdrTruncated(GraphModel):
-    """
-    Truncate Exponential Distance Rule model
-    """
-    def __init__(self, **kwargs):
-        if kwargs is not None:
-            super().__init__(**kwargs)
-        self.args_mapping = ['c_edr_trunc', 'lambda_edr_trunc', 'b_edr_trunc']
-        self.model_type = 'spatial'
-        self.formula = r'$\frac{e^{-d_{ij}/\lambda}} {\lambda \left(1-e^{-b/\lambda} \right)}$'
-        self.bounds = [(0, None), (0, None), (0, None)]
+#     def sample_adjacency(self, theta, batch_size=1, with_grads=False, slope=500):
+#         Q = np.random.exponential(self.parameters['dij'], size=[batch_size,self.N,self.N])
+#         Q = np.triu(Q, 1)
+#         Q = np.transpose(Q, axes=[0,2,1])
+#         return Q
 
-    def expected_adjacency(self, *args):
-        c = args[0]
-        l = args[1]
-        b = args[2]
-        P = args[0] * np.exp(-args[1] * self.parameters['dij'])
-        P = c*np.exp(-self.parameters['dij']/l)/(l*(1-np.exp(-b/l)))
-        np.fill_diagonal(P, 0)
-        return P
+# class EdrTruncated(GraphModel):
+#     """
+#     Truncate Exponential Distance Rule model
+#     """
+#     def __init__(self, **kwargs):
+#         if kwargs is not None:
+#             super().__init__(**kwargs)
+#         self.args_mapping = ['c_edr_trunc', 'lambda_edr_trunc', 'b_edr_trunc']
+#         self.model_type = 'spatial'
+#         self.formula = r'$\frac{e^{-d_{ij}/\lambda}} {\lambda \left(1-e^{-b/\lambda} \right)}$'
+#         self.bounds = [(0, None), (0, None), (0, None)]
+
+#     def expected_adjacency(self, theta):
+#         c = theta[0]
+#         l = theta[1]
+#         b = theta[2]
+#         P = theta[0] * np.exp(-theta[1] * self.parameters['dij'])
+#         P = c*np.exp(-self.parameters['dij']/l)/(l*(1-np.exp(-b/l)))
+#         np.fill_diagonal(P, 0)
+#         return P
 
 
-class PowerLawDistance(GraphModel):
-    """
-    Distance rule based on power law
-    """
-    def __init__(self, **kwargs):
-        if kwargs is not None:
-            super().__init__(**kwargs)
-        self.args_mapping = ['c_pldr', 'mu_pldr']
-        self.model_type = 'spatial'
-        self.formula = r'$c_{pldr} d_{ij}^{-\mu_{pldr}}$'
-        self.bounds = [(0, None), (0, None)]
+# class PowerLawDistance(GraphModel):
+#     """
+#     Distance rule based on power law
+#     """
+#     def __init__(self, **kwargs):
+#         if kwargs is not None:
+#             super().__init__(**kwargs)
+#         self.args_mapping = ['c_pldr', 'mu_pldr']
+#         self.model_type = 'spatial'
+#         self.formula = r'$c_{pldr} d_{ij}^{-\mu_{pldr}}$'
+#         self.bounds = [(0, None), (0, None)]
 
-    def expected_adjacency(self, *args):
-        P = args[0]*(self.parameters['dij']**(-args[1]))
-        np.fill_diagonal(P, 0)
-        return P
-
-
-class EdrSum(GraphModel):
-    """
-    Sum of exponential distance rules
-    """
-    def __init__(self, **kwargs):
-        if kwargs is not None:
-            super().__init__(**kwargs)
-
-        num_exp = self.parameters['num_exponentials']
-        self.args_mapping = [
-            'c_edrsum_'+str(int(i/2)) if i % 2 == 0 else 'mu_edrsum_'+str(int(i/2)) for i in range(0, 2*num_exp)]
-        self.model_type = 'spatial'
-        self.formula = r'$\sum \limits_{l=0}^L c_l e^{-d_{ij} \mu_l}$'
-        self.bounds = [(0,None)] *2 * num_exp
-
-    def expected_adjacency(self, *args):
-        nargs = len(args)
-        if nargs % 2 is not 0:
-            raise 'Non compatible number of exponential sums'
-
-        num_exp = self.parameters['num_exponentials']
-        N = len(self.parameters['dij'])
-        P = np.zeros([N, N])
-        for i in range(0, int(nargs/2)):
-            P += args[i]*np.exp(-self.parameters['dij']*args[int(i+nargs/2)])
-        np.fill_diagonal(P, 0)
-        return P#/np.sum(args[0:int(nargs/2)])  # divide by sum of all constants
+#     def expected_adjacency(self, theta):
+#         P = theta*(self.parameters['dij']**(-theta))
+#         np.fill_diagonal(P, 0)
+#         return P
 
 
-class TopoIdentity(GraphModel):
-    def __init__(self, **kwargs):
-        if kwargs is not None:
-            super().__init__(**kwargs)
-        self.args_mapping = []
-        self.model_type = 'topological'
-        self.formula = r'$1$'
-        self.bounds = None
+# class EdrSum(GraphModel):
+#     """
+#     Sum of exponential distance rules
+#     """
+#     def __init__(self, **kwargs):
+#         if kwargs is not None:
+#             super().__init__(**kwargs)
 
-    def expected_adjacency(self, *args):
-        return 1-np.eye(self.parameters['num_nodes'])
+#         num_exp = self.parameters['num_exponentials']
+#         self.args_mapping = [
+#             'c_edrsum_'+str(int(i/2)) if i % 2 == 0 else 'mu_edrsum_'+str(int(i/2)) for i in range(0, 2*num_exp)]
+#         self.model_type = 'spatial'
+#         self.formula = r'$\sum \limits_{l=0}^L c_l e^{-d_{ij} \mu_l}$'
+#         self.bounds = [(0,None)] *2 * num_exp
+
+#     def expected_adjacency(self, theta):
+#         nargs = len(args)
+#         if nargs % 2 is not 0:
+#             raise 'Non compatible number of exponential sums'
+
+#         num_exp = self.parameters['num_exponentials']
+#         N = len(self.parameters['dij'])
+#         P = np.zeros([N, N])
+#         for i in range(0, int(nargs/2)):
+#             P += args[i]*np.exp(-self.parameters['dij']*args[int(i+nargs/2)])
+#         np.fill_diagonal(P, 0)
+#         return P#/np.sum(args[0:int(nargs/2)])  # divide by sum of all constants
 
 
-class HiddenVariables(GraphModel):
-    def __init__(self, **kwargs):
-        if kwargs is not None:
-            super().__init__(**kwargs)
-        self.args_mapping = ['x_' + str(i) for i in range(0, kwargs['N'])]
-        self.model_type = 'topological'
-        self.formula = r'$1$'
-        self.bounds = [(0, None) for i in range(0, kwargs['N'])]
-        if self.parameters.get('powerlaw', False):
-            self.args_mapping += ['gamma']
-            self.bounds += [(0, None)]
+# class TopoIdentity(GraphModel):
+#     def __init__(self, **kwargs):
+#         if kwargs is not None:
+#             super().__init__(**kwargs)
+#         self.args_mapping = []
+#         self.model_type = 'topological'
+#         self.formula = r'$1$'
+#         self.bounds = None
 
-    def expected_adjacency(self, *args):
-        if self.parameters.get('powerlaw', True):
-            return np.outer([*args[0:-1]], [*args[0:-1]])**(-args[-1])
-        return np.outer([*args],[*args])
+#     def expected_adjacency(self, *args):
+#         return 1-np.eye(self.parameters['num_nodes'])
+
+
+# class HiddenVariables(GraphModel):
+#     def __init__(self, **kwargs):
+#         if kwargs is not None:
+#             super().__init__(**kwargs)
+#         self.args_mapping = ['x_' + str(i) for i in range(0, kwargs['N'])]
+#         self.model_type = 'topological'
+#         self.formula = r'$1$'
+#         self.bounds = [(0, None) for i in range(0, kwargs['N'])]
+#         if self.parameters.get('powerlaw', False):
+#             self.args_mapping += ['gamma']
+#             self.bounds += [(0, None)]
+
+#     def expected_adjacency(self, *args):
+#         if self.parameters.get('powerlaw', True):
+#             return np.outer([*args[0:-1]], [*args[0:-1]])**(-args[-1])
+#         return np.outer([*args],[*args])
 
         
-class TopoDegreeProd(GraphModel):
-    """
-    Topological product of graph degrees (strengths) with powerlaw
-    """
+# class TopoDegreeProd(GraphModel):
+#     """
+#     Topological product of graph degrees (strengths) with powerlaw
+#     """
 
-    def __init__(self, **kwargs):
-        if kwargs is not None:
-            super().__init__(**kwargs)
-        self.args_mapping = ['c_degprod', 'mu_degprod']
-        self.model_type = 'topological'
-        self.formula = r'$c_{degprod} (k_i k_j)^{-\mu_{degprod}}$'
-        self.bounds = [(0, None), (0, None)]
+#     def __init__(self, **kwargs):
+#         if kwargs is not None:
+#             super().__init__(**kwargs)
+#         self.args_mapping = ['c_degprod', 'mu_degprod']
+#         self.model_type = 'topological'
+#         self.formula = r'$c_{degprod} (k_i k_j)^{-\mu_{degprod}}$'
+#         self.bounds = [(0, None), (0, None)]
 
-    def expected_adjacency(self, *args):
-        k = self.parameters['k']
-        return args[0]*(np.outer(k, k)**(-args[1]))
-
-
-class TopoDegreeAvg(GraphModel):
-    """
-    Topological average of graph degrees (strength) with powerlaw
-    """
-
-    def __init__(self, **kwargs):
-        if kwargs is not None:
-            super().__init__(**kwargs)
-        self.args_mapping = ['c_degavg', 'mu_degavg']
-        self.model_type = 'topological'
-        self.formula = r'$0.5 c_{degavg} (k_i+ k_j)^{-\mu_{degavg}}$'
-        self.bounds = [(0, None), (0, None)]
-
-    def expected_adjacency(self, *args):
-        k = self.parameters['k']
-        T = np.outer(k, np.ones([1, len(k)]))
-        return args[0]*((T + T.T)/2)**(-args[1])
+#     def expected_adjacency(self, *args):
+#         k = self.parameters['k']
+#         return args[0]*(np.outer(k, k)**(-args[1]))
 
 
-class TopoDegreeDiff(GraphModel):
-    """
-    Topological absolute difference of graph degrees (strengths) with powerlaw
-    pij = c (ki - kj)^mu
-    """
+# class TopoDegreeAvg(GraphModel):
+#     """
+#     Topological average of graph degrees (strength) with powerlaw
+#     """
 
-    def __init__(self, **kwargs):
-        if kwargs is not None:
-            super().__init__(**kwargs)
-        self.args_mapping = ['c_degdiff', 'mu_degdiff']
-        self.model_type = 'topological'
-        self.formula = r'$c_{degdiff} (|k_i - k_j|)^{-\mu_{degdiff}}$'
-        self.bounds = [(0, None), (0, None)]
+#     def __init__(self, **kwargs):
+#         if kwargs is not None:
+#             super().__init__(**kwargs)
+#         self.args_mapping = ['c_degavg', 'mu_degavg']
+#         self.model_type = 'topological'
+#         self.formula = r'$0.5 c_{degavg} (k_i+ k_j)^{-\mu_{degavg}}$'
+#         self.bounds = [(0, None), (0, None)]
 
-    def expected_adjacency(self, *args):
-        k = self.parameters['k']
-        T = np.outer(k, np.ones([1, len(k)]))
-        return args[0]*(np.abs(T-T.T))**(-args[1])
+#     def expected_adjacency(self, *args):
+#         k = self.parameters['k']
+#         T = np.outer(k, np.ones([1, len(k)]))
+#         return args[0]*((T + T.T)/2)**(-args[1])
 
-class TopoJaccard(GraphModel):
-    """
-    Topological models with probability link given by Jaccard coefficient
-    For weighted graphs it automatically uses the Weighted Jaccard similarity.
-    If 'normalized' is specified to False this model reproduces the
-    "Economical Preferential Attachment model"    
-    Here we set the powerlaw exponent to be unbounded
-    Reference:
-    Vertes et al. Simple models of human brain functional networks. 
-    PNAS (2012) https://doi.org/10.1073/pnas.1111738109
-    """
-    def __init__(self, **kwargs):
-        if kwargs is not None:
-            super().__init__(**kwargs)
-        self.args_mapping = ['c_nei', 'mu_nei']
-        self.model_type = 'topological'
-        self.normalized = kwargs.get('normalized', True)
-        if self.normalized:
-            self.formula = r'$c_{jacc} (J_{ij})^{-\mu_{jacc}}$'
-        else:
-            self.formula = r'$c_{commnei} (\sum_l A_{il}A_{lj})^{-\mu_{commnei}}$'
-        self.A = kwargs['A'] # save the adjacency matrix        
-        self.generate_matching() # then generate the matching
-        self.bounds = [(0, None), (0, None)]
 
-    def generate_matching(self):
-        from scipy.spatial.distance import cdist
-        # https://mathoverflow.net/questions/123339/weighted-jaccard-similarity
-        # https://docs.scipy.org/doc/scipy-1.0.0/reference/generated/scipy.spatial.distance.cdist.html
-        if self.normalized:
-            self.M = cdist(self.A, self.A, lambda u, v: (np.minimum(u,v).sum())/(np.maximum(u,v).sum()) )
-        else:
-            self.M = cdist(self.A, self.A, lambda u, v: np.minimum(u,v).sum() )
+# class TopoDegreeDiff(GraphModel):
+#     """
+#     Topological absolute difference of graph degrees (strengths) with powerlaw
+#     pij = c (ki - kj)^mu
+#     """
+
+#     def __init__(self, **kwargs):
+#         if kwargs is not None:
+#             super().__init__(**kwargs)
+#         self.args_mapping = ['c_degdiff', 'mu_degdiff']
+#         self.model_type = 'topological'
+#         self.formula = r'$c_{degdiff} (|k_i - k_j|)^{-\mu_{degdiff}}$'
+#         self.bounds = [(0, None), (0, None)]
+
+#     def expected_adjacency(self, *args):
+#         k = self.parameters['k']
+#         T = np.outer(k, np.ones([1, len(k)]))
+#         return args[0]*(np.abs(T-T.T))**(-args[1])
+
+# class TopoJaccard(GraphModel):
+#     """
+#     Topological models with probability link given by Jaccard coefficient
+#     For weighted graphs it automatically uses the Weighted Jaccard similarity.
+#     If 'normalized' is specified to False this model reproduces the
+#     "Economical Preferential Attachment model"    
+#     Here we set the powerlaw exponent to be unbounded
+#     Reference:
+#     Vertes et al. Simple models of human brain functional networks. 
+#     PNAS (2012) https://doi.org/10.1073/pnas.1111738109
+#     """
+#     def __init__(self, **kwargs):
+#         if kwargs is not None:
+#             super().__init__(**kwargs)
+#         self.args_mapping = ['c_nei', 'mu_nei']
+#         self.model_type = 'topological'
+#         self.normalized = kwargs.get('normalized', True)
+#         if self.normalized:
+#             self.formula = r'$c_{jacc} (J_{ij})^{-\mu_{jacc}}$'
+#         else:
+#             self.formula = r'$c_{commnei} (\sum_l A_{il}A_{lj})^{-\mu_{commnei}}$'
+#         self.A = kwargs['A'] # save the adjacency matrix        
+#         self.generate_matching() # then generate the matching
+#         self.bounds = [(0, None), (0, None)]
+
+#     def generate_matching(self):
+#         from scipy.spatial.distance import cdist
+#         # https://mathoverflow.net/questions/123339/weighted-jaccard-similarity
+#         # https://docs.scipy.org/doc/scipy-1.0.0/reference/generated/scipy.spatial.distance.cdist.html
+#         if self.normalized:
+#             self.M = cdist(self.A, self.A, lambda u, v: (np.minimum(u,v).sum())/(np.maximum(u,v).sum()) )
+#         else:
+#             self.M = cdist(self.A, self.A, lambda u, v: np.minimum(u,v).sum() )
         
-    def expected_adjacency(self, *args):
-        return args[0]*(self.M)**(-args[1])
+#     def expected_adjacency(self, *args):
+#         return args[0]*(self.M)**(-args[1])
 
 
-class ModelFactory():
+# class ModelFactory():
     
-    @staticmethod
-    def factory(type, **kwargs):
-        raise RuntimeError('Must implement all the models manually')
-        if type == 'Edr':
-            return Edr(**kwargs)
-        assert 0, "Non supported model: " + type
-    #factory = staticmethod(factory)
+#     @staticmethod
+#     def factory(type, **kwargs):
+#         raise RuntimeError('Must implement all the models manually')
+#         if type == 'Edr':
+#             return Edr(**kwargs)
+#         assert 0, "Non supported model: " + type
+#     #factory = staticmethod(factory)
 
-    def __init__(self, **kwargs):
-        super().__init__()
-        self.model_type = kwargs.get('model_type')
-        self.parameters = kwargs
+#     def __init__(self, **kwargs):
+#         super().__init__()
+#         self.model_type = kwargs.get('model_type')
+#         self.parameters = kwargs
 
-    def __iter__(self):
-        return self.__next__()
+#     def __iter__(self):
+#         return self.__next__()
 
-    def __next__(self):
-        for m in GraphModel.__subclasses__():
-            if self.model_type is None:
-                yield m
-                #self.n = self.n+1
-            if m(**self.parameters).model_type == self.model_type:
-                yield m
-                #self.n = self.n+1
+#     def __next__(self):
+#         for m in GraphModel.__subclasses__():
+#             if self.model_type is None:
+#                 yield m
+#                 #self.n = self.n+1
+#             if m(**self.parameters).model_type == self.model_type:
+#                 yield m
+#                 #self.n = self.n+1

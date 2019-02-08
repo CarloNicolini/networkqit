@@ -28,6 +28,7 @@ The normalized graph Laplacian is computed as $\\mathcal{L}=I - D^{-1/2} A D^{-1
 
 import autograd.numpy as np
 from autograd.scipy.special import expit
+EPS = np.finfo(float).eps
 
 def graph_laplacian(A):
     """
@@ -180,6 +181,7 @@ def batched_symmetric_random(batch_size, N):
     rij = np.random.random([batch_size, N, N])
     rij = np.triu(rij, 1)
     rij += np.transpose(rij,[0,2,1]) # transpose last axis
+    rij[rij<EPS]=EPS # to avoid zeros
     return rij
 
 def batched_gumbel(batch_size, N, eps=1E-20):

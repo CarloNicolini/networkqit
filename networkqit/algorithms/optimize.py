@@ -201,7 +201,10 @@ class MLEOptimizer(ModelOptimizer):
             if hasattr(self.model, 'constraints'):
                 raise RuntimeError('Cannot solve saddle_point_equations with non-linear constraints')
             # Use the Dogbox method to optimize likelihood
-            ls_bounds = [np.min(np.ravel(self.model.bounds)), np.max(np.ravel(self.model.bounds))]
+            #ls_bounds = [np.min(np.ravel(self.model.bounds)), np.max(np.ravel(self.model.bounds))]
+            ls_bounds = np.ravel(self.model.bounds).astype(float)
+            ls_bounds[np.isnan(ls_bounds)] = np.inf
+            ls_bounds = np.reshape(ls_bounds,[len(self.x0),2]).T.tolist() # it is required in a different format
             def basin_opt(*basin_opt_args, **basin_opt_kwargs):
                 opt_result = least_squares(fun=basin_opt_args[0],
                                            x0=np.squeeze(basin_opt_args[1]),
