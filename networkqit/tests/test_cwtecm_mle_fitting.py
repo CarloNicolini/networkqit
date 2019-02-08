@@ -23,8 +23,8 @@ if __name__=='__main__':
     A = G>t
     print('threshold=',t)
 
-    filename = home + '/workspace/communityalg/data/Coactivation_matrix_weighted.adj'
-    G = np.loadtxt(filename)#[0:64, 0:64]  *  10
+    filename = home + '/workspace/communityalg/data/GroupAverage_rsfMRI_weighted.adj'
+    G = np.loadtxt(filename)[0:64, 0:64]
     t = G[np.nonzero(G)].min()
 
     W = G
@@ -38,28 +38,40 @@ if __name__=='__main__':
     pairs = n*(n-1)/2
 
     M = CWTECM(N=len(G), threshold=t)
-    x0 = (np.concatenate([k,s])) * 1E-4
-    # # Optimize by L-BFGS-B
-    opt = nq.MLEOptimizer(G, x0=x0, model=M)
-    sol = opt.run(model=M, verbose=0, gtol=1E-6, method='MLE')
+    x0 = np.concatenate([k,s])
+    x0 = np.clip(x0/x0.max(), np.finfo(float).eps, 1-np.finfo(float).eps ) # to make it in [0,1]
+    # TEST LBFGS-B
+    opt = nq.MLEOptimizer(W, x0=x0, model=M)
+    sol = opt.run(model=M, verbose=2, gtol=1E-9, method='MLE')
     print('Loglikelihood = ', M.loglikelihood(G,sol['x']))
-    #print('Saddle point= ', M.saddle_point(G,sol['x']))
-    # from autograd import grad
-    # mygradient = grad(lambda z : M.loglikelihood(G,z))
-    # print(mygradient(sol['x']))
 
     pij = M.expected_adjacency(sol['x'])
     wij = M.expected_weighted_adjacency(sol['x'])
-    plot_mle(G,pij,wij,title='Loglikelihood L-BFGS-B')
+    plot_mle(W,pij,wij,title='Loglikelihood LBFGS-B')
+
+    # TEST JACOBIAN
+    from autograd import grad
+    print('|grad|=',np.sqrt((grad(lambda z : M.loglikelihood(G,z))(sol['x'])**2).sum()))
+    print('saddle_point=', np.sqrt((M.saddle_point(G,sol['x'])**2)).sum())
+
+    # TEST SAMPLING
+    Sd = (M.sample_adjacency(sol['x'], batch_size=500, with_grads=False)>0).mean(axis=0)
+    S = (M.sample_adjacency(sol['x'], batch_size=500, with_grads=False)).mean(axis=0)
+    plot_mle(W, Sd.astype(float), S, title='Sampling')
     
-    opt = nq.MLEOptimizer(W, x0=sol['x'], model=M)
-    sol = opt.run(method='saddle_point', xtol=1E-12, gtol=1E-9)
+
+    # TEST SADDLE POINT
+    opt = nq.MLEOptimizer(W, x0=x0, model=M)
+    sol = opt.run(method='saddle_point', verbose=2, xtol=1E-9, gtol=1E-9)
+    print('Loglikelihood = ', M.loglikelihood(G,sol['x']))
     pij = M.expected_adjacency(sol['x'])
     wij = M.expected_weighted_adjacency(sol['x'])
-    print('Loglikelihood = ', M.loglikelihood(G,sol['x']))
-    plot_mle(W, pij, wij, title='Saddle point')
-    
-    sol = opt.run(method='saddle_point', basinhopping = True, basin_hopping_niter=10, xtol=1E-9, gtol=1E-9)
+    plot_mle(W,pij,wij,title='Saddle point method')
+
+    # TEST BASINHOPPING
+    opt = nq.MLEOptimizer(W, x0=x0, model=M)
+    sol = opt.run(method='saddle_point', verbose=2, basinhopping = True, basin_hopping_niter=10, xtol=1E-9, gtol=1E-9)
+    #print('Gradient at Least squares solution=\n',grad(sol['x']))
     print('Loglikelihood = ', M.loglikelihood(G,sol['x']))
     pij = M.expected_adjacency(sol['x'])
     wij = M.expected_weighted_adjacency(sol['x'])

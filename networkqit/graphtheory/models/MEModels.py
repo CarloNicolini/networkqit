@@ -241,10 +241,10 @@ class UECM3(GraphModel):
     def saddle_point(self, observed_adj, theta):
         k = (observed_adj>0).sum(axis=0)
         pij = self.expected_adjacency(theta)
-        avgk = pij.sum(axis=0) - np.diag(pij)
+        avgk = pij.sum(axis=0)
         w = observed_adj.sum(axis=0)
         wij = self.expected_weighted_adjacency(theta)
-        avgw = wij.sum(axis=0) - np.diag(wij)
+        avgw = wij.sum(axis=0)
         return np.hstack([k - avgk, w - avgw])
 
     def sample_adjacency(self, theta, batch_size=1, with_grads=False, slope=500):
@@ -302,7 +302,7 @@ class CWTECM(GraphModel):
         2. 0 < yi < 1
         3  0 < xi yi < 1
     """
-    
+
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
         self.args_mapping =   ['x_' + str(i) for i in range(0, kwargs['N'])] + ['y_' + str(i) for i in range(0, kwargs['N'])]

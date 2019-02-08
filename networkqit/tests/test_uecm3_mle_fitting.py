@@ -64,4 +64,4 @@ if __name__=='__main__':
     print('Loglikelihood = ', M.loglikelihood(G,sol['x']))
     pij = M.expected_adjacency(sol['x'])
     wij = M.expected_weighted_adjacency(sol['x'])
-    plot(W,pij,wij)
+    plot_mle(W,pij,wij)
