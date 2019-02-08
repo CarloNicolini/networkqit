@@ -343,7 +343,7 @@ class CWTECM(GraphModel):
         xixj = np.outer(x,x)
         yiyj = np.outer(y,y)
         if not hasattr(self, '_k'):
-            self._k =  (observed_adj>t).astype(float).sum(axis=0)
+            self._k =  (observed_adj>0).astype(float).sum(axis=0)
             self._s = observed_adj.sum(axis=0)
         loglike = (self._s*np.log(y) + self._k*np.log(x)).sum() + np.triu(np.log(-np.log(yiyj)/(xixj*(yiyj**t) -t*(np.log(yiyj)) ) ),1).sum()
         return loglike
@@ -354,16 +354,13 @@ class CWTECM(GraphModel):
         wij = self.expected_weighted_adjacency(theta)
         if with_grads:
             A = expit(slope*(pij-rij)) # it needs a gigantic slope to reduce error
-            A = np.triu(A, 1)
-            A += np.transpose(A, axes=[0, 2, 1])
             # to generate random weights, needs a second decorrelated random source
             rij = batched_symmetric_random(batch_size, self.N)
-            W = np.triu(-wij*np.log(rij)/pij, 1)
+            W = -wij*np.log(rij)/pij
         else:
             A = (pij>rij).astype(float)
-            A = np.triu(A, 1) # make it symmetric
-            A += np.transpose(A, axes=[0, 2, 1])
-            W = np.triu(np.random.exponential(wij/pij,size=[batch_size,self.N,self.N]),1)
+            W = np.random.exponential(wij/pij,size=[batch_size,self.N,self.N])
+        W = np.triu(A*W,1)
         W +=  np.transpose(W, axes=[0, 2, 1])
-        return A*W
+        return W
 
