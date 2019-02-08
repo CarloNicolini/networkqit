@@ -301,12 +301,11 @@ class CWTECM(GraphModel):
         1. xi > 0
         2. 0 < yi < 1
         3  0 < xi yi < 1
-
     """
+    
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
         self.args_mapping =   ['x_' + str(i) for i in range(0, kwargs['N'])] + ['y_' + str(i) for i in range(0, kwargs['N'])]
-        #self.formula = '$\frac{x_i x_j (y_i y_j)^t}{t \log(yi y_j) + x_i x_j (y_i y_j)^t}$'
         self.N = kwargs['N']
         self.threshold = kwargs['threshold']
         self.bounds = [(EPS, None)] * self.N + [(EPS, 1-EPS)] * self.N
@@ -314,8 +313,8 @@ class CWTECM(GraphModel):
     def expected_adjacency(self, theta):
         x,y = theta[0:self.N], theta[(self.N):]
         t = self.threshold
-        xixj = np.abs(np.outer(x,x)) # these variables are always > 0
-        yiyj = np.abs(np.outer(y,y)) # these variables are always > 0
+        xixj = np.outer(x,x)
+        yiyj = np.outer(y,y)
         yiyjt = yiyj**t
         pij = (xixj*yiyjt) / (xixj*yiyjt - t*np.log(yiyj)) # <aij>
         return pij
@@ -323,29 +322,29 @@ class CWTECM(GraphModel):
     def expected_weighted_adjacency(self, theta):
         x,y = theta[0:self.N], theta[(self.N):]
         t = self.threshold
-        xixj = np.outer(x,x) # these variables are always > 0
-        yiyj = np.outer(y,y) # these variables are always > 0
+        xixj = np.outer(x,x)
+        yiyj = np.outer(y,y)
         yiyjt = yiyj**t
         wij = self.expected_adjacency(theta) * ((t*np.log(yiyj)-1.0) / (np.log(yiyj)))
         return wij
     
     def saddle_point(self, observed_adj, theta):
-        k = (G>0).sum(axis=0)
+        k = (observed_adj>0).sum(axis=0)
         pij = self.expected_adjacency(theta)
-        avgk = pij.sum(axis=0) - np.diag(pij)
-        w = G.sum(axis=0)
+        avgk = pij.sum(axis=0)
+        w = observed_adj.sum(axis=0)
         wij = self.expected_weighted_adjacency(theta)
-        avgw = wij.sum(axis=0) - np.diag(wij)
+        avgw = wij.sum(axis=0)
         return np.hstack([k - avgk, w - avgw])
     
     def loglikelihood(self, observed_adj, theta):
-        t = self.threshold
         x,y = theta[0:self.N], theta[(self.N):]
+        t = self.threshold
         xixj = np.outer(x,x)
         yiyj = np.outer(y,y)
         if not hasattr(self, '_k'):
-            self._k =  (wij>t).astype(float).sum(axis=0)
-            self._s = wij.sum(axis=0)
+            self._k =  (observed_adj>t).astype(float).sum(axis=0)
+            self._s = observed_adj.sum(axis=0)
         loglike = (self._s*np.log(y) + self._k*np.log(x)).sum() + np.triu(np.log(-np.log(yiyj)/(xixj*(yiyj**t) -t*(np.log(yiyj)) ) ),1).sum()
         return loglike
 

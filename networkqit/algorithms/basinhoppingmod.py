@@ -711,8 +711,8 @@ class BHBounds(object):
         self.xmax = xmax
     def __call__(self, **kwargs):
         x = kwargs["x_new"]
-        tmin = bool(np.all(x > self.xmin))
-        tmax = bool(np.all(x < self.xmax))
+        tmin = bool(np.all(x >= self.xmin))
+        tmax = bool(np.all(x <= self.xmax))
         return tmin and tmax
     
     

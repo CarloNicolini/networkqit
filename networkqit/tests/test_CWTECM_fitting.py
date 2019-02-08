@@ -24,7 +24,7 @@ if __name__=='__main__':
     print('threshold=',t)
 
     filename = home + '/workspace/communityalg/data/Coactivation_matrix_weighted.adj'
-    G = np.loadtxt(filename)[0:64, 0:64]  *  10
+    G = np.loadtxt(filename)#[0:64, 0:64]  *  10
     t = G[np.nonzero(G)].min()
 
     W = G
@@ -39,10 +39,9 @@ if __name__=='__main__':
 
     M = CWTECM(N=len(G), threshold=t)
     x0 = (np.concatenate([k,s])) * 1E-4
-    #x0 = np.random.random([2*len(k),])
     # # Optimize by L-BFGS-B
     opt = nq.MLEOptimizer(G, x0=x0, model=M)
-    sol = opt.run(model=M, verbose=2, gtol=1E-6, method='MLE')
+    sol = opt.run(model=M, verbose=0, gtol=1E-6, method='MLE')
     print('Loglikelihood = ', M.loglikelihood(G,sol['x']))
     #print('Saddle point= ', M.saddle_point(G,sol['x']))
     # from autograd import grad
@@ -51,22 +50,17 @@ if __name__=='__main__':
 
     pij = M.expected_adjacency(sol['x'])
     wij = M.expected_weighted_adjacency(sol['x'])
-    plot_mle(G,pij,wij)
+    plot_mle(G,pij,wij,title='Loglikelihood L-BFGS-B')
     
-    # opt = nq.MLEOptimizer(W, x0=x0, model=M)
-    # sol = opt.run(method='saddle_point', xtol=1E-12, gtol=1E-9)
-    # pij = M.expected_adjacency(sol['x'])
-    # wij = M.expected_weighted_adjacency(sol['x'])
-    # plot_mle(W,pij,wij)
+    opt = nq.MLEOptimizer(W, x0=sol['x'], model=M)
+    sol = opt.run(method='saddle_point', xtol=1E-12, gtol=1E-9)
+    pij = M.expected_adjacency(sol['x'])
+    wij = M.expected_weighted_adjacency(sol['x'])
+    print('Loglikelihood = ', M.loglikelihood(G,sol['x']))
+    plot_mle(W, pij, wij, title='Saddle point')
     
-    # print('Loglikelihood = ', M.loglikelihood(G,sol['x']))
-    # pij = M.expected_adjacency(sol['x'])
-    # wij = M.expected_weighted_adjacency(sol['x'])
-    # plot(W,pij,wij)
-
-    # sol = opt.run(method='saddle_point', basinhopping = True, basin_hopping_niter=10, xtol=1E-9, gtol=1E-9)
-    # #print('Gradient at Least squares solution=\n',grad(sol['x']))
-    # print('Loglikelihood = ', M.loglikelihood(G,sol['x']))
-    # pij = M.expected_adjacency(sol['x'])
-    # wij = M.expected_weighted_adjacency(sol['x'])
-    # plot(W,pij,wij)
+    sol = opt.run(method='saddle_point', basinhopping = True, basin_hopping_niter=10, xtol=1E-9, gtol=1E-9)
+    print('Loglikelihood = ', M.loglikelihood(G,sol['x']))
+    pij = M.expected_adjacency(sol['x'])
+    wij = M.expected_weighted_adjacency(sol['x'])
+    plot_mle(W,pij,wij)

@@ -15,8 +15,7 @@ if __name__=='__main__':
 
     filename = home + '/workspace/communityalg/data/Coactivation_matrix_weighted.adj'
     G = np.loadtxt(filename)[0:64, 0:64]
-    G = np.round(G*10)
-    print(np.unique(G))
+    G = np.round(G*50)
     W = G
     A = (G>0).astype(float)
     k = A.sum(axis=0)
@@ -32,29 +31,33 @@ if __name__=='__main__':
     
     # TEST LBFGS-B
     opt = nq.MLEOptimizer(W, x0=x0, model=M)
-    sol = opt.run(model=M, verbose=2, gtol=1E-8, method='MLE')
+    sol = opt.run(model=M, gtol=1E-8, method='MLE')
     print('Loglikelihood = ', M.loglikelihood(G,sol['x']))
-
+    print('AIC = ', sol['AIC'])
+    
     pij = M.expected_adjacency(sol['x'])
     wij = M.expected_weighted_adjacency(sol['x'])
     plot_mle(W,pij,wij,title='Loglikelihood method')
 
     # TEST SAMPLING
-    S = M.sample_adjacency(sol['x'],batch_size=500, with_grads=False).mean(axis=0)
-    plot_mle(W,(S>0).astype(float),S, title='Sampling')
+    Sd = (M.sample_adjacency(sol['x'], batch_size=500, with_grads=False)>0).mean(axis=0)
+    S = (M.sample_adjacency(sol['x'], batch_size=500, with_grads=False)).mean(axis=0)
+    plot_mle(W, Sd.astype(float), S, title='Sampling')
 
     # TEST SADDLE POINT
     opt = nq.MLEOptimizer(W, x0=x0, model=M)
     sol = opt.run(method='saddle_point', gtol=1E-9)
     print('Loglikelihood = ', M.loglikelihood(G,sol['x']))
+    print('AIC = ', sol['AIC'])
     pij = M.expected_adjacency(sol['x'])
     wij = M.expected_weighted_adjacency(sol['x'])
     plot_mle(W,pij,wij,title='Saddle point method')
 
     # TEST BASINHOPPING
-    sol = opt.run(method='saddle_point', basinhopping = True, basin_hopping_niter=10, xtol=1E-9, gtol=1E-9)
-    #print('Gradient at Least squares solution=\n',grad(sol['x']))
+    opt = nq.MLEOptimizer(W, x0=x0, model=M)
+    sol = opt.run(method='saddle_point', basinhopping = True, basin_hopping_niter=100, xtol=1E-9, gtol=1E-9)
     print('Loglikelihood = ', M.loglikelihood(G,sol['x']))
+    print('AIC = ', sol['AIC'])
     pij = M.expected_adjacency(sol['x'])
     wij = M.expected_weighted_adjacency(sol['x'])
-    plot(W,pij,wij)
+    plot_mle(W,pij,wij,title='Saddle point + basinhopping')

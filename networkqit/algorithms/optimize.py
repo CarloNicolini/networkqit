@@ -152,9 +152,9 @@ class MLEOptimizer(ModelOptimizer):
                 'xtol': kwargs.get('xtol', 1E-8),
                 'maxfun': kwargs.get('maxfun', 1E10),
                 'maxiter': kwargs.get('maxiter', 1E4),
-                'verbose' : kwargs.get('verbose', 2),
-                'disp':  bool(kwargs.get('verbose', 2)),
-                'iprint': kwargs.get('verbose', 1)
+                'verbose' : kwargs.get('verbose', 0),
+                'disp':  bool(kwargs.get('verbose', 0)),
+                'iprint': kwargs.get('verbose', 0)
                 }
 
         if kwargs.get('method', 'MLE') is 'MLE':
@@ -187,16 +187,6 @@ class MLEOptimizer(ModelOptimizer):
                 if self.sol['status'] != 0:
                     RuntimeWarning(self.sol['message'])
                 #raise Exception('Method did not converge to maximum likelihood: ')
-            # Compute the corrected Akaike information and Bayes information criteria
-            # http://downloads.hindawi.com/journals/complexity/2019/5120581.pdf
-            K = len(self.sol['x'])
-            N = len(self.G)
-            n = N*(N-1)/2 # n is the sample size
-            # Both AIC and BIC are minimum for the best explanatory model
-            self.sol['AIC'] = 2*self.sol['fun'] + 2*K + (2*K*(K+1)) / (n-K+1)
-            self.sol['BIC'] = 2*self.sol['fun'] + K*np.log(n)
-            return self.sol
-
         elif kwargs.get('method', 'saddle_point') is 'saddle_point':
             if hasattr(self.model, 'constraints'):
                 raise RuntimeError('Cannot solve saddle_point_equations with non-linear constraints')
@@ -226,10 +216,8 @@ class MLEOptimizer(ModelOptimizer):
                 # otherwise combine local and global optimization with basinhopping
                 nlineq = lambda z: self.model.saddle_point(self.G, z)
                 from .basinhoppingmod import basinhopping, BHBounds, BHRandStepBounded
-                xmin = np.zeros_like(self.x0) + np.finfo(float).eps
-                xmax = xmin + np.inf  # broadcast infinity
-                bounds = BHBounds(xmin=xmin, xmax=np.inf)
-                bounded_step = BHRandStepBounded(xmin, xmax, stepsize=0.5)
+                bounds = BHBounds(xmin=ls_bounds[0], xmax=ls_bounds[1])
+                bounded_step = BHRandStepBounded(ls_bounds[0], ls_bounds[1], stepsize=0.5)
                 self.sol = basinhopping(func=lambda z: (nlineq(z)**2).sum(),
                                         x0=np.squeeze(self.x0),
                                         T=kwargs.get('T', 1),
@@ -239,7 +227,17 @@ class MLEOptimizer(ModelOptimizer):
                                         take_step=bounded_step,
                                         niter=kwargs.get('basin_hopping_niter', 5),
                                         disp=bool(kwargs.get('verbose')))
-            return self.sol
+        
+        # Compute the corrected Akaike information and Bayes information criteria
+        # http://downloads.hindawi.com/journals/complexity/2019/5120581.pdf
+        K = len(self.sol['x'])
+        N = len(self.G)
+        n = N*(N-1)/2 # n is the sample size
+        # Both AIC and BIC are minimum for the best explanatory model
+        L = self.model.loglikelihood(self.G,self.sol['x'])
+        self.sol['AIC'] = -2*L + 2*K + (2*K*(K+1)) / (n-K+1)
+        self.sol['BIC'] = -2*L + K*np.log(n)
+        return self.sol
 
 
 class ContinuousOptimizer(ModelOptimizer):
