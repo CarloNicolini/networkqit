@@ -256,19 +256,17 @@ class UECM3(GraphModel):
         if with_grads:
             # broadcasting pij and rij
             A = expit(slope*(pij-rij)) # sampling, approximates binomial with continuos
-            A = np.triu(A, 1) # make it symmetric
-            A += np.transpose(A, axes=[0, 2, 1])
             # then must extract from a geometric distribution with probability P
             # https://math.stackexchange.com/questions/580901/r-generate-sample-that-follows-a-geometric-distribution
             q = np.log(rij+EPS)/np.log(np.abs(1.0-pij))
             W = multiexpit(slope*(q-1.0)) # continuous approximation to floor(x)
         else:
             # Questa è la soluzione corretta
-            A = np.triu(pij>rij,1)
-            A += np.transpose(A, axes=[0, 2, 1])
-            W = np.triu(np.random.geometric(1-yiyj,size=[batch_size,self.N,self.N]),1)
-            W += np.transpose(W, axes=[0, 2, 1])
-        return W*A
+            A = pij>rij
+            W = np.random.geometric(1-yiyj,size=[batch_size,self.N,self.N])
+        W = np.triu(A*W,1)
+        W += np.transpose(W, axes=[0, 2, 1])
+        return W
 
 #################### Continuous models #######################
 
