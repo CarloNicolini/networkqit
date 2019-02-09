@@ -38,11 +38,7 @@ if __name__=='__main__':
     pairs = n*(n-1)/2
 
     M = CWTECM(N=len(G), threshold=t)
-    x0 = np.concatenate([k,s])
-    x0 = np.clip(x0/x0.max(), np.finfo(float).eps, 1-np.finfo(float).eps ) # to make it in [0,1]
-    # TEST LBFGS-B
-    opt = nq.MLEOptimizer(W, x0=x0, model=M)
-    sol = opt.run(method='MLE', model=M, verbose=0, maxiter=5000, gtol=1E-6)
+    sol = M.fit(G, method='MLE', model=M, verbose=0, maxiter=5000, gtol=1E-6)
     print('Loglikelihood = ', M.loglikelihood(G,sol['x']))
 
     pij = M.expected_adjacency(sol['x'])
@@ -66,8 +62,7 @@ if __name__=='__main__':
     
 
     # TEST SADDLE POINT
-    opt = nq.MLEOptimizer(W, x0=sol['x'], model=M)
-    sol = opt.run(method='saddle_point', verbose=2, xtol=1E-9, gtol=1E-9)
+    sol = M.fit(G, method='saddle_point', model=M, verbose=0, maxiter=5000, gtol=1E-6)
     print('Loglikelihood = ', M.loglikelihood(G,sol['x']))
     pij = M.expected_adjacency(sol['x'])
     wij = M.expected_weighted_adjacency(sol['x'])

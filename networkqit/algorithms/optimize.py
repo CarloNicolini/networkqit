@@ -71,21 +71,7 @@ logger = logging.getLogger('optimize')
 logger.setLevel(logging.INFO)
 
 
-class ModelOptimizer:
-    def __init__(self, **kwargs):
-        """
-        This represents the base abstract class from which to inherit all the possible model optimization classes
-        """
-        super().__init__()
-
-    def run(self, model, **kwargs):
-        """
-        The  method to call to start optimization
-        """
-        pass
-
-
-class MLEOptimizer(ModelOptimizer):
+class MLEOptimizer:
     """
     This class, inheriting from the model optimizer class solves the problem of 
     maximum likelihood parameters estimation in the classical settings.
@@ -158,7 +144,7 @@ class MLEOptimizer(ModelOptimizer):
                 }
 
         if kwargs.get('method', 'MLE') is 'MLE':
-            # The model has non-linear constraints, must use Sequential Linear Square Programming SLSQP
+            # If the model has non-linear constraints, must use Sequential Linear Square Programming SLSQP
             from autograd import jacobian
             J = jacobian(lambda z : -self.model.loglikelihood(self.G,z))
             if hasattr(self.model, 'constraints'):
@@ -228,6 +214,9 @@ class MLEOptimizer(ModelOptimizer):
                                         niter=kwargs.get('basin_hopping_niter', 5),
                                         disp=bool(kwargs.get('verbose')))
         
+        else:
+            raise RuntimeError('Only MLE and saddle_point methods are supported')
+        
         # Compute the corrected Akaike information and Bayes information criteria
         # http://downloads.hindawi.com/journals/complexity/2019/5120581.pdf
         K = len(self.sol['x'])
@@ -240,7 +229,7 @@ class MLEOptimizer(ModelOptimizer):
         return self.sol
 
 
-class ContinuousOptimizer(ModelOptimizer):
+class ContinuousOptimizer:
     """
     Continuos optimization method of spectral entropy in the continuous approximation S(rho, sigma(E[L])))
     """
@@ -421,7 +410,7 @@ class ContinuousOptimizer(ModelOptimizer):
                 print(s.format(self.sol[i]['beta'], *row))
 
 
-class StochasticOptimizer(ModelOptimizer):
+class StochasticOptimizer:
     """
     This class is at the base of implementation of methods based on stochastic gradient descent.
     The idea behind this class is to help the user in designing a nice stochastic gradient descent method,
