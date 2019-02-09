@@ -44,7 +44,7 @@ def plot_mle(G,pij,wij=None, **kwargs):
     ax[1,1].grid(False)
     ax[1,1].set_title('$p_{ij}$')
 
-    ax[1,2].plot((G>0).sum(axis=0),pij.sum(axis=0), 'b.')
+    ax[1,2].plot((G>0).sum(axis=0)-np.diag(G>0),pij.sum(axis=0) - np.diag(pij), 'b.')
     ax[1,2].plot(np.linspace(0,pij.sum(axis=0).max()),np.linspace(0,pij.sum(axis=0).max()),'r-')
     ax[1,2].grid(True)
     ax[1,2].set_title('Degrees reconstruction')
@@ -52,7 +52,7 @@ def plot_mle(G,pij,wij=None, **kwargs):
     ax[1,2].set_xlabel('empirical')
 
     if wij is not None:
-        ax[0,2].plot(G.sum(axis=0),wij.sum(axis=0), 'b.')
+        ax[0,2].plot(G.sum(axis=0), wij.sum(axis=0) - np.diag(wij), 'b.')
         ax[0,2].plot(np.linspace(0,wij.sum(axis=0).max()),np.linspace(0,wij.sum(axis=0).max()),'r-')
         ax[0,2].set_title('Strength reconstruction')
         ax[0,2].axis('equal')

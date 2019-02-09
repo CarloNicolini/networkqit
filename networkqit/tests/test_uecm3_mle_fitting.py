@@ -40,15 +40,14 @@ if __name__=='__main__':
 
     # TEST JACOBIAN
     from autograd import grad
-    print('|grad|=',np.sqrt((grad(lambda z : M.loglikelihood(G,z))(sol['x'])**2).sum()))
-    print('saddle_point=', np.sqrt((M.saddle_point(G,sol['x'])**2)).sum())
+    print('|grad|=',np.sqrt((grad(lambda z : M.loglikelihood(W,z))(sol['x'])**2).sum()))
+    print('saddle_point=', np.sqrt((M.saddle_point(W,sol['x'])**2)).sum())
 
     # TEST SAMPLING
     Sd = (M.sample_adjacency(sol['x'], batch_size=500, with_grads=False)>0).mean(axis=0)
     S = (M.sample_adjacency(sol['x'], batch_size=500, with_grads=False)).mean(axis=0)
     plot_mle(W, Sd.astype(float), S, title='Sampling')
     
-
     # TEST SADDLE POINT
     opt = nq.MLEOptimizer(W, x0=x0, model=M)
     sol = opt.run(method='saddle_point', gtol=1E-9)
@@ -56,6 +55,11 @@ if __name__=='__main__':
     pij = M.expected_adjacency(sol['x'])
     wij = M.expected_weighted_adjacency(sol['x'])
     plot_mle(W,pij,wij,title='Saddle point method')
+
+    # TEST JACOBIAN
+    from autograd import grad
+    print('|grad|=',np.sqrt((grad(lambda z : M.loglikelihood(W,z))(sol['x'])**2).sum()))
+    print('saddle_point=', np.sqrt((M.saddle_point(W,sol['x'])**2)).sum())
 
     # TEST BASINHOPPING
     opt = nq.MLEOptimizer(W, x0=x0, model=M)
@@ -65,3 +69,8 @@ if __name__=='__main__':
     pij = M.expected_adjacency(sol['x'])
     wij = M.expected_weighted_adjacency(sol['x'])
     plot_mle(W,pij,wij)
+
+    # TEST JACOBIAN
+    from autograd import grad
+    print('|grad|=',np.sqrt((grad(lambda z : M.loglikelihood(W,z))(sol['x'])**2).sum()))
+    print('saddle_point=', np.sqrt((M.saddle_point(W,sol['x'])**2)).sum())

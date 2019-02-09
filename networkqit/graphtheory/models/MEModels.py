@@ -26,38 +26,31 @@ Garlaschelli, D., & Loffredo, M. I. (2008).
 Maximum likelihood: Extracting unbiased information from complex networks.
 PRE 78(1), 1–4. https://doi.org/10.1103/PhysRevE.78.015101
 
-G here is the graph adjacency matrix, A is the binary adjacency, W is the weighted
+G here is the graph adjacency matrix, A is the binary adjacency, W is the weighted adjacency
 """
 
 import autograd.numpy as np
 from .GraphModel import GraphModel
-from .GraphModel import expit, batched_symmetric_random, multiexpit
+from .GraphModel import expit, multiexpit, batched_symmetric_random
+from networkqit import MLEOptimizer
 EPS = np.finfo(float).eps
 
 class UBCM(GraphModel):
     """
     1. Model name: Undirected Binary Configuration Model
-
     2. Constraints: degree sequence k_i^*
-    
     3. Hamiltonian:
         H(A) = sum_{i<j} (alpha_i) k_i^*
-    
     4. Lagrange multipliers substitutions:
         x_i = exp(-alpha_i)
-    
     5. Number of parameters:
         N
-    
     6. Link probability <aij>
         <aij> = pij = xixj/(1 + xixj)
-
     7. Expected link weight <wij>
         <wij> = <aij>
-
     8. LogLikelihood logP:
         sum_{i<j} a_{ij}*log(pij) + (1-aij)*log(1-pij)
-    
     9. Reference:
         Squartini thesis page 110
     """
@@ -82,7 +75,7 @@ class UBCM(GraphModel):
     def saddle_point(self, observed_adj, theta):
         k = (observed_adj>0).sum(axis=0)
         pij = self.expected_adjacency(theta)
-        avgk = pij.sum(axis=0)
+        avgk = pij.sum(axis=0) - np.diag(pij)
         return k - avgk
 
     def sample_adjacency(self, theta, batch_size=1, with_grads=False, slope=500):
@@ -97,34 +90,36 @@ class UBCM(GraphModel):
         A += np.transpose(A, axes=[0, 2, 1])
         return A
 
+    def fit(self, G, x0=None, **opt_kwargs):
+        from networkqit import MLEOptimizer
+        A = (G>0).astype(float)
+        k = A.sum(axis=0)
+        if x0 is None:
+            x0 = k / k.max()
+        opt = MLEOptimizer(G, x0=x0, model=self)
+        sol = opt.run(**opt_kwargs)
+        return sol
+
+
 class UWCM(GraphModel):
     """"
     1. Model name: Undirected Weighted Configuration Model
-
     2. Constraints: strength sequence s_i^*
-    
     3. Hamiltonian:
         H(A) = sum_{i<j} (beta_i) s_i^*
-    
     4. Lagrange multipliers substitutions:
         y_i = exp(-beta_i)
         pij = y_i y_j
-    
     5. Number of parameters:
         N
-    
     6. Link probability <aij>:
         <aij> = pij = yiyj
-
     7. Expected link weight <wij>:
         <wij> = yiyj/(1-yiyj)
-
     8. LogLikelihood logP:
         logP = sum_{i<j} w_{ij}*log(pij) + log(1-pij)
-    
     9. Parameters bounds
         0 < yij < 1
-
     Reference:
         Squartini thesis page 110
     """
@@ -151,10 +146,11 @@ class UWCM(GraphModel):
         loglike = observed_adj * np.log(pij) + np.log(1.0 - pij)
         return np.sum(np.triu(loglike,1))
 
-    def saddle_point(self, G, theta):
-        s = G.sum(axis=0)
+    def saddle_point(self, observed_adj, theta):
+        s = observed_adj.sum(axis=0)
         wij = self.expected_weighted_adjacency(theta)
-        return s - wij.sum(axis=0)
+        avgs = wij.sum(axis=0) - np.diag(wij)
+        return s - avgs
 
     def sample_adjacency(self, theta, batch_size=1, with_grads=False, slope=500):
         """
@@ -171,41 +167,40 @@ class UWCM(GraphModel):
         W += np.transpose(W, axes=[0, 2, 1])
         return W
 
-
+    def fit(self, G, x0=None, **opt_kwargs):
+        from networkqit import MLEOptimizer
+        A = (G>0).astype(float)
+        k = A.sum(axis=0)
+        if x0 is None:
+            x0 = k / k.max()
+        opt = MLEOptimizer(G, x0=x0, model=self)
+        sol = opt.run(**opt_kwargs)
+        return sol
 
 class UECM3(GraphModel):
     """
     1. Model name: Undirected Enhanced Configuration model III
-
     2. Constraints: strenght sequence s_i^*, degree sequence k_i^*
-
     3. Hamiltonian:
         H(G) = sum_i \alpha_i k_i^* + \beta_i s_i^* 
              = sum_{i<j} (\alpha_i+\alpha_i) Heaviside(w_{ij}) + (beta_i + beta_j) w_{ij}
-
     4. Lagrange multipliers substitutions:
         x_i = exp(-alpha_i)
         y_i = exp(-beta_i)
-
     5. Number of parameters:
         2N
-
     6. Link probability <aij>:
         <aij> = (xixj yiyj) / (1 - yiyj + xixj*yiyj)
-
     7. Link probability <wij>:
         <wij> = (xixj yiyj) / ((1 - yiyj + xixj*yiyj)(1-yiyj))
-
     8. LogLikelihood logP:
         logP = sum_i k_i(A) log(x_i) + sum_i s_i(W) log(y_i) + sum_{i<j} log( (1-yiyj) / (1-yiyj+xixj*yiyj) )
-
     9. Parameters bounds
         very complicated
         1. xi > 0
         2. yi > 0
         3. yi < 1
         4. 0 < xi yi < 1
-
     Reference:
         Squartini thesis page 126
     """
@@ -238,13 +233,13 @@ class UECM3(GraphModel):
         loglike = (k*np.log(x)).sum() + (s*np.log(y)).sum() + np.triu(np.log( (1-yiyj)/(1-yiyj + xixj*yiyj) ) ,1).sum()
         return loglike
 
-    def saddle_point(self, observed_adj, theta):
+    def saddle_point(self, observed_adj, theta): # equations (9,10) of 10.1088/1367-2630/16/4/043022
         k = (observed_adj>0).sum(axis=0)
-        pij = self.expected_adjacency(theta)
-        avgk = pij.sum(axis=0)
+        pij = self.expected_adjacency(theta) 
+        avgk = pij.sum(axis=0) - np.diag(pij)
         w = observed_adj.sum(axis=0)
         wij = self.expected_weighted_adjacency(theta)
-        avgw = wij.sum(axis=0)
+        avgw = wij.sum(axis=0) - np.diag(wij)
         return np.hstack([k - avgk, w - avgw])
 
     def sample_adjacency(self, theta, batch_size=1, with_grads=False, slope=500):
@@ -261,40 +256,42 @@ class UECM3(GraphModel):
             q = np.log(rij+EPS)/np.log(np.abs(1.0-pij))
             W = multiexpit(slope*(q-1.0)) # continuous approximation to floor(x)
         else:
-            # Questa è la soluzione corretta
             A = pij>rij
             W = np.random.geometric(1-yiyj,size=[batch_size,self.N,self.N])
         W = np.triu(A*W,1)
         W += np.transpose(W, axes=[0, 2, 1])
         return W
 
-#################### Continuous models #######################
+    def fit(self, G, x0=None, **opt_kwargs):
+        A = (G>0).astype(float)
+        k = A.sum(axis=0)
+        s = G.sum(axis=0)
+        if x0 is None:
+            x0 = np.concatenate([k,s])
+            x0 = np.clip(x0/x0.max(), np.finfo(float).eps, 1-np.finfo(float).eps )
+        opt = MLEOptimizer(G, x0=x0, model=self)
+        sol = opt.run(**opt_kwargs)
+        return sol
 
+
+#################### Continuous models #######################
 class CWTECM(GraphModel):
     """
     1. Model name: Continuous Weighted Thresholded Enhanced Configuration Model
-
     2. Constraints: degree sequence k_i^*, strenght sequence s_i and threshold hyperparameter t
-    
     3. Hamiltonian:
         H(W) = sum_{i<j} (alpha_i+alpha_j) Heaviside(w_{ij}-t) + (beta_i+beta_j) w_{ij} Heaviside(w_{ij}-t)
-    
     4. Lagrange multipliers substitutions:
         x_i = exp(-alpha_i)
         y_i = exp(-beta_i)
-    
     5. Number of parameters:
         2N
-    
     6. Link probability pij=<aij>
-        (xixj*yiyjt )/ (xixj*yiyjt - t*log(yiyj))
-        
+        (xixj*(yiyj**t) )/ (xixj*(yiyj**t) - t*log(yiyj))
     7. Expected link weight <wij>
         wij = (t*log(yiyj)-1)/(t*log(yiyj))* <aij>
-
     8. LogLikelihood logP:
         sum_{i<j}  xij^{Aij} yij^{Aij wij} - log(t - (xij yij^t/ log (yij)) )
-
     9. Constraints:
         1. xi > 0
         2. 0 < yi < 1
@@ -329,10 +326,10 @@ class CWTECM(GraphModel):
     def saddle_point(self, observed_adj, theta):
         k = (observed_adj>0).sum(axis=0)
         pij = self.expected_adjacency(theta)
-        avgk = pij.sum(axis=0)
+        avgk = pij.sum(axis=0) - np.diag(pij)
         w = observed_adj.sum(axis=0)
         wij = self.expected_weighted_adjacency(theta)
-        avgw = wij.sum(axis=0)
+        avgw = wij.sum(axis=0) - np.diag(wij)
         return np.hstack([k - avgk, w - avgw])
     
     def loglikelihood(self, observed_adj, theta):
@@ -362,3 +359,14 @@ class CWTECM(GraphModel):
         W +=  np.transpose(W, axes=[0, 2, 1])
         return W
 
+    def fit(self, G, x0=None, **opt_kwargs):
+        from networkqit import MLEOptimizer
+        A = (G>self.threshold).astype(float)
+        k = A.sum(axis=0)
+        s = G.sum(axis=0)
+        if x0 is None:
+            x0 = np.concatenate([k,s])
+            x0 = np.clip(x0/x0.max(), np.finfo(float).eps, 1-np.finfo(float).eps )
+        opt = MLEOptimizer(G, x0=x0, model=self)
+        sol = opt.run(**opt_kwargs)
+        return sol

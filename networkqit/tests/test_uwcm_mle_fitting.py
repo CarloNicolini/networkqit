@@ -34,10 +34,15 @@ if __name__=='__main__':
     sol = opt.run(model=M, gtol=1E-8, method='MLE')
     print('Loglikelihood = ', M.loglikelihood(G,sol['x']))
     print('AIC = ', sol['AIC'])
-    
+
     pij = M.expected_adjacency(sol['x'])
     wij = M.expected_weighted_adjacency(sol['x'])
     plot_mle(W,pij,wij,title='Loglikelihood method')
+
+    # TEST JACOBIAN
+    from autograd import grad
+    print('|grad|=',np.sqrt((grad(lambda z : M.loglikelihood(W,z))(sol['x'])**2).sum()))
+    print('saddle_point=', np.sqrt((M.saddle_point(W,sol['x'])**2)).sum())
 
     # TEST SAMPLING
     Sd = (M.sample_adjacency(sol['x'], batch_size=500, with_grads=False)>0).mean(axis=0)
