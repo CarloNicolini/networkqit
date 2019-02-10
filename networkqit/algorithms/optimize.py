@@ -145,7 +145,7 @@ class MLEOptimizer:
 
         if kwargs.get('method', 'MLE') is 'MLE':
             # If the model has non-linear constraints, must use Sequential Linear Square Programming SLSQP
-            from autograd import jacobian
+            from autograd import jacobian # using automatic jacobian from autograd
             J = jacobian(lambda z : -self.model.loglikelihood(self.G,z))
             if hasattr(self.model, 'constraints'):
                 #H=hessian(lambda z : -self.model.loglikelihood(self.G,z))
@@ -185,10 +185,11 @@ class MLEOptimizer:
                 opt_result = least_squares(fun=basin_opt_args[0],
                                            x0=np.squeeze(basin_opt_args[1]),
                                            bounds=ls_bounds,
-                                           method='dogbox',
+                                           method='trf',
                                            xtol=opts['xtol'],
                                            gtol=opts['gtol'],
-                                           max_nfev=opts['maxfun'],
+                                           tr_solver='lsmr',
+                                           max_nfev=opts['maxiter'],
                                            verbose=opts['verbose'])
                 # use this form with linear loss as in the basinhopping
                 # func argument to be consistent

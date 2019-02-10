@@ -32,7 +32,7 @@ G here is the graph adjacency matrix, A is the binary adjacency, W is the weight
 import autograd.numpy as np
 from .GraphModel import GraphModel
 from .GraphModel import expit, multiexpit, batched_symmetric_random
-from networkqit import MLEOptimizer
+from networkqit.algorithms import MLEOptimizer
 EPS = np.finfo(float).eps
 
 class UBCM(GraphModel):
@@ -331,6 +331,14 @@ class CWTECM(GraphModel):
         wij = self.expected_weighted_adjacency(theta)
         avgw = wij.sum(axis=0) - np.diag(wij)
         return np.hstack([k - avgk, w - avgw])
+
+    # def saddle_point_jac(self, observed_adj, theta):
+    #     x,y = theta[0:self.N], theta[(self.N):]
+    #     t = self.threshold
+    #     xixj = np.outer(x,x)
+    #     yiyj = np.outer(y,y)
+    #     dpijdxixj = t*(xixj*(yiyj**t))/(yiyj**t*(-xixj)+2*t*np.log(yiyj)) * np.log(yiyj)
+    #     dpijdyiyj = t*xixj*(yiyj**t)*(t*np.log(yiyj) -1)/(xixj*(yiyj**t) - 2*t*np.log(yiyj))
     
     def loglikelihood(self, observed_adj, theta):
         x,y = theta[0:self.N], theta[(self.N):]
