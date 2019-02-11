@@ -35,6 +35,10 @@ from .GraphModel import expit, multiexpit, batched_symmetric_random
 from networkqit.algorithms import MLEOptimizer
 EPS = np.finfo(float).eps
 
+def ilessjsum(Q):
+    # This function is equivalent to np.triu(Q,1).sum() but 4 times faster
+    return (Q.sum()- np.diag(Q).sum())/2 
+
 class UBCM(GraphModel):
     """
     1. Model name: Undirected Binary Configuration Model
@@ -69,7 +73,8 @@ class UBCM(GraphModel):
 
     def loglikelihood(self, observed_adj, theta):
         pij = self.expected_adjacency(theta)
-        loglike = np.sum(np.triu(observed_adj * np.log(pij) + (1.0 - observed_adj) * np.log(1.0 - pij),1))
+        #loglike = np.sum(np.triu(observed_adj * np.log(pij) + (1.0 - observed_adj) * np.log(1.0 - pij),1))
+        loglike = ilessjsum(observed_adj * np.log(pij) + (1.0 - observed_adj) * np.log(1.0 - pij))
         return loglike
     
     def saddle_point(self, observed_adj, theta):
@@ -143,8 +148,7 @@ class UWCM(GraphModel):
     
     def loglikelihood(self, observed_adj, theta):
         pij = self.expected_adjacency(theta)
-        loglike = observed_adj * np.log(pij) + np.log(1.0 - pij)
-        return np.sum(np.triu(loglike,1))
+        return ilessjsum(observed_adj * np.log(pij) + np.log(1.0 - pij))
 
     def saddle_point(self, observed_adj, theta):
         s = observed_adj.sum(axis=0)
@@ -230,7 +234,7 @@ class UECM3(GraphModel):
         s = observed_adj.sum(axis=0)
         xixj = np.outer(x,x)
         yiyj = np.outer(y,y)
-        loglike = (k*np.log(x)).sum() + (s*np.log(y)).sum() + np.triu(np.log( (1-yiyj)/(1-yiyj + xixj*yiyj) ) ,1).sum()
+        loglike = (k*np.log(x)).sum() + (s*np.log(y)).sum() + ilessjsum(np.log( (1-yiyj)/(1-yiyj + xixj*yiyj) ))
         return loglike
 
     def saddle_point(self, observed_adj, theta): # equations (9,10) of 10.1088/1367-2630/16/4/043022
@@ -348,7 +352,7 @@ class CWTECM(GraphModel):
         if not hasattr(self, '_k'):
             self._k =  (observed_adj>0).astype(float).sum(axis=0)
             self._s = observed_adj.sum(axis=0)
-        loglike = (self._s*np.log(y) + self._k*np.log(x)).sum() + np.triu(np.log(-np.log(yiyj)/(xixj*(yiyj**t) -t*(np.log(yiyj)) ) ),1).sum()
+        loglike = (self._s*np.log(y) + self._k*np.log(x)).sum() + ilessjsum(np.log(-np.log(yiyj)/(xixj*(yiyj**t) -t*(np.log(yiyj)) ) ))
         return loglike
 
     def sample_adjacency(self, theta, batch_size=1, with_grads=False, slope=500):
