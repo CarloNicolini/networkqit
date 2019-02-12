@@ -63,7 +63,7 @@ def plot_mle(G,pij,wij=None, **kwargs):
     if kwargs.get('title',None) is not None:
         plt.suptitle(kwargs.get('title',None))
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-    plt.show()
+    #plt.show()
 
 def step_callback(A, beta, model, x, **kwargs):
     def drawfig1():

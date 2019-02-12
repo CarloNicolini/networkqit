@@ -31,13 +31,9 @@ G here is the graph adjacency matrix, A is the binary adjacency, W is the weight
 
 import autograd.numpy as np
 from .GraphModel import GraphModel
-from .GraphModel import expit, multiexpit, batched_symmetric_random
+from ..matrices import expit, multiexpit, batched_symmetric_random, ilessjsum
 from networkqit.algorithms import MLEOptimizer
 EPS = np.finfo(float).eps
-
-def ilessjsum(Q):
-    # This function is equivalent to np.triu(Q,1).sum() but 4 times faster
-    return (Q.sum()- np.diag(Q).sum())/2 
 
 class UBCM(GraphModel):
     """
@@ -223,10 +219,9 @@ class UECM3(GraphModel):
         return pij
 
     def expected_weighted_adjacency(self, theta):
-        x,y = theta[0:self.N], theta[(self.N):]
-        pij = self.expected_adjacency(theta)
+        y = theta[(self.N):]
         yiyj = np.outer(y,y)
-        return pij / (1.0 - yiyj)
+        return self.expected_adjacency(theta) / (1.0 - yiyj)
 
     def loglikelihood(self, observed_adj, theta):
         x,y = theta[0:self.N], theta[(self.N):]
@@ -239,7 +234,7 @@ class UECM3(GraphModel):
 
     def saddle_point(self, observed_adj, theta): # equations (9,10) of 10.1088/1367-2630/16/4/043022
         k = (observed_adj>0).sum(axis=0)
-        pij = self.expected_adjacency(theta) 
+        pij = self.expected_adjacency(theta)
         avgk = pij.sum(axis=0) - np.diag(pij)
         w = observed_adj.sum(axis=0)
         wij = self.expected_weighted_adjacency(theta)
@@ -319,11 +314,9 @@ class CWTECM(GraphModel):
         return pij
     
     def expected_weighted_adjacency(self, theta):
-        x,y = theta[0:self.N], theta[(self.N):]
+        y = theta[(self.N):]
         t = self.threshold
-        xixj = np.outer(x,x)
         yiyj = np.outer(y,y)
-        yiyjt = yiyj**t
         wij = self.expected_adjacency(theta) * ((t*np.log(yiyj)-1.0) / (np.log(yiyj)))
         return wij
     
@@ -335,14 +328,6 @@ class CWTECM(GraphModel):
         wij = self.expected_weighted_adjacency(theta)
         avgw = wij.sum(axis=0) - np.diag(wij)
         return np.hstack([k - avgk, w - avgw])
-
-    # def saddle_point_jac(self, observed_adj, theta):
-    #     x,y = theta[0:self.N], theta[(self.N):]
-    #     t = self.threshold
-    #     xixj = np.outer(x,x)
-    #     yiyj = np.outer(y,y)
-    #     dpijdxixj = t*(xixj*(yiyj**t))/(yiyj**t*(-xixj)+2*t*np.log(yiyj)) * np.log(yiyj)
-    #     dpijdyiyj = t*xixj*(yiyj**t)*(t*np.log(yiyj) -1)/(xixj*(yiyj**t) - 2*t*np.log(yiyj))
     
     def loglikelihood(self, observed_adj, theta):
         x,y = theta[0:self.N], theta[(self.N):]

@@ -221,3 +221,7 @@ def multiexpit2(x, slope=50):
     i = np.arange(int(min(x)//1),int(max(x)//1)+1)
     X, I = np.meshgrid(x,i)
     return np.sum(expit(slope*(X-I)),axis=0)+min(x)//1-1
+
+def ilessjsum(Q):
+    # This function is equivalent to np.triu(Q,1).sum() but 4 times faster
+    return (Q.sum()- np.trace(Q))/2 

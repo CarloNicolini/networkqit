@@ -166,14 +166,14 @@ def find_beta_logc(L, c, a=1E-5, b=1E5):
     return bisect(lambda x: s(x, lambd) - np.log(c), a, b)
 
 
-def batch_relative_entropy(Lobs : np.array, Lmodel: np.array, beta : float):
+def batch_relative_entropy(Lobs : np.array, Lmodel: np.array, beta : float, one_connected_component=False):
     if len(Lobs.shape) != 2:
         raise RuntimeError('Must provide a square, non batched observed laplacian')
     Srho = compute_vonneumann_entropy(L=Lobs, beta=beta)
     rho = compute_vonneuman_density(L=Lobs, beta=beta)
     if len(Lmodel.shape) == 3: # compute the average relative entropy over batched laplacians
         Emodel = np.mean(np.sum(np.sum(Lmodel * rho, axis=2), axis=1))
-        lambd_model = eigh(Lmodel)[0] # batched eigenvalues
+        lambd_model = eigh(Lmodel)[0] # batched eigenvalues            
         Fmodel = - np.mean(logsumexp(-beta * lambd_model, axis=1) / beta)
         loglike = beta * (Emodel - Fmodel) # - Tr[rho log(sigma)]
         dkl = loglike  - Srho # Tr[rho log(rho)] - Tr[rho log(sigma)]
