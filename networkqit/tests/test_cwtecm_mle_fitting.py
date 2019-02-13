@@ -39,11 +39,12 @@ if __name__=='__main__':
 
     M = CWTECM(N=len(G), threshold=t)
     sol = M.fit(G, method='MLE', model=M, verbose=0, maxiter=5000, gtol=1E-6)
-    print('Loglikelihood = ', M.loglikelihood(G,sol['x']))
+    print('Loglikelihood = ', M.loglikelihood(G,sol['x']),'AIC = ', sol['AIC'])
 
     pij = M.expected_adjacency(sol['x'])
     wij = M.expected_weighted_adjacency(sol['x'])
     plot_mle(W,pij,wij,title='Loglikelihood LBFGS-B')
+    plt.show()
 
     # TEST JACOBIAN
     from autograd import grad

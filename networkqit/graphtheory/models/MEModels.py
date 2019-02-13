@@ -180,7 +180,7 @@ class UWCM(GraphModel):
 class UECM3(GraphModel):
     """
     1. Model name: Undirected Enhanced Configuration model III
-    2. Constraints: strenght sequence s_i^*, degree sequence k_i^*
+    2. Constraints: strength sequence s_i^*, degree sequence k_i^*
     3. Hamiltonian:
         H(G) = sum_i \alpha_i k_i^* + \beta_i s_i^* 
              = sum_{i<j} (\alpha_i+\alpha_i) Heaviside(w_{ij}) + (beta_i + beta_j) w_{ij}
@@ -274,10 +274,91 @@ class UECM3(GraphModel):
 
 
 #################### Continuous models #######################
+class CWTCM(GraphModel):
+    """
+    1. Model name: Continuous Weighted Thresholded Configuration Model
+    2. Constraints: strength sequence s_i and threshold hyperparameter t
+    3. Hamiltonian:
+        H(W) = sum_{i<j} (beta_i+beta_j) w_{ij} Heaviside(w_{ij}-t)
+    4. Lagrange multipliers substitutions:
+        y_i = exp(-beta_i)
+    5. Number of parameters:
+        N
+    6. Link probability pij=<aij>
+        ((yiyj**t) )/ ((yiyj**t) - t*log(yiyj))
+    7. Expected link weight <wij>
+        wij = (t*log(yiyj)-1)/(t*log(yiyj))* <aij>
+    8. LogLikelihood logP:
+        
+    9. Constraints:
+        2. 0 < yi < 1
+    """
+
+    def __init__(self,**kwargs):
+        super().__init__(**kwargs)
+        self.args_mapping =   ['y_' + str(i) for i in range(0, kwargs['N'])]
+        self.N = kwargs['N']
+        self.threshold = kwargs['threshold']
+        self.bounds = [(EPS, 1-EPS)] * self.N
+
+    def expected_adjacency(self, theta):
+        y = theta
+        t = self.threshold
+        yiyj = np.outer(y,y)
+        yiyjt = yiyj**t
+        pij = (yiyjt) / (yiyjt - t*np.log(yiyj)) # <aij>
+        return pij
+    
+    def expected_weighted_adjacency(self, theta):
+        y = theta
+        t = self.threshold
+        yiyj = np.outer(y,y)
+        wij = self.expected_adjacency(theta) * ((t*np.log(yiyj)-1.0) / (np.log(yiyj)))
+        return wij
+    
+    def saddle_point(self, observed_adj, theta):
+        w = observed_adj.sum(axis=0)
+        wij = self.expected_weighted_adjacency(theta)
+        avgw = wij.sum(axis=0) - np.diag(wij)
+        return np.hstack([w - avgw])
+    
+    def loglikelihood(self, observed_adj, theta):
+        y = theta
+        t = self.threshold
+        yiyj = np.outer(y,y)
+        if not hasattr(self, '_k'):
+            self._s = observed_adj.sum(axis=0)
+        loglike = (self._s*np.log(y)).sum() + ilessjsum(np.log(-np.log(yiyj)/((yiyj**t) -t*(np.log(yiyj)) ) ))
+        return loglike
+
+    def sample_adjacency(self, theta, batch_size=1, with_grads=False, slope=500):
+        rij = batched_symmetric_random(batch_size, self.N)
+        wij = self.expected_weighted_adjacency(theta)
+        if with_grads:
+            # to generate random weights, needs a second decorrelated random source
+            rij = batched_symmetric_random(batch_size, self.N)
+            W = -wij*np.log(rij)/pij
+        else:
+            W = np.random.exponential(wij,size=[batch_size,self.N,self.N])
+        W = np.triu(W,1)
+        W +=  np.transpose(W, axes=[0, 2, 1])
+        return W
+
+    def fit(self, G, x0=None, **opt_kwargs):
+        from networkqit import MLEOptimizer
+        s = G.sum(axis=0)
+        if x0 is None:
+            x0 = np.concatenate([s])
+            x0 = np.clip(x0/x0.max(), np.finfo(float).eps, 1-np.finfo(float).eps )
+        opt = MLEOptimizer(G, x0=x0, model=self)
+        sol = opt.run(**opt_kwargs)
+        return sol
+
+
 class CWTECM(GraphModel):
     """
     1. Model name: Continuous Weighted Thresholded Enhanced Configuration Model
-    2. Constraints: degree sequence k_i^*, strenght sequence s_i and threshold hyperparameter t
+    2. Constraints: degree sequence k_i^*, strength sequence s_i and threshold hyperparameter t
     3. Hamiltonian:
         H(W) = sum_{i<j} (alpha_i+alpha_j) Heaviside(w_{ij}-t) + (beta_i+beta_j) w_{ij} Heaviside(w_{ij}-t)
     4. Lagrange multipliers substitutions:
