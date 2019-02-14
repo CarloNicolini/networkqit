@@ -304,17 +304,23 @@ class CWTERG(GraphModel):
         self.threshold = kwargs['threshold']
         self.bounds = [(EPS, None)] + [(EPS, 1-EPS)]
 
-    def expected_adjacency(self, theta):
+    def expected_adjacency(self, theta, expand_to_adj=False):
         x,y = theta[0], theta[1]
         t = self.threshold
         p = (x*y**t) / (x*(y**t) - t*np.log(y)) # <aij>
-        return p
+        if expand_to_adj:
+            return p*(1-np.eye(self.N))
+        else:
+            return p
     
-    def expected_weighted_adjacency(self, theta):
+    def expected_weighted_adjacency(self, theta, expand_to_adj=False):
         x,y = theta[0], theta[1]
         t = self.threshold
         w = (x*(y**t)*(1-t*np.log(y))) / ((-x*(y**t) + t*np.log(y))*np.log(y))
-        return w
+        if expand_to_adj:
+            return w * (1-np.eye(self.N))
+        else:
+            return w
     
     def saddle_point(self, observed_adj, theta):
         Lstar = (observed_adj>0).sum() / 2
@@ -322,16 +328,21 @@ class CWTERG(GraphModel):
         avgL = p * (self.N*(self.N-1)) / 2
         wtot = observed_adj.sum() / 2
         w = self.expected_weighted_adjacency(theta)
-        avgwtot = w / 2
+        avgwtot = w * (self.N*(self.N-1)) / 2
         return np.hstack([Lstar - avgL, wtot - avgwtot])
     
     def loglikelihood(self, observed_adj, theta):
         x,y = theta[0], theta[1]
         t = self.threshold
-        Lstar =  (observed_adj>0).sum()
-        Wtotstar = observed_adj.sum()
-        loglike = (x*(y**observed_adj))
-        loglike = ilessjsum((observed_adj*np.log(y) + np.log(x))*(observed_adj>0)) + (np.log(np.log(y)/(t*np.log(y) - x*(y**t))))
+        N = self.N
+        Lstar =  (observed_adj>0).sum() /2
+        Wtotstar = observed_adj.sum() / 2
+        n = N*(N-1)/2
+        Z = (-x*y**t + t*np.log(y)) / (np.log(y))
+        # logZ = np.log((-x*y**t + t*np.log(y))/np.log(y))
+        # H = -n*(-np.log(x)*Lstar -np.log(y)*Wtotstar)
+        #ynt = 
+        loglike = (np.log(x)*Lstar + np.log(y)*Wtotstar) - n*np.log(Z)
         return loglike
 
     def sample_adjacency(self, theta, batch_size=1, with_grads=False, slope=500):
