@@ -327,8 +327,8 @@ class CWTERG(GraphModel):
         p = self.expected_adjacency(theta)
         avgL = p * (self.N*(self.N-1)) / 2
         wtot = observed_adj.sum() / 2
-        w = self.expected_weighted_adjacency(theta)
-        avgwtot = w * (self.N*(self.N-1)) / 2
+        w = self.expected_weighted_adjacency(theta,expand_to_adj=True)
+        avgwtot = w.sum() / 2
         return np.hstack([Lstar - avgL, wtot - avgwtot])
     
     def loglikelihood(self, observed_adj, theta):
@@ -356,7 +356,7 @@ class CWTERG(GraphModel):
             W = -wij*np.log(rij)/p
         else:
             A = (p>rij).astype(float)
-            W = np.random.exponential(w/p,size=[batch_size,self.N,self.N]) / (self.N*(self.N-1))
+            W = np.random.exponential(w/p,size=[batch_size,self.N,self.N])
         W = np.triu(A*W,1)
         W +=  np.transpose(W, axes=[0, 2, 1])
         return W
@@ -364,8 +364,8 @@ class CWTERG(GraphModel):
     def fit(self, G, x0=None, **opt_kwargs):
         from networkqit import MLEOptimizer
         A = (G>self.threshold).astype(float)
-        Lstar = A.sum()
-        Wtotstar = G.sum()
+        Lstar = A.sum() / 2 
+        Wtotstar = G.sum() / 2
         if x0 is None:
             x0 = np.array([Lstar,Wtotstar]).reshape([2,])
             x0 = np.clip(x0/x0.max(), np.finfo(float).eps, 1-np.finfo(float).eps )
