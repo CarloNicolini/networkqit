@@ -274,6 +274,106 @@ class UECM3(GraphModel):
 
 
 #################### Continuous models #######################
+class CWTERG(GraphModel):
+    """
+    1. Model name: Continuous Weighted Thresholded Enhanced Random Graph
+    2. Constraints: number of links L, total weight W and threshold hyperparameter t
+    3. Hamiltonian:
+        H(W) = sum_{i<j} (alpha) Heaviside(w_{ij}-t) + (beta) w_{ij} Heaviside(w_{ij}-t)
+    4. Lagrange multipliers substitutions:
+        x = exp(-alpha)
+        y = exp(-beta)
+    5. Number of parameters:
+        2
+    6. Link probability pij=<aij>
+        (x*(y**t) )/ (x*(y**t) - t*log(y))
+    7. Expected link weight <wij>
+        wij = (t*log(y)-1)/(t*log(y))* <aij>
+    8. LogLikelihood logP:
+        sum_{i<j}  x^{Aij} y^{Aij wij} - log(t - (x y^t/ log (y)) )
+    9. Constraints:
+        1. x > 0
+        2. 0 < y < 1
+        3  0 < x y < 1
+    """
+
+    def __init__(self,**kwargs):
+        super().__init__(**kwargs)
+        self.args_mapping =   ['x', 'y']
+        self.N = kwargs['N']
+        self.threshold = kwargs['threshold']
+        self.bounds = [(EPS, None)] + [(EPS, 1-EPS)]
+
+    def expected_adjacency(self, theta, expand_to_adj=False):
+        x,y = theta[0], theta[1]
+        t = self.threshold
+        p = (x*y**t) / (x*(y**t) - t*np.log(y)) # <aij>
+        if expand_to_adj:
+            return p*(1-np.eye(self.N))
+        else:
+            return p
+    
+    def expected_weighted_adjacency(self, theta, expand_to_adj=False):
+        x,y = theta[0], theta[1]
+        t = self.threshold
+        w = (x*(y**t)*(1-t*np.log(y))) / ((-x*(y**t) + t*np.log(y))*np.log(y))
+        if expand_to_adj:
+            return w * (1-np.eye(self.N))
+        else:
+            return w
+    
+    def saddle_point(self, observed_adj, theta):
+        Lstar = (observed_adj>0).sum() / 2
+        p = self.expected_adjacency(theta)
+        avgL = p * (self.N*(self.N-1)) / 2
+        wtot = observed_adj.sum() / 2
+        w = self.expected_weighted_adjacency(theta,expand_to_adj=True)
+        avgwtot = w.sum() / 2
+        return np.hstack([Lstar - avgL, wtot - avgwtot])
+    
+    def loglikelihood(self, observed_adj, theta):
+        x,y = theta[0], theta[1]
+        t = self.threshold
+        N = self.N
+        Lstar =  (observed_adj>0).sum() /2
+        Wtotstar = observed_adj.sum() / 2
+        n = N*(N-1)/2
+        Z = (-x*y**t + t*np.log(y)) / (np.log(y))
+        # logZ = np.log((-x*y**t + t*np.log(y))/np.log(y))
+        # H = -n*(-np.log(x)*Lstar -np.log(y)*Wtotstar)
+        #ynt = 
+        loglike = (np.log(x)*Lstar + np.log(y)*Wtotstar) - n*np.log(Z)
+        return loglike
+
+    def sample_adjacency(self, theta, batch_size=1, with_grads=False, slope=500):
+        rij = batched_symmetric_random(batch_size, self.N)
+        p = self.expected_adjacency(theta)
+        w = self.expected_weighted_adjacency(theta)
+        if with_grads:
+            A = expit(slope*(p-rij)) # it needs a gigantic slope to reduce error
+            # to generate random weights, needs a second decorrelated random source
+            rij = batched_symmetric_random(batch_size, self.N)
+            W = -wij*np.log(rij)/p
+        else:
+            A = (p>rij).astype(float)
+            W = np.random.exponential(w/p,size=[batch_size,self.N,self.N])
+        W = np.triu(A*W,1)
+        W +=  np.transpose(W, axes=[0, 2, 1])
+        return W
+
+    def fit(self, G, x0=None, **opt_kwargs):
+        from networkqit import MLEOptimizer
+        A = (G>self.threshold).astype(float)
+        Lstar = A.sum() / 2 
+        Wtotstar = G.sum() / 2
+        if x0 is None:
+            x0 = np.array([Lstar,Wtotstar]).reshape([2,])
+            x0 = np.clip(x0/x0.max(), np.finfo(float).eps, 1-np.finfo(float).eps )
+        opt = MLEOptimizer(G, x0=x0, model=self)
+        sol = opt.run(**opt_kwargs)
+        return sol
+
+
 class CWTCM(GraphModel):
     """
     1. Model name: Continuous Weighted Thresholded Configuration Model
