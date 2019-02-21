@@ -29,7 +29,7 @@ from autograd import grad as agrad
 from networkqit.graphtheory import graph_laplacian as graph_laplacian
 from autograd.scipy.special import expit
 from ..matrices import batched_symmetric_random, multiexpit
-
+EPS = np.finfo(float).eps
 
 class GraphModel:
     """
@@ -176,27 +176,43 @@ class ErdosRenyi(GraphModel):
         self.args_mapping = ['c_er']
         self.model_type = 'topological'
         self.formula = '$c_{er}$'
-        self.bounds = [(0, None)]
+        self.bounds = [(EPS, 1-EPS)]
 
     def expected_adjacency(self, theta):
         P = theta*(1 - np.eye(self.parameters['N']))
         return P
     
-    def expected_laplacian_grad(self, theta):
-        N = self.parameters['N']
-        G = np.zeros([N, 1, N])
-        G[:,0,:] = (N-1) * np.eye(N) - (1-np.eye(N))
-        return G
-
-    def sample_adjacency(self, *args, **kwargs):
-        batch_size = kwargs.get('batch_size', 1)
-        slope = kwargs.get('slope', 200.0)
+    def sample_adjacency(self, theta, batch_size=1, with_grads=False, slope=500):
         rij = batched_symmetric_random(batch_size, self.N)
-        P = (args) * (1.0-np.eye(self.N))
-        A = expit(slope*(P-rij)) # broadcasting of P over rij
+        P = self.expected_adjacency(theta)
+        if with_grads:
+            A = expit(slope*(P-rij)) # broadcasting of P over rij
+        else:
+            A = (P > rij).astype(float)
         A = np.triu(A, 1)
         A += np.transpose(A,axes=[0,2,1])
         return A
+
+    def loglikelihood(self, observed_adj, theta):
+        A = (observed_adj>0).astype(float)
+        Lstar = A.sum() / 2
+        loglike = Lstar*np.log(theta) + (self.N*(self.N-1)/2 - Lstar)*(np.log(1-theta))
+        return loglike
+
+    def saddle_point(self, observed_adj, theta):
+        A = (observed_adj>0).astype(float)
+        Lstar = A.sum() / 2
+        avgL = np.sum(theta * (self.N*(self.N-1)) / 2)
+        return np.array([Lstar - avgL])
+
+    def fit(self, G, x0=None, **opt_kwargs):
+        from networkqit import MLEOptimizer
+        A = (G>0).astype(float)
+        if x0 is None:
+            x0 = [0.1]
+        opt = MLEOptimizer(A, x0=x0, model=self)
+        sol = opt.run(**opt_kwargs)
+        return sol
 
 class IsingModel(GraphModel):
     """

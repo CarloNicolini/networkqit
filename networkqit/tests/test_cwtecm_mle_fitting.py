@@ -55,12 +55,13 @@ if __name__=='__main__':
     Sd = (M.sample_adjacency(sol['x'], batch_size=1, with_grads=False)>0)[0,:,:]
     S = (M.sample_adjacency(sol['x'], batch_size=1, with_grads=False))[0,:,:]
     plot_mle(W, Sd.astype(float), S, title='Sampling')
+    plt.show()
 
     # TEST SAMPLING WITH AVERAGING
     Sd = (M.sample_adjacency(sol['x'], batch_size=500, with_grads=False)>0).mean(axis=0)
     S = (M.sample_adjacency(sol['x'], batch_size=500, with_grads=False)).mean(axis=0)
     plot_mle(W, Sd.astype(float), S, title='Sampling averaging')
-    
+    plt.show()
 
     # TEST SADDLE POINT
     sol = M.fit(G, method='saddle_point', model=M, verbose=0, maxiter=5000, gtol=1E-6)
@@ -68,6 +69,7 @@ if __name__=='__main__':
     pij = M.expected_adjacency(sol['x'])
     wij = M.expected_weighted_adjacency(sol['x'])
     plot_mle(W,pij,wij,title='Saddle point method')
+    plt.show()
 
     from autograd import grad
     print('|grad|=',np.sqrt((grad(lambda z : M.loglikelihood(W,z))(sol['x'])**2).sum()))
