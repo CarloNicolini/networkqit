@@ -186,32 +186,47 @@ def batched_symmetric_random(batch_size, N):
 
 def batched_gumbel(batch_size, N, eps=1E-20):
   """Sample from Gumbel(0, 1)"""
-  rij = batched_symmetric_random(batch_size,N)
-  return -np.log(-np.log(U + eps) + eps)
+  uij = batched_symmetric_random(batch_size,N)
+  return -np.log(-np.log(uij))
 
-def gumbel_softmax_sample(logits, temperature): 
-  """ Draw a sample from the Gumbel-Softmax distribution"""
-  y = logits + batched_gumbel(logits.shape[0],logits.shape[1])
-  return tf.nn.softmax( y / temperature)
+def gumbel_softmax_sample(probits, temperature): 
+    """
+    Draw a sample from the Gumbel-Softmax distribution
 
-def gumbel_softmax(logits, temperature, hard=False):
-  """Sample from the Gumbel-Softmax distribution and optionally discretize.
-  Args:
-    logits: [batch_size, n_class] unnormalized log-probs
+    Example:
+    p = 0.1
+    K = 8
+    probits = np.reshape(np.tile(np.array([p**(k)*(1-p) for k in range(
+    K)]),[batch_size,]),[batch_size,K])
+
+    Args:
+    probits: [batch_size, n_class] unnormalized probabilities
     temperature: non-negative scalar
-    hard: if True, take argmax, but differentiate w.r.t. soft sample y
-  Returns:
+    """
+    def softmax(x):
+      return np.exp(x)/np.sum(np.exp(x))
+    y = np.reshape(np.repeat(probits,[8,]),[3,8,8]) + batched_gumbel(probits.shape[0],probits.shape[1])
+    return softmax( y / temperature)
+
+def gumbel_softmax(probits, temperature, hard=False):
+    """
+    Sample from the Gumbel-Softmax distribution and optionally discretize.
+
+    Args:
+    probits: [batch_size, n_class] unnormalized probabilities
+    temperature: non-negative scalar
+    Returns:
     [batch_size, n_class] sample from the Gumbel-Softmax distribution.
     If hard=True, then the returned sample will be one-hot, otherwise it will
     be a probabilitiy distribution that sums to 1 across classes
-  """
-  y = gumbel_softmax_sample(logits, temperature)
-  if hard:
-    k = tf.shape(logits)[-1]
-    #y_hard = tf.cast(tf.one_hot(tf.argmax(y,1),k), y.dtype)
-    y_hard = tf.cast(tf.equal(y,tf.reduce_max(y,1,keep_dims=True)),y.dtype)
-    y = tf.stop_gradient(y_hard - y) + y
-  return y
+    """
+    y = gumbel_softmax_sample(logits, temperature)
+    if hard:
+        k = tf.shape(logits)[-1]
+        #y_hard = tf.cast(tf.one_hot(tf.argmax(y,1),k), y.dtype)
+        y_hard = tf.cast(tf.equal(y,tf.reduce_max(y,1,keep_dims=True)),y.dtype)
+        y = tf.stop_gradient(y_hard - y) + y
+    return y
 
 def multiexpit(x, slope=50):
     y = np.asarray([ expit(slope*(x-i)) for i in range(int(np.max(x))) ])
