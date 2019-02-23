@@ -444,7 +444,7 @@ class StochasticOptimizer:
             N = len(self.A)
             # advanced broadcasting here!
             # Sample 'batch_size' adjacency matrices shape=[batch_size,N,N]
-            Amodel = self.model.sample_adjacency(z, batch_size=batch_size)
+            Amodel = self.model.sample_adjacency(theta=z, batch_size=batch_size, with_grads=True)
             #print('Amodel nan?:', np.any(np.isnan(Amodel.ravel())))
             # Here exploit broadcasting to create batch_size diagonal matrices with the degrees
             Dmodel = np.eye(N) * np.transpose(np.zeros([1, 1, N]) + np.einsum('ijk->ik', Amodel), [1, 0, 2])
@@ -489,9 +489,9 @@ class Adam(StochasticOptimizer):
         nu2 = 1.0 # for quasi-hyperbolic adam
         # visualization options
         refresh_frames = kwargs.get('refresh_frames', 100)
-        #from drawnow import drawnow, figure
+        from drawnow import drawnow, figure
         import matplotlib.pyplot as plt
-        plt.figure(figsize=(8, 8))
+        figure(figsize=(8, 8))
 
         # Populate the solution list as function of beta
         # the list sol contains all optimization points
@@ -499,6 +499,7 @@ class Adam(StochasticOptimizer):
         # Iterate over all beta provided by the user
         mt, vt = np.zeros(self.x0.shape), np.zeros(self.x0.shape)
         all_dkl = []
+        
         # TODO implement model boundaries in Adam
         frames = 0
         for beta in self.beta_range:
@@ -537,8 +538,8 @@ class Adam(StochasticOptimizer):
                     frames += 1
                     def draw_fig():
                         sol.append({'x': x.copy()})
-                        plt.figure(figsize=(8, 8))
-                        A0 = np.mean(self.model.sample_adjacency(x, batch_size=batch_size), axis=0)
+                        #plt.figure(figsize=(8, 8))
+                        A0 = np.mean(self.model.sample_adjacency(theta=x, batch_size=batch_size), axis=0)
                         plt.subplot(2, 2, 1)
                         plt.imshow(self.A)
                         plt.title('Data')
@@ -550,9 +551,8 @@ class Adam(StochasticOptimizer):
                         plt.xlabel('iteration')
                         plt.ylabel('$S(\\rho,\\sigma)$')
                         plt.subplot(2, 2, 4)
-                        plt.semilogx(self.beta_range, batch_compute_vonneumann_entropy(self.L, np.logspace(3,-3,100)), '.-', label='data')
-                        plt.semilogx(self.beta_range,
-                                     batch_compute_vonneumann_entropy(graph_laplacian(A0), np.logspace(3,-3,100)), '.-', label='model')
+                        plt.semilogx(self.beta_range, batch_compute_vonneumann_entropy(self.L, self.beta_range), '.-', label='data')
+                        plt.semilogx(self.beta_range, batch_compute_vonneumann_entropy(graph_laplacian(A0), self.beta_range), '.-', label='model')
                         plt.plot(beta, batch_compute_vonneumann_entropy(graph_laplacian(A0), [beta]), 'ko', label='model')
                         plt.xlabel('$\\beta$')
                         plt.ylabel('$S$')
@@ -561,9 +561,9 @@ class Adam(StochasticOptimizer):
                         plt.suptitle('$\\beta=$' + '{0:0>3}'.format(beta))
                         #plt.tight_layout()
                         print('frame_' + '{0:0>5}'.format(frames) + '.png')
-                        plt.savefig('frame_' + '{0:0>5}'.format(frames) + '.png')
-                        plt.cla()
-                    draw_fig()
+                        #plt.savefig('frame_' + '{0:0>5}'.format(frames) + '.png')
+                        #plt.cla()
+                    drawnow(draw_fig)
         self.sol = sol
         return sol
 
