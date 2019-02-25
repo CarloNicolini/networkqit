@@ -182,6 +182,24 @@ def batch_relative_entropy(Lobs : np.array, Lmodel: np.array, beta : float, one_
         return SpectralDivergence(Lobs=Lobs, Lmodel=Lmodel, beta=beta).rel_entropy
 
 
+def batch_beta_relative_entropy(Lobs : np.array, Lmodel : np.array, beta_range : np.array):
+    if len(Lobs.shape) != 2:
+        raise RuntimeError('Must provide a square, non batched observed laplacian')
+    
+    Srho = batch_compute_vonneumann_entropy(L=Lobs, beta_range=beta_range)
+    nbeta = len(beta_range)
+    Emodel_beta = np.zeros([nbeta,])
+    Fmodel_beta = np.zeros([nbeta,])
+    loglike_beta = np.zeros([nbeta,])
+    dkl_beta = np.zeros([nbeta,])
+    lambd_model = eigh(Lmodel)[0] # batched eigenvalues
+    for i, beta in enumerate(beta_range):
+        rho_beta = compute_vonneuman_density(L=Lobs, beta=beta)
+        Emodel_beta[i] = np.mean(np.sum(np.sum(Lmodel * rho_beta, axis=2), axis=1))
+        Fmodel_beta[i] =  - np.mean(logsumexp(-beta * lambd_model, axis=1))/beta
+        loglike_beta[i] = beta * (Emodel_beta[i] - Fmodel_beta[i])
+        dkl_beta[i] = loglike_beta[i] - Srho[i]
+    return dkl_beta
 
 class SpectralDivergence(object):
     """
