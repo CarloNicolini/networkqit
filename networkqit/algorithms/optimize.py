@@ -444,7 +444,7 @@ class StochasticOptimizer:
             N = len(self.A)
             # advanced broadcasting here!
             # Sample 'batch_size' adjacency matrices shape=[batch_size,N,N]
-            Amodel = self.model.sample_adjacency(z, batch_size=batch_size)
+            Amodel = self.model.sample_adjacency(z, batch_size=batch_size, with_grads=True)
             #print('Amodel nan?:', np.any(np.isnan(Amodel.ravel())))
             # Here exploit broadcasting to create batch_size diagonal matrices with the degrees
             Dmodel = np.eye(N) * np.transpose(np.zeros([1, 1, N]) + np.einsum('ijk->ik', Amodel), [1, 0, 2])
@@ -489,9 +489,10 @@ class Adam(StochasticOptimizer):
         nu2 = 1.0 # for quasi-hyperbolic adam
         # visualization options
         refresh_frames = kwargs.get('refresh_frames', 100)
-        #from drawnow import drawnow, figure
+        from drawnow import drawnow, figure
+        figure(figsize=(8,8))
         import matplotlib.pyplot as plt
-        plt.figure(figsize=(8, 8))
+        #plt.figure(figsize=(8, 8))
 
         # Populate the solution list as function of beta
         # the list sol contains all optimization points
@@ -515,11 +516,11 @@ class Adam(StochasticOptimizer):
                 dkl, grad_t = self.gradient(x, rho, beta, batch_size=batch_size)
                 # Convergence status
                 if np.linalg.norm(grad_t) < gtol:
-                    converged = True
+                    #converged = True
                     logger.info('Exceeded minimum gradient |grad|<%g' % gtol)
                 if t > max_iters:
                     logger.info('Exceeded maximum iterations')
-                    converged = True
+                    #converged = True
                 # TODO implement check boundaries in Adam
                 # if np.any(np.ravel(self.model.bounds)):
                 #    raise RuntimeError('variable bounds exceeded')
@@ -533,26 +534,28 @@ class Adam(StochasticOptimizer):
                     deltax = mttilde / np.sqrt(vttilde + epsilon)
                 x -= eta * deltax
                 all_dkl.append(dkl)
+                print(x)
                 if t % refresh_frames == 0:
                     frames += 1
                     def draw_fig():
                         sol.append({'x': x.copy()})
-                        plt.figure(figsize=(8, 8))
+                        #plt.figure(figsize=(8, 8))
                         A0 = np.mean(self.model.sample_adjacency(x, batch_size=batch_size), axis=0)
                         plt.subplot(2, 2, 1)
-                        plt.imshow(self.A)
+                        im = plt.imshow(self.A)
+                        plt.colorbar(im)
                         plt.title('Data')
                         plt.subplot(2, 2, 2)
-                        plt.imshow(A0)
+                        im = plt.imshow(A0)
+                        plt.colorbar(im)
                         plt.title('<Model>')
                         plt.subplot(2, 2, 3)
                         plt.plot(all_dkl)
                         plt.xlabel('iteration')
                         plt.ylabel('$S(\\rho,\\sigma)$')
                         plt.subplot(2, 2, 4)
-                        plt.semilogx(self.beta_range, batch_compute_vonneumann_entropy(self.L, np.logspace(3,-3,100)), '.-', label='data')
-                        plt.semilogx(self.beta_range,
-                                     batch_compute_vonneumann_entropy(graph_laplacian(A0), np.logspace(3,-3,100)), '.-', label='model')
+                        #plt.semilogx(self.beta_range, batch_compute_vonneumann_entropy(self.L, np.logspace(3,-3,100)), '.-', label='data')
+                        #plt.semilogx(self.beta_range, batch_compute_vonneumann_entropy(graph_laplacian(A0), np.logspace(3,-3,100)), '.-', label='model')
                         plt.plot(beta, batch_compute_vonneumann_entropy(graph_laplacian(A0), [beta]), 'ko', label='model')
                         plt.xlabel('$\\beta$')
                         plt.ylabel('$S$')
@@ -560,10 +563,11 @@ class Adam(StochasticOptimizer):
                         plt.legend(loc='best')
                         plt.suptitle('$\\beta=$' + '{0:0>3}'.format(beta))
                         #plt.tight_layout()
-                        print('frame_' + '{0:0>5}'.format(frames) + '.png')
-                        plt.savefig('frame_' + '{0:0>5}'.format(frames) + '.png')
-                        plt.cla()
-                    draw_fig()
+                        #print('frame_' + '{0:0>5}'.format(frames) + '.png')
+                        #plt.savefig('frame_' + '{0:0>5}'.format(frames) + '.png')
+                        #plt.cla()
+                    #draw_fig()
+                    drawnow(draw_fig)
         self.sol = sol
         return sol
 
