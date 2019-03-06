@@ -251,10 +251,10 @@ class Edr(GraphModel):
     def __init__(self, dij, **kwargs):
         if kwargs is not None:
             super().__init__(**kwargs)
-        self.args_mapping = ['c_edr', 'mu_edr']
+        self.args_mapping = ['lambd_edr']
         self.model_type = 'spatial'
-        self.formula = r'$c_{edr} e^{-\mu_{edr} d_{ij}}$'
-        self.bounds = [(0, None), (0, None)]
+        self.formula = r'$e^{-\lambda_{edr} d_{ij}}$'
+        self.bounds = [(0, None)]
         import copy
         self.dij = copy.deepcopy(dij)
         np.fill_diagonal(self.dij,1) # to avoid division warning
@@ -270,9 +270,9 @@ class Edr(GraphModel):
         if with_grads:
             rij = batched_symmetric_random(batch_size, self.N)
             # to generate random weights, needs a second decorrelated random source
-            W = -(theta[1]*(self.invdij))*np.log(1-rij) # oneline for exponential distribution
+            W = -(theta[0]*(self.invdij))*np.log(1-rij) # oneline for exponential distribution
         else:
-            W = np.random.exponential((self.invdij)*theta[1], size=[batch_size,self.N,self.N])*theta[0]
+            W = np.random.exponential(-(self.dij)*theta[0], size=[batch_size,self.N,self.N])*theta[0]
             W = np.triu(W, 1)
             W += np.transpose(W, axes=[0,2,1])
         return W

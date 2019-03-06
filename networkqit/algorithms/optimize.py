@@ -66,9 +66,6 @@ from autograd.scipy.misc import logsumexp
 from scipy.optimize import minimize, least_squares
 from networkqit.graphtheory import *
 from networkqit.infotheory.density import *
-import logging
-logger = logging.getLogger('optimize')
-logger.setLevel(logging.INFO)
 
 
 class MLEOptimizer:
@@ -502,6 +499,14 @@ class Adam(StochasticOptimizer):
         all_dkl = []
         # TODO implement model boundaries in Adam
         frames = 0
+        filename = 'adam.log'
+        logfile = open(filename,'w')
+        import logging
+        import sys
+        logging.basicConfig(stream=sys.stderr, level=logging.INFO)
+        adam_logger = logging.getLogger('ADAM')
+        adam_logger.setLevel(logging.INFO)
+
         for beta in self.beta_range:
             logger.info('Changed beta to %g' % beta)
             # if rho is provided, user rho is used, otherwise is computed at every beta
@@ -516,11 +521,11 @@ class Adam(StochasticOptimizer):
                 dkl, grad_t = self.gradient(x, rho, beta, batch_size=batch_size)
                 # Convergence status
                 if np.linalg.norm(grad_t) < gtol:
-                    #converged = True
-                    logger.info('Exceeded minimum gradient |grad|<%g' % gtol)
+                    converged = True
+                    adam_logger.info('Exceeded minimum gradient |grad|<%g' % gtol)
                 if t > max_iters:
-                    logger.info('Exceeded maximum iterations')
-                    #converged = True
+                    adam_logger.info('Exceeded maximum iterations')
+                    converged = True
                 # TODO implement check boundaries in Adam
                 # if np.any(np.ravel(self.model.bounds)):
                 #    raise RuntimeError('variable bounds exceeded')
@@ -534,10 +539,12 @@ class Adam(StochasticOptimizer):
                     deltax = mttilde / np.sqrt(vttilde + epsilon)
                 x -= eta * deltax
                 all_dkl.append(dkl)
-                print(x)
+                print(np.hstack([x,beta,dkl]))
+                logfile.write( u"%g\t%g\t%g\n" % (x[0],beta,dkl) )
                 if t % refresh_frames == 0:
                     frames += 1
                     def draw_fig():
+                        plot_beta_range = np.logspace(-3,3,100)
                         sol.append({'x': x.copy()})
                         #plt.figure(figsize=(8, 8))
                         A0 = np.mean(self.model.sample_adjacency(x, batch_size=batch_size), axis=0)
@@ -554,8 +561,8 @@ class Adam(StochasticOptimizer):
                         plt.xlabel('iteration')
                         plt.ylabel('$S(\\rho,\\sigma)$')
                         plt.subplot(2, 2, 4)
-                        #plt.semilogx(self.beta_range, batch_compute_vonneumann_entropy(self.L, np.logspace(3,-3,100)), '.-', label='data')
-                        #plt.semilogx(self.beta_range, batch_compute_vonneumann_entropy(graph_laplacian(A0), np.logspace(3,-3,100)), '.-', label='model')
+                        plt.semilogx(plot_beta_range, batch_compute_vonneumann_entropy(self.L, plot_beta_range), '.-', label='data')
+                        plt.semilogx(plot_beta_range, batch_compute_vonneumann_entropy(graph_laplacian(A0), plot_beta_range), '.-', label='model')
                         plt.plot(beta, batch_compute_vonneumann_entropy(graph_laplacian(A0), [beta]), 'ko', label='model')
                         plt.xlabel('$\\beta$')
                         plt.ylabel('$S$')
@@ -569,5 +576,6 @@ class Adam(StochasticOptimizer):
                     #draw_fig()
                     drawnow(draw_fig)
         self.sol = sol
+        adam_logger.info('Optimization finished\n' + str(self.sol))
         return sol
 
