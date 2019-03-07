@@ -241,31 +241,41 @@ class IsingModel(GraphModel):
         A += np.transpose(A,axes=[0,2,1])
         return A
 
-# class Edr(GraphModel):
-#     """
-#     Exponential Distance Rule model.
-#     The pairwise spatial distance matrix must be specified as a kwargs argument.
-#     For example, `M = Edr(dij=dij)`
-#     """
+class Edr(GraphModel):
+    """
+    Exponential Distance Rule model.
+    The pairwise spatial distance matrix must be specified as a kwargs argument.
+    For example, `M = Edr(dij=dij)`
+    """
 
-#     def __init__(self, **kwargs):
-#         if kwargs is not None:
-#             super().__init__(**kwargs)
-#         self.args_mapping = ['c_edr', 'mu_edr']
-#         self.model_type = 'spatial'
-#         self.formula = r'$c_{edr} e^{-\mu_{edr} d_{ij}}$'
-#         self.bounds = [(0, None), (0, None)]
+    def __init__(self, dij, **kwargs):
+        if kwargs is not None:
+            super().__init__(**kwargs)
+        self.args_mapping = ['lambd_edr']
+        self.model_type = 'spatial'
+        self.formula = r'$e^{-\lambda_{edr} d_{ij}}$'
+        self.bounds = [(0, None)]
+        import copy
+        self.dij = copy.deepcopy(dij)
+        np.fill_diagonal(self.dij,1) # to avoid division warning
+        self.invdij = 1/self.dij
+        np.fill_diagonal(self.invdij,0) # set it back to 0
 
-#     def expected_adjacency(self, theta):
-#         P = theta[0] * np.exp(-theta[1] * self.parameters['dij'])
-#         np.fill_diagonal(P, 0)
-#         return P
+    def expected_adjacency(self, theta):
+        P = theta[0] * np.exp(-theta[1] * self.dij)
+        np.fill_diagonal(P, 0)
+        return P
 
-#     def sample_adjacency(self, theta, batch_size=1, with_grads=False, slope=500):
-#         Q = np.random.exponential(self.parameters['dij'], size=[batch_size,self.N,self.N])
-#         Q = np.triu(Q, 1)
-#         Q = np.transpose(Q, axes=[0,2,1])
-#         return Q
+    def sample_adjacency(self, theta, batch_size=1, with_grads=False, slope=500):
+        if with_grads:
+            rij = batched_symmetric_random(batch_size, self.N)
+            # to generate random weights, needs a second decorrelated random source
+            W = -(theta[0]*(self.invdij))*np.log(1-rij) # oneline for exponential distribution
+        else:
+            W = np.random.exponential(-(self.dij)*theta[0], size=[batch_size,self.N,self.N])*theta[0]
+            W = np.triu(W, 1)
+            W += np.transpose(W, axes=[0,2,1])
+        return W
 
 # class EdrTruncated(GraphModel):
 #     """

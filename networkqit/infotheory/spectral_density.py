@@ -30,7 +30,6 @@ from networkqit.graphtheory.matrices import normalized_graph_laplacian as NGL
 from scipy.linalg import eigvalsh
 import sympy as sp
 import mpmath as mp
-from tqdm import tqdm
 from networkqit.graphtheory.matrices import sbm
 
 
@@ -174,7 +173,7 @@ def compute_rho(allz, ers, nr, matrix, eps=1E-7, maxsteps=150, include_isolated=
     print('Continuos band')
     io = open('allt.dat','w')
     rho = np.zeros_like(allz)  # initialize rho as zeros
-
+    from tqdm import tqdm
     for i, z in tqdm(enumerate(allz),ascii=True):
         t = compute_tr(z + eps * 1j, t0, ers, nr, matrix)
         for tt in t:
