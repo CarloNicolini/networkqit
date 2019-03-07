@@ -502,6 +502,7 @@ class Adam(StochasticOptimizer):
         frames = 0
         filename = 'adam.log'
         logfile = open(filename,'w')
+        from scipy.stats import linregress
         import logging
         import sys
         logging.basicConfig(stream=sys.stderr, level=logging.INFO)
@@ -509,7 +510,7 @@ class Adam(StochasticOptimizer):
         adam_logger.setLevel(logging.INFO)
 
         for beta in self.beta_range:
-            logger.info('Changed beta to %g' % beta)
+            adam_logger.info('Changed beta to %g' % beta)
             # if rho is provided, user rho is used, otherwise is computed at every beta
             rho = kwargs.get('rho', compute_vonneuman_density(L=self.L, beta=beta))
             # initialize at x0
@@ -528,6 +529,16 @@ class Adam(StochasticOptimizer):
                 if t > max_iters:
                     adam_logger.info('Exceeded maximum iterations')
                     converged = True
+
+                # check the convergence based on the slope of dkl of the last 10 iterations
+                last_iters = 100
+                if len(all_dkl) > last_iters:
+                    dkl_iters = np.arange(last_iters)
+                    slope, intercept, r_value, p_value, std_err = linregress(x=dkl_iters, y=all_dkl[-last_iters:])
+                    if np.abs(slope - 1E-3) < 0:
+                            converged = True
+                            adam_logger.info('Optimization terminated for flatness')
+
                 # TODO implement check boundaries in Adam
                 # if np.any(np.ravel(self.model.bounds)):
                 #    raise RuntimeError('variable bounds exceeded')
@@ -541,7 +552,7 @@ class Adam(StochasticOptimizer):
                     deltax = mttilde / np.sqrt(vttilde + epsilon)
                 x -= eta * deltax
                 all_dkl.append(dkl)
-                print(np.hstack([x,beta,dkl]))
+                #print(np.hstack([t, x,beta,dkl]))
                 logfile.write( u"%g\t%g\t%g\n" % (x[0],beta,dkl) )
                 if t % refresh_frames == 0:
                     frames += 1
