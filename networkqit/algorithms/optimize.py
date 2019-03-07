@@ -524,6 +524,7 @@ class Adam(StochasticOptimizer):
                 if np.linalg.norm(grad_t) < gtol:
                     converged = True
                     adam_logger.info('Exceeded minimum gradient |grad|<%g' % gtol)
+                
                 if t > max_iters:
                     adam_logger.info('Exceeded maximum iterations')
                     converged = True
