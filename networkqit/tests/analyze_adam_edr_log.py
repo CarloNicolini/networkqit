@@ -14,11 +14,11 @@ plt.title('$\\lambda$')
 plt.xlabel('$\\beta$')
 plt.ylabel('$\\lambda$')
 plt.legend()
+plt.savefig('adam_macaque_fig1.pdf')
 
 plt.figure()
 plt.plot(Y[:,1],Y[:,2],color='k',label='dkl')
 plt.title('Relative entropy')
 plt.xlabel('$\\beta$')
 plt.ylabel('$S(\\rho \\| \\sigma )$')
-
-plt.show()
+plt.savefig('adam_macaque_fig2.pdf')
