@@ -12,16 +12,10 @@ Visualization utilities for model optimization and entropy visualization
 #    BSD license.
 
 
-import matplotlib.pyplot as plt
-from drawnow import drawnow
 import autograd.numpy as np
-import seaborn as sns
-from networkqit.infotheory.density import compute_vonneuman_density, compute_vonneumann_entropy
-from networkqit.graphtheory import graph_laplacian as graph_laplacian
-
-import matplotlib.gridspec as gridspec
 
 def plot_mle(G,pij,wij=None, **kwargs):
+    import matplotlib.pyplot as plt
     fig, ax = plt.subplots(nrows=2,ncols=3,figsize=(12,8))
     im = ax[0,0].imshow(G)
     plt.colorbar(im,ax=ax[0,0],fraction=0.046, pad=0.04)
@@ -66,6 +60,9 @@ def plot_mle(G,pij,wij=None, **kwargs):
     #plt.show()
 
 def step_callback(A, beta, model, x, **kwargs):
+    import seaborn as sns
+    from drawnow import drawnow
+    import matplotlib.gridspec as gridspec
     def drawfig1():
         P = model(x)
         #plt.suptitle(kwargs.get('model_name','Model optimization'))
@@ -110,6 +107,8 @@ def step_callback(A, beta, model, x, **kwargs):
     print("Beta = %.4f x=%s" % (beta,x))
 
 def plot_spectral_entropy(A, beta_range, **kwargs):
+    from networkqit.infotheory.density import compute_vonneumann_entropy
+    from networkqit.graphtheory import graph_laplacian as graph_laplacian
     fobs = lambda beta : compute_vonneumann_entropy(L=graph_laplacian(A), beta=beta)
     Sobs = [fobs(beta)/np.log(len(A)) for beta in beta_range]
     plt.semilogx(1.0/beta_range, Sobs, kwargs.get('color','r'))
