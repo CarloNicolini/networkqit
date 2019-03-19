@@ -45,6 +45,52 @@ def graph_laplacian(A):
         return np.diag(A.sum(axis=0)) - A
 
 
+def directed_graph_laplacian(A, walk_type='random_walk', alpha=0.95):
+    r"""Return the directed Laplacian matrix of A.
+
+    The graph directed Laplacian is the matrix
+
+    .. math::
+
+        L = I - (\Phi^{1/2} P \Phi^{-1/2} + \Phi^{-1/2} P^T \Phi^{1/2} ) / 2
+
+    where `I` is the identity matrix, `P` is the transition matrix of the
+    graph, and `\Phi` a matrix with the Perron vector of `P` in the diagonal and
+    zeros elsewhere.
+
+    Depending on the value of walk_type, `P` can be the transition matrix
+    induced by a random walk, a lazy random walk, or a random walk with
+    teleportation (PageRank).
+
+    Parameters
+    ----------
+    A : numpy.array
+       The adjacency matrix
+
+    walk_type : string or None, optional (default=None)
+       If None, `P` is selected depending on the properties of the
+       graph. Otherwise is one of 'random', 'lazy', or 'pagerank'
+
+    alpha : real
+       (1 - alpha) is the teleportation probability used with pagerank
+
+    Returns
+    -------
+    L : NumPy array
+      Directed Laplacian of A.
+
+    Notes
+    -----
+    Only implemented for DiGraphs
+
+    References
+    ----------
+    .. [1] Fan Chung (2005).
+       Laplacians and the Cheeger inequality for directed graphs.
+       Annals of Combinatorics, 9(1), 2005
+    """
+    raise NotImplementedError('Still not implemented, take a look at networkx nx.directed_graph_laplacian')
+
 def normalized_graph_laplacian(A):
     """
     Get the normalized graph laplacian 

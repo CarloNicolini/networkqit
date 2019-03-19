@@ -452,7 +452,7 @@ class StochasticOptimizer:
             Fmodel = - np.mean(logsumexp(-beta * lambd_model, axis=1) / beta)
             loglike = beta * (Emodel - Fmodel) # - Tr[rho log(sigma)]
             dkl = loglike # - entropy # Tr[rho log(rho)] - Tr[rho log(sigma)]
-            return dkl
+            return dkl / beta
 
         # value and gradient of relative entropy as a function
         dkl_and_dkldx = autograd.value_and_grad(log_likelihood)
