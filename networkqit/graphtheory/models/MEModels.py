@@ -548,3 +548,98 @@ class CWTECM(GraphModel):
         opt = MLEOptimizer(G, x0=x0, model=self)
         sol = opt.run(**opt_kwargs)
         return sol
+
+
+class CWTECM2(GraphModel):
+    """
+    1. Model name: Continuous Weighted Thresholded Enhanced Configuration Model
+    2. Constraints: degree sequence k_i^*, strength sequence s_i and threshold hyperparameter t
+    3. Hamiltonian:
+        H(W) = sum_{i<j} (alpha_i+alpha_j) t* Heaviside(w_{ij}-t) + (beta_i+beta_j) w_{ij} Heaviside(w_{ij}-t)
+    4. Lagrange multipliers substitutions:
+        x_i = exp(-alpha_i)
+        y_i = exp(-beta_i)
+    5. Number of parameters:
+        2N
+    6. Link probability pij=<aij>
+        (xixj*yiyj)**t / (xixj*yiyj)**t) - t*log(yiyj))
+    7. Expected link weight <wij>
+        wij = (t*log(yiyj)-1)/(t*log(yiyj))* <aij>
+    8. LogLikelihood logP:
+        sum_{i<j} ( Aij (t(log(xixj)) + wij log(yiyj)) log(yiyj) ) / ((xixjyjyj)**t -t log(yiyj))
+    9. Constraints:
+        1. xi > 0
+        2. 0 < yi < 1
+        3  0 < xi yi < 1
+    """
+
+    def __init__(self,**kwargs):
+        super().__init__(**kwargs)
+        self.args_mapping =   ['x_' + str(i) for i in range(0, kwargs['N'])] + ['y_' + str(i) for i in range(0, kwargs['N'])]
+        self.N = kwargs['N']
+        self.threshold = kwargs['threshold']
+        self.bounds = [(EPS, None)] * self.N + [(EPS, 1-EPS)] * self.N
+
+    def expected_adjacency(self, theta):
+        x,y = theta[0:self.N], theta[(self.N):]
+        t = self.threshold
+        xixj = np.outer(x,x)
+        yiyj = np.outer(y,y)
+        pij = ((xixj*yiyj)**t) / ((xixj*yiyj)**t - t*np.log(yiyj))  # <aij>
+        return pij
+    
+    def expected_weighted_adjacency(self, theta):
+        x,y = theta[0:self.N], theta[(self.N):]
+        t = self.threshold
+        xixj = np.outer(x,x)
+        yiyj = np.outer(y,y)
+        wij = (- ((xixj*yiyj)**t) + t*((xixj*yiyj)**t)*np.log(yiyj)) / (((xixj*yiyj)**t - t*np.log(yiyj)) * np.log(yiyj))
+        wij = self.expected_adjacency(theta) * ((t*np.log(yiyj)-1.0) / (np.log(yiyj)))
+        return wij
+    
+    def saddle_point(self, observed_adj, theta):
+        k = (observed_adj>0).sum(axis=0)
+        pij = self.expected_adjacency(theta)
+        avgk = pij.sum(axis=0) - np.diag(pij)
+        w = observed_adj.sum(axis=0)
+        wij = self.expected_weighted_adjacency(theta)
+        avgw = wij.sum(axis=0) - np.diag(wij)
+        return np.hstack([k - avgk, w - avgw])
+    
+    def loglikelihood(self, observed_adj, theta):
+        x,y = theta[0:self.N], theta[(self.N):]
+        t = self.threshold
+        xixj = np.outer(x,x)
+        yiyj = np.outer(y,y)
+        aij = observed_adj > 0
+        wij = observed_adj        
+        loglike1 = (t*np.log(xixj) + wij*np.log(yiyj)) *aij + np.log(-np.log(yiyj)/( (xixj*yiyj)**t - t*np.log(yiyj)))
+        return ilessjsum(loglike1)
+
+    def sample_adjacency(self, theta, batch_size=1, with_grads=False, slope=500):
+        rij = batched_symmetric_random(batch_size, self.N)
+        pij = self.expected_adjacency(theta)
+        wij = self.expected_weighted_adjacency(theta)
+        if with_grads:
+            A = expit(slope*(pij-rij)) # it needs a gigantic slope to reduce error
+            # to generate random weights, needs a second decorrelated random source
+            rij = batched_symmetric_random(batch_size, self.N)
+            W = -wij*np.log(rij)/pij
+        else:
+            A = (pij>rij).astype(float)
+            W = np.random.exponential(wij/pij,size=[batch_size,self.N,self.N])
+        W = np.triu(A*W,1)
+        W +=  np.transpose(W, axes=[0, 2, 1])
+        return W
+
+    def fit(self, G, x0=None, **opt_kwargs):
+        from networkqit import MLEOptimizer
+        A = (G>=self.threshold).astype(float)
+        k = A.sum(axis=0)
+        s = G.sum(axis=0)
+        if x0 is None:
+            x0 = np.concatenate([k,s])
+            x0 = np.clip(x0/x0.max(), np.finfo(float).eps, 1-np.finfo(float).eps )
+        opt = MLEOptimizer(G, x0=x0, model=self)
+        sol = opt.run(**opt_kwargs)
+        return sol
