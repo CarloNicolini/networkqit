@@ -433,42 +433,46 @@ class Edr(GraphModel):
 #         T = np.outer(k, np.ones([1, len(k)]))
 #         return args[0]*(np.abs(T-T.T))**(-args[1])
 
-# class TopoJaccard(GraphModel):
-#     """
-#     Topological models with probability link given by Jaccard coefficient
-#     For weighted graphs it automatically uses the Weighted Jaccard similarity.
-#     If 'normalized' is specified to False this model reproduces the
-#     "Economical Preferential Attachment model"    
-#     Here we set the powerlaw exponent to be unbounded
-#     Reference:
-#     Vertes et al. Simple models of human brain functional networks. 
-#     PNAS (2012) https://doi.org/10.1073/pnas.1111738109
-#     """
-#     def __init__(self, **kwargs):
-#         if kwargs is not None:
-#             super().__init__(**kwargs)
-#         self.args_mapping = ['c_nei', 'mu_nei']
-#         self.model_type = 'topological'
-#         self.normalized = kwargs.get('normalized', True)
-#         if self.normalized:
-#             self.formula = r'$c_{jacc} (J_{ij})^{-\mu_{jacc}}$'
-#         else:
-#             self.formula = r'$c_{commnei} (\sum_l A_{il}A_{lj})^{-\mu_{commnei}}$'
-#         self.A = kwargs['A'] # save the adjacency matrix        
-#         self.generate_matching() # then generate the matching
-#         self.bounds = [(0, None), (0, None)]
+class TopoJaccard(GraphModel):
+    """
+    Topological models with probability link given by Jaccard coefficient
+    For weighted graphs it automatically uses the Weighted Jaccard similarity.
+    If 'normalized' is specified to False this model reproduces the
+    "Economical Preferential Attachment model"
+    Here we set the powerlaw exponent to be unbounded
+    Reference:
+    Vertes et al. Simple models of human brain functional networks. 
+    PNAS (2012) https://doi.org/10.1073/pnas.1111738109
+    """
+    def __init__(self, **kwargs):
+        if kwargs is not None:
+            super().__init__(**kwargs)
+        self.args_mapping = ['c_nei', 'mu_nei']
+        self.model_type = 'topological'
+        self.normalized = kwargs.get('normalized', True)
+        if self.normalized:
+            self.formula = r'$c_{jacc} (J_{ij})^{-\mu_{jacc}}$'
+        else:
+            self.formula = r'$c_{commnei} (\sum_l A_{il}A_{lj})^{-\mu_{commnei}}$'
+        self.A = kwargs['A'] # save the adjacency matrix        
+        self._generate_matching() # then generate the matching
+        self.bounds = [(0, None), (0, None)]
 
-#     def generate_matching(self):
-#         from scipy.spatial.distance import cdist
-#         # https://mathoverflow.net/questions/123339/weighted-jaccard-similarity
-#         # https://docs.scipy.org/doc/scipy-1.0.0/reference/generated/scipy.spatial.distance.cdist.html
-#         if self.normalized:
-#             self.M = cdist(self.A, self.A, lambda u, v: (np.minimum(u,v).sum())/(np.maximum(u,v).sum()) )
-#         else:
-#             self.M = cdist(self.A, self.A, lambda u, v: np.minimum(u,v).sum() )
+    def _generate_matching(self):
+        from scipy.spatial.distance import cdist
+        # https://mathoverflow.net/questions/123339/weighted-jaccard-similarity
+        # https://docs.scipy.org/doc/scipy-1.0.0/reference/generated/scipy.spatial.distance.cdist.html
+        if self.normalized:
+            self.M = cdist(self.A, self.A, lambda u, v: (np.minimum(u,v).sum())/(np.maximum(u,v).sum()) )
+        else:
+            self.M = cdist(self.A, self.A, lambda u, v: np.minimum(u,v).sum() )
         
-#     def expected_adjacency(self, *args):
-#         return args[0]*(self.M)**(-args[1])
+    def expected_adjacency(self, theta):
+        return theta[0]*(self.M)**(-theta[1])
+
+    def sample_adjacency(self, theta, batch_size=1, with_grads=False, slope=500):
+        return None
+
 
 
 # class ModelFactory():

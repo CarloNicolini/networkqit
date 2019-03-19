@@ -562,11 +562,11 @@ class CWTECM2(GraphModel):
     5. Number of parameters:
         2N
     6. Link probability pij=<aij>
-        (xixj*yiyj)**t / (xixj*yiyj)**t) - t*log(yiyj))
+        
     7. Expected link weight <wij>
-        wij = (t*log(yiyj)-1)/(t*log(yiyj))* <aij>
+        
     8. LogLikelihood logP:
-        sum_{i<j} ( Aij (t(log(xixj)) + wij log(yiyj)) log(yiyj) ) / ((xixjyjyj)**t -t log(yiyj))
+        
     9. Constraints:
         1. xi > 0
         2. 0 < yi < 1
@@ -627,7 +627,7 @@ class CWTECM2(GraphModel):
             W = -wij*np.log(rij)/pij
         else:
             A = (pij>rij).astype(float)
-            W = np.random.exponential(wij/pij,size=[batch_size,self.N,self.N])
+            W = np.random.exponential(scale=np.nan_to_num(np.abs(wij/pij)),size=[batch_size,self.N,self.N])
         W = np.triu(A*W,1)
         W +=  np.transpose(W, axes=[0, 2, 1])
         return W
