@@ -230,6 +230,13 @@ def batched_symmetric_random(batch_size, N):
     rij[rij<EPS]=EPS # to avoid zeros
     return rij
 
+def trunc_exp_rv(low, scale, size):
+    import scipy.stats as ss
+    rnd_cdf = np.random.uniform(ss.expon.cdf(x=low, scale=scale),
+                                #ss.expon.cdf(x=np.inf, scale=scale),
+                                size=size)
+    return ss.expon.ppf(q=rnd_cdf, scale=scale)
+
 def batched_gumbel(batch_size, N, eps=1E-20):
   """Sample from Gumbel(0, 1)"""
   uij = batched_symmetric_random(batch_size,N)

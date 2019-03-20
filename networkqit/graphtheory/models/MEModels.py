@@ -31,7 +31,7 @@ G here is the graph adjacency matrix, A is the binary adjacency, W is the weight
 
 import autograd.numpy as np
 from .GraphModel import GraphModel
-from ..matrices import expit, multiexpit, batched_symmetric_random, ilessjsum
+from ..matrices import expit, multiexpit, batched_symmetric_random, ilessjsum, trunc_exp_rv
 from networkqit.algorithms import MLEOptimizer
 EPS = np.finfo(float).eps
 
@@ -67,14 +67,14 @@ class UBCM(GraphModel):
         xixj = np.outer(theta, theta)
         return xixj / (1.0 + xixj)
 
-    def loglikelihood(self, observed_adj, theta):
+    def loglikelihood(self, G, theta):
         pij = self.expected_adjacency(theta)
-        #loglike = np.sum(np.triu(observed_adj * np.log(pij) + (1.0 - observed_adj) * np.log(1.0 - pij),1))
-        loglike = ilessjsum(observed_adj * np.log(pij) + (1.0 - observed_adj) * np.log(1.0 - pij))
+        #loglike = np.sum(np.triu(G * np.log(pij) + (1.0 - G) * np.log(1.0 - pij),1))
+        loglike = ilessjsum(G * np.log(pij) + (1.0 - G) * np.log(1.0 - pij))
         return loglike
     
-    def saddle_point(self, observed_adj, theta):
-        k = (observed_adj>0).sum(axis=0)
+    def saddle_point(self, G, theta):
+        k = (G>0).sum(axis=0)
         pij = self.expected_adjacency(theta)
         avgk = pij.sum(axis=0) - np.diag(pij)
         return k - avgk
@@ -142,12 +142,12 @@ class UWCM(GraphModel):
         wij = pij / (1.0 - pij)
         return wij
     
-    def loglikelihood(self, observed_adj, theta):
+    def loglikelihood(self, G, theta):
         pij = self.expected_adjacency(theta)
-        return ilessjsum(observed_adj * np.log(pij) + np.log(1.0 - pij))
+        return ilessjsum(G * np.log(pij) + np.log(1.0 - pij))
 
-    def saddle_point(self, observed_adj, theta):
-        s = observed_adj.sum(axis=0)
+    def saddle_point(self, G, theta):
+        s = G.sum(axis=0)
         wij = self.expected_weighted_adjacency(theta)
         avgs = wij.sum(axis=0) - np.diag(wij)
         return s - avgs
@@ -223,20 +223,20 @@ class UECM3(GraphModel):
         yiyj = np.outer(y,y)
         return self.expected_adjacency(theta) / (1.0 - yiyj)
 
-    def loglikelihood(self, observed_adj, theta):
+    def loglikelihood(self, G, theta):
         x,y = theta[0:self.N], theta[(self.N):]
-        k = (observed_adj > 0).sum(axis=0)
-        s = observed_adj.sum(axis=0)
+        k = (G > 0).sum(axis=0)
+        s = G.sum(axis=0)
         xixj = np.outer(x,x)
         yiyj = np.outer(y,y)
         loglike = (k*np.log(x)).sum() + (s*np.log(y)).sum() + ilessjsum(np.log( (1-yiyj)/(1-yiyj + xixj*yiyj) ))
         return loglike
 
-    def saddle_point(self, observed_adj, theta): # equations (9,10) of 10.1088/1367-2630/16/4/043022
-        k = (observed_adj>0).sum(axis=0)
+    def saddle_point(self, G, theta): # equations (9,10) of 10.1088/1367-2630/16/4/043022
+        k = (G>0).sum(axis=0)
         pij = self.expected_adjacency(theta)
         avgk = pij.sum(axis=0) - np.diag(pij)
-        w = observed_adj.sum(axis=0)
+        w = G.sum(axis=0)
         wij = self.expected_weighted_adjacency(theta)
         avgw = wij.sum(axis=0) - np.diag(wij)
         return np.hstack([k - avgk, w - avgw])
@@ -322,21 +322,21 @@ class CWTERG(GraphModel):
         else:
             return w
     
-    def saddle_point(self, observed_adj, theta):
-        Lstar = (observed_adj>0).sum() / 2
+    def saddle_point(self, G, theta):
+        Lstar = (G>0).sum() / 2
         p = self.expected_adjacency(theta)
         avgL = p * (self.N*(self.N-1)) / 2
-        wtot = observed_adj.sum() / 2
+        wtot = G.sum() / 2
         w = self.expected_weighted_adjacency(theta,expand_to_adj=True)
         avgwtot = w.sum() / 2
         return np.hstack([Lstar - avgL, wtot - avgwtot])
     
-    def loglikelihood(self, observed_adj, theta):
+    def loglikelihood(self, G, theta):
         x,y = theta[0], theta[1]
         t = self.threshold
         N = self.N
-        Lstar =  (observed_adj>0).sum() /2
-        Wtotstar = observed_adj.sum() / 2
+        Lstar =  (G>0).sum() /2
+        Wtotstar = G.sum() / 2
         n = N*(N-1)/2
         Z = (-x*y**t + t*np.log(y)) / (np.log(y))
         # logZ = np.log((-x*y**t + t*np.log(y))/np.log(y))
@@ -391,7 +391,7 @@ class CWTCM(GraphModel):
     8. LogLikelihood logP:
         
     9. Constraints:
-        2. 0 < yi < 1
+        0 < yi < 1
     """
 
     def __init__(self,**kwargs):
@@ -416,18 +416,18 @@ class CWTCM(GraphModel):
         wij = self.expected_adjacency(theta) * ((t*np.log(yiyj)-1.0) / (np.log(yiyj)))
         return wij
     
-    def saddle_point(self, observed_adj, theta):
-        w = observed_adj.sum(axis=0)
+    def saddle_point(self, G, theta):
+        w = G.sum(axis=0)
         wij = self.expected_weighted_adjacency(theta)
         avgw = wij.sum(axis=0) - np.diag(wij)
         return np.hstack([w - avgw])
     
-    def loglikelihood(self, observed_adj, theta):
+    def loglikelihood(self, G, theta):
         y = theta
         t = self.threshold
         yiyj = np.outer(y,y)
         if not hasattr(self, '_k'):
-            self._s = observed_adj.sum(axis=0)
+            self._s = G.sum(axis=0)
         loglike = (self._s*np.log(y)).sum() + ilessjsum(np.log(-np.log(yiyj)/((yiyj**t) -t*(np.log(yiyj)) ) ))
         return loglike
 
@@ -501,23 +501,23 @@ class CWTECM(GraphModel):
         wij = self.expected_adjacency(theta) * ((t*np.log(yiyj)-1.0) / (np.log(yiyj)))
         return wij
     
-    def saddle_point(self, observed_adj, theta):
-        k = (observed_adj>0).sum(axis=0)
+    def saddle_point(self, G, theta):
+        k = (G>0).sum(axis=0)
         pij = self.expected_adjacency(theta)
         avgk = pij.sum(axis=0) - np.diag(pij)
-        w = observed_adj.sum(axis=0)
+        w = G.sum(axis=0)
         wij = self.expected_weighted_adjacency(theta)
         avgw = wij.sum(axis=0) - np.diag(wij)
         return np.hstack([k - avgk, w - avgw])
     
-    def loglikelihood(self, observed_adj, theta):
+    def loglikelihood(self, G, theta):
         x,y = theta[0:self.N], theta[(self.N):]
         t = self.threshold
         xixj = np.outer(x,x)
         yiyj = np.outer(y,y)
         if not hasattr(self, '_k'):
-            self._k =  (observed_adj>0).astype(float).sum(axis=0)
-            self._s = observed_adj.sum(axis=0)
+            self._k =  (G>0).astype(float).sum(axis=0)
+            self._s = G.sum(axis=0)
         loglike = (self._s*np.log(y) + self._k*np.log(x)).sum() + ilessjsum(np.log(-np.log(yiyj)/(xixj*(yiyj**t) -t*(np.log(yiyj)) ) ))
         return loglike
 
@@ -585,7 +585,7 @@ class CWTECM2(GraphModel):
         t = self.threshold
         xixj = np.outer(x,x)
         yiyj = np.outer(y,y)
-        pij = ((xixj*yiyj)**t) / ((xixj*yiyj)**t - t*np.log(yiyj))  # <aij>
+        pij = (t*(xixj*yiyj)**t) / ((xixj*yiyj)**t - t*np.log(yiyj))  # <aij>
         return pij
     
     def expected_weighted_adjacency(self, theta):
@@ -593,48 +593,72 @@ class CWTECM2(GraphModel):
         t = self.threshold
         xixj = np.outer(x,x)
         yiyj = np.outer(y,y)
-        wij = (- ((xixj*yiyj)**t) + t*((xixj*yiyj)**t)*np.log(yiyj)) / (((xixj*yiyj)**t - t*np.log(yiyj)) * np.log(yiyj))
-        wij = self.expected_adjacency(theta) * ((t*np.log(yiyj)-1.0) / (np.log(yiyj)))
+        pij = self.expected_adjacency(theta) # to normalize correctly
+        wij =  pij * ((t*np.log(yiyj)-1.0) / (t*np.log(yiyj)))
         return wij
     
-    def saddle_point(self, observed_adj, theta):
-        k = (observed_adj>0).sum(axis=0)
-        pij = self.expected_adjacency(theta)
+    def saddle_point(self, G, theta):
+        k = (G>0).sum(axis=0)
+        t = self.threshold
+        pij = self.expected_adjacency(theta)/t # because otherwise these are not probabilities
         avgk = pij.sum(axis=0) - np.diag(pij)
-        w = observed_adj.sum(axis=0)
+        w = G.sum(axis=0)
         wij = self.expected_weighted_adjacency(theta)
         avgw = wij.sum(axis=0) - np.diag(wij)
         return np.hstack([k - avgk, w - avgw])
     
-    def loglikelihood(self, observed_adj, theta):
+    def loglikelihood(self, G, theta):
         x,y = theta[0:self.N], theta[(self.N):]
         t = self.threshold
         xixj = np.outer(x,x)
         yiyj = np.outer(y,y)
-        aij = observed_adj > 0
-        wij = observed_adj        
+        aij = G >= t
+        wij = G        
         loglike1 = (t*np.log(xixj) + wij*np.log(yiyj)) *aij + np.log(-np.log(yiyj)/( (xixj*yiyj)**t - t*np.log(yiyj)))
         return ilessjsum(loglike1)
 
+    # def sample_adjacency(self, theta, batch_size=1, with_grads=False, slope=500):
+    #     rij = batched_symmetric_random(batch_size, self.N)
+    #     pij = self.expected_adjacency(theta)
+    #     wij = self.expected_weighted_adjacency(theta)
+    #     if with_grads:
+    #         A = expit(slope*(pij-rij)) # it needs a gigantic slope to reduce error
+    #         # to generate random weights, needs a second decorrelated random source
+    #         rij = batched_symmetric_random(batch_size, self.N)
+    #         W = -wij*np.log(rij)/pij
+    #     else:
+    #         A = (pij>rij).astype(float)
+    #         W = np.random.exponential(scale=np.nan_to_num(np.abs(wij/pij)),size=[batch_size,self.N,self.N])
+    #     W = np.triu(A*W,1)
+    #     W +=  np.transpose(W, axes=[0, 2, 1])
+    #     return W
+
     def sample_adjacency(self, theta, batch_size=1, with_grads=False, slope=500):
-        rij = batched_symmetric_random(batch_size, self.N)
-        pij = self.expected_adjacency(theta)
+        x,y = theta[0:self.N], theta[(self.N):]
+        t = self.threshold
+        rij = t * batched_symmetric_random(batch_size, self.N)
+        pij = self.expected_adjacency(theta) # gives numbers in [0,t] and not in [0,1] as typical models
         wij = self.expected_weighted_adjacency(theta)
+        xixj = np.outer(x,x)
+        yiyj = np.outer(y,y)
         if with_grads:
-            A = expit(slope*(pij-rij)) # it needs a gigantic slope to reduce error
+            A = expit(slope*(pij/t-rij)) # it needs a gigantic slope to reduce error
             # to generate random weights, needs a second decorrelated random source
             rij = batched_symmetric_random(batch_size, self.N)
             W = -wij*np.log(rij)/pij
         else:
             A = (pij>rij).astype(float)
-            W = np.random.exponential(scale=np.nan_to_num(np.abs(wij/pij)),size=[batch_size,self.N,self.N])
-        W = np.triu(A*W,1)
+            #W = t + np.random.exponential(scale=np.abs(wij/pij), size=[batch_size,self.N,self.N])
+            # sample from truncated exponential distribution
+            W = trunc_exp_rv(low=t, scale=t*wij/pij, size=[batch_size,self.N,self.N])
+        W = np.triu(A*W, 1)
         W +=  np.transpose(W, axes=[0, 2, 1])
         return W
 
+
     def fit(self, G, x0=None, **opt_kwargs):
         from networkqit import MLEOptimizer
-        A = (G>=self.threshold).astype(float)
+        A = (G>0).astype(float)
         k = A.sum(axis=0)
         s = G.sum(axis=0)
         if x0 is None:
