@@ -36,7 +36,7 @@ if __name__ == '__main__':
     betaj = sp.Symbol('\\beta_j', positive=True, real=True)
     betaij = sp.Symbol('\\beta_{ij}', real=True)
 
-    case = 'ctWCM'
+    case = 'ctERG'
     # discrete models
     if case is 'ER':  # erdos-renyi
         H = alpha * gij
@@ -62,24 +62,27 @@ if __name__ == '__main__':
         H = beta * gij
     elif case is 'cWCM':
         H = (betai+betaj) * gij
+    elif case is 'ctERG':
+        H = (alpha) * t * sp.Heaviside(gij-t) + beta * gij * sp.Heaviside(gij-t)
     elif case is 'ctWRG':
         H = beta * sp.Heaviside(gij-t)
     elif case is 'ctWCM':
         H = (betai + betaj) * sp.Heaviside(gij-t)
+    elif case is 'ctECM':
+        H = (alphai + alphaj) * t * sp.Heaviside(gij-t) + (betai + betaj) * sp.Heaviside(gij-t)
     
-    gmax = sp.Symbol('g_{max}',real=True,positive=True)
-    
-    Z = sp.integrate(sp.exp(-H.rewrite(sp.Piecewise)),(gij,0,5))
+    gmax = sp.Symbol('g_{max}', real=True, positive=True)
+    Z = sp.integrate(sp.exp(-H.rewrite(sp.Piecewise)),(gij,0,gmax))
 
     # Probability
     P = sp.exp(-H)/Z
 
     # Loglikelihood
     logL = sp.expand_log(sp.log(P))
-    
+    print(sp.simplify(logL.rewrite(sp.Piecewise)))
     # Free energy
     F = -sp.log(Z)
     #print(sp.limit(F,gmax,+sp.oo))
     # Expectation
-    print(sp.simplify(sp.diff(F,betai)))
+    #print(sp.simplify(sp.diff(F,beta)))
     #print(sp.simplify(do_replacement(sp.diff(F,betai),'forward')))
