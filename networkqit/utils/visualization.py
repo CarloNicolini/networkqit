@@ -17,23 +17,23 @@ import autograd.numpy as np
 def plot_mle(G,pij,wij=None, **kwargs):
     import matplotlib.pyplot as plt
     fig, ax = plt.subplots(nrows=2,ncols=3,figsize=(12,8))
-    im = ax[0,0].imshow(G)
+    im = ax[0,0].imshow(G,interpolation='none')
     plt.colorbar(im,ax=ax[0,0],fraction=0.046, pad=0.04)
     ax[0,0].grid(False)
     ax[0,0].set_title('Weighted empirical')
 
-    im = ax[1,0].imshow((G>0).astype(float))
+    im = ax[1,0].imshow((G>0).astype(float),interpolation='none')
     plt.colorbar(im,ax=ax[1,0],fraction=0.046, pad=0.04)
     ax[1,0].grid(False)
     ax[1,0].set_title('Binary empirical')
 
     if wij is not None:
-        im = ax[0,1].imshow(wij)
+        im = ax[0,1].imshow(wij,interpolation='none')
         plt.colorbar(im, ax=ax[0,1],fraction=0.046, pad=0.04)
         ax[0,1].grid(False)
         ax[0,1].set_title('$<w_{ij}>$')
 
-    im = ax[1,1].imshow(pij)
+    im = ax[1,1].imshow(pij,interpolation='none')
     plt.colorbar(im,ax=ax[1,1],fraction=0.046, pad=0.04)
     ax[1,1].grid(False)
     ax[1,1].set_title('$p_{ij}$')
