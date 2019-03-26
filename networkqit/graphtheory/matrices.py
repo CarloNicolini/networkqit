@@ -106,6 +106,78 @@ def normalized_graph_laplacian(A):
         invSqrtT = np.diag(1.0 / np.sqrt(A.sum(axis=0)))
         return np.eye(A.shape[0]) - invSqrtT @ A @ invSqrtT
 
+def bethe_hessian_matrix(A,r):
+    """
+    Get the bethe hessian matrix also called the deformed laplacian
+    :math:`H(r) = (r^2-1)\\mathbb{1} - rA + D`
+    If a batched adjacency matrix of shape [batch_size,N,N] is 
+    given, the batched bethe_hessian matrix is returned
+
+    References:
+    Spectral Clustering of Graphs with the Bethe Hessian
+    A.Saade, F.Krzkala, L.Zdeborova
+    https://papers.nips.cc/paper/5520-spectral-clustering-of-graphs-with-the-bethe-hessian.pdf
+    """
+    N = A.shape[-1]
+    if len(A.shape)==3:
+        D = np.eye(N) * np.transpose(np.zeros([1, 1, N]) + np.einsum('ijk->ik', A), [1, 0, 2])
+        return (r**2 - 1)*np.ones(A.shape) - r*A + D
+    else:        
+        D = np.diag(A.sum(0))
+        return (r**2-1)*np.ones([N,N]) -r*A + D
+
+def incidence_matrix(A, oriented=False):
+    import networkx as nx
+    I = nx.incidence_matrix(G=nx.from_numpy_array(A), oriented=oriented, weight='weight')
+    return I.toarray()
+    
+    # https://networkx.github.io/documentation/networkx-1.9/reference/generated/networkx.linalg.graphmatrix.incidence_matrix.html
+    # https://medium.com/@HavocMath/a-python-approach-to-developing-tools-in-graph-theory-as-an-application-basis-for-quantum-mechanics-ebb1964883fc
+    # n = A.shape[0]
+    # columns = int(np.triu(A,1).sum())
+    # I = np.zeros([n, int(columns)])
+    # m = 0
+    # for i in range(0, n):
+    #     for j in range(i, n):
+    #         if A[i, j] == 1:
+    #             I[i, m] = -1.0
+    #             I[j, m] = 1.0
+    #             m += 1
+    # return I
+
+def negative_laplacian(A):
+    # https://medium.com/@HavocMath/a-python-approach-to-developing-tools-in-graph-theory-as-an-application-basis-for-quantum-mechanics-ebb1964883fc
+    I = incidence_matrix(A)
+    return I.T @ I
+
+def hashimoto_matrix(A):
+    # https://www.quora.com/What-is-an-intuitive-explanation-of-the-Hashimoto-non-backtracking-matrix-and-its-utility-in-network-analysis
+    return NotImplementedError('Still not implemented')
+
+def full_nonbacktracking_matrix(A):
+    """
+    Get the nonbacktracking matrix, a 2m by 2m matrix
+    :math:`B_{(u\to v),(w\to x)}=1 \\if v=w \\textrm{ and } u\neq x`
+    """
+    I = incidence_matrix(A)
+    H = (I>0).T @ (I<0)
+    return H
+
+def reduced_nonbacktracking_matrix(A):
+    """
+    Get the reduced nonbacktracking matrix, a 2n by 2n matrix
+    :math:`\\begin{pmatrix}0, D-\\mathbb{1} \\\\-\\mathbb{1}, A \\end{pmatrix}`
+    as defined in Eq.4 of 
+    Spectral redemption in clustering sparse networks
+    Krzkala et al PNAS (2013)
+    """
+    n = A.shape[0]
+    m = (A>0).sum() // 2
+    
+    I = np.eye(n)
+    D = np.diag(np.sum(A,0))
+    B = np.vstack([np.hstack([np.zeros(A.shape),D-I]),-I,A])
+    return B
 
 def modularity_matrix(A):
     """

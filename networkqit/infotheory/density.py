@@ -186,6 +186,9 @@ def batch_beta_relative_entropy(Lobs : np.array, Lmodel : np.array, beta_range :
     if len(Lobs.shape) != 2:
         raise RuntimeError('Must provide a square, non batched observed laplacian')
     
+    if len(Lmodel.shape)==2:
+        Lmodel = np.expand_dims(Lmodel,0) # add the zero dimension to have batched 
+
     Srho = batch_compute_vonneumann_entropy(L=Lobs, beta_range=beta_range)
     nbeta = len(beta_range)
     Emodel_beta = np.zeros([nbeta,])
