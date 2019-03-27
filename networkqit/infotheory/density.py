@@ -196,6 +196,7 @@ def batch_beta_relative_entropy(Lobs : np.array, Lmodel : np.array, beta_range :
     loglike_beta = np.zeros([nbeta,])
     dkl_beta = np.zeros([nbeta,])
     lambd_model = eigh(Lmodel)[0] # batched eigenvalues
+    expmLobs = expm(-Lobs)
     for i, beta in enumerate(beta_range):
         rho_beta = compute_vonneuman_density(L=Lobs, beta=beta)
         Emodel_beta[i] = np.mean(np.sum(np.sum(Lmodel * rho_beta, axis=2), axis=1))
