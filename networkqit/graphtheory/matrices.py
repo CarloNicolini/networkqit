@@ -114,9 +114,8 @@ def bethe_hessian_matrix(A,r):
     given, the batched bethe_hessian matrix is returned
 
     References:
-    Spectral Clustering of Graphs with the Bethe Hessian
-    A.Saade, F.Krzkala, L.Zdeborova
-    https://papers.nips.cc/paper/5520-spectral-clustering-of-graphs-with-the-bethe-hessian.pdf
+    [1] https://papers.nips.cc/paper/5520-spectral-clustering-of-graphs-with-the-bethe-hessian.pdf
+    [2] https://arxiv.org/pdf/1609.02906.pdf
     """
     N = A.shape[-1]
     if len(A.shape)==3:
@@ -126,13 +125,22 @@ def bethe_hessian_matrix(A,r):
         D = np.diag(A.sum(0))
         return (r**2-1)*np.ones([N,N]) -r*A + D
 
-def incidence_matrix(A, oriented=False):
-    import networkx as nx
-    I = nx.incidence_matrix(G=nx.from_numpy_array(A), oriented=oriented, weight='weight')
-    return I.toarray()
+def incidence_matrix(A, oriented=True):
+    """
+    Get the incidence matrix of the graph
+    Here we use the networkx representation
+    References:
+    [1] https://networkx.github.io/documentation/networkx-1.9/reference/generated/networkx.linalg.graphmatrix.incidence_matrix.html
+    [2] https://medium.com/@HavocMath/a-python-approach-to-developing-tools-in-graph-theory-as-an-application-basis-for-quantum-mechanics-ebb1964883fc
+    """
     
-    # https://networkx.github.io/documentation/networkx-1.9/reference/generated/networkx.linalg.graphmatrix.incidence_matrix.html
-    # https://medium.com/@HavocMath/a-python-approach-to-developing-tools-in-graph-theory-as-an-application-basis-for-quantum-mechanics-ebb1964883fc
+    import networkx as nx
+    if oriented:
+        I = nx.incidence_matrix(G=nx.DiGraph(nx.from_numpy_array(A)), oriented=True, weight='weight')
+    else:
+        I = nx.incidence_matrix(G=nx.from_numpy_array(A), oriented=False, weight='weight')
+    return I.toarray()
+    # use the implementation from ref 2
     # n = A.shape[0]
     # columns = int(np.triu(A,1).sum())
     # I = np.zeros([n, int(columns)])
@@ -150,14 +158,29 @@ def negative_laplacian(A):
     I = incidence_matrix(A)
     return I.T @ I
 
-def hashimoto_matrix(A):
-    # https://www.quora.com/What-is-an-intuitive-explanation-of-the-Hashimoto-non-backtracking-matrix-and-its-utility-in-network-analysis
-    return NotImplementedError('Still not implemented')
-
-def full_nonbacktracking_matrix(A):
+def nonbacktracking_matrix(A):
+    return NotImplementedError('Not a reliable implementation')
     """
-    Get the nonbacktracking matrix, a 2m by 2m matrix
+    Get the nonbacktracking matrix, a 2m by 2m matrix, also called DEA 
+    Directed Edge Adjacency matrix, or Hashimoto non-backtracking operator.
     :math:`B_{(u\to v),(w\to x)}=1 \\if v=w \\textrm{ and } u\neq x`
+    The DEA is a 2m x 2m matrix, where m is the number of links in the (binary)
+    adjacency matrix.
+
+    Notes:
+        Still no results exist for weighted graphs about the spectrum of 
+        the non-backtracking matrix, so for the moment only unweighted 
+        adjacency matrices are accepted.
+
+    Input:
+        A (np.array): the adjacency matrix of the graph
+    Output:
+        B (np.array): the 2m x 2m reduced non-backtracking matrix
+
+    References:
+        [1] https://www.quora.com/What-is-an-intuitive-explanation-of-the-Hashimoto-non-backtracking-matrix-and-its-utility-in-network-analysis
+        [2] http://lib.itp.ac.cn/html/panzhang/
+        [3] Spectral redemption in clustering sparse networks, Krzkala et al PNAS (2013)
     """
     I = incidence_matrix(A)
     H = (I>0).T @ (I<0)
@@ -165,19 +188,30 @@ def full_nonbacktracking_matrix(A):
 
 def reduced_nonbacktracking_matrix(A):
     """
-    Get the reduced nonbacktracking matrix, a 2n by 2n matrix
+    Get the reduced nonbacktracking matrix, a 2n by 2n matrix with the same spectral
+    properties of the nonbacktracking matrix
     :math:`\\begin{pmatrix}0, D-\\mathbb{1} \\\\-\\mathbb{1}, A \\end{pmatrix}`
     as defined in Eq.4 of 
     Spectral redemption in clustering sparse networks
     Krzkala et al PNAS (2013)
+    Here we use F to avoid messing names with the modularity matrix.
+
+    Input:
+        A (np.array): the adjacency matrix of the graph
+    Output:
+        F (np.array): the 2n x 2n reduced non-backtracking matrix
     """
     n = A.shape[0]
-    m = (A>0).sum() // 2
+    m = (A>0).sum()# // 2
     
     I = np.eye(n)
     D = np.diag(np.sum(A,0))
-    B = np.vstack([np.hstack([np.zeros(A.shape),D-I]),-I,A])
-    return B
+    Z = np.zeros(A.shape)
+    
+    b1 = np.hstack([Z,D-I])
+    b2 = np.hstack([-I, A])
+    F = np.vstack([b1,b2])
+    return F
 
 def modularity_matrix(A):
     """
