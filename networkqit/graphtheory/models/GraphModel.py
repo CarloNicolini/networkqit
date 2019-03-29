@@ -224,7 +224,7 @@ class IsingModel(GraphModel):
         #self.args_mapping = ['c_er']
         self.model_type = 'topological'
         #self.formula = '$c_{er}$'
-        self.bounds = [(0, None)] * self.N
+        self.bounds = [(0, None)] * self.N * self.N
 
     def expected_adjacency(self, theta):
         return np.reshape(theta,[self.N,self.N])

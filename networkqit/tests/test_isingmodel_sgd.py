@@ -19,9 +19,10 @@ p = A.sum() / (N*(N-1))
 L = nq.graph_laplacian(A)
 
 beta = 0.1
-opt = Adam(A=A, L=L, x0=np.random.random([N*N,]), beta_range=np.logspace(-1,-3,1), model=M)
+opt = Adam(G=A, L=L, x0=np.random.random([N*N,]), model=M)
 rho = nq.compute_vonneuman_density(L=L, beta=beta)
-sol = opt.run(refresh_frames=5000, quasi_hyperbolic=True, eta=1E-3, max_iters=5, gtol=1E-5, batch_size=64)
+sol = opt.run(beta)
+#sol = opt.run(refresh_frames=5000, quasi_hyperbolic=True, eta=1E-3, max_iters=5, gtol=1E-5, batch_size=64)
 
 
             #all_dkl.append(dkl)

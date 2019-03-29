@@ -63,7 +63,7 @@ import autograd
 import autograd.numpy as np
 from autograd.numpy.linalg import eigh
 from autograd.scipy.misc import logsumexp
-from networkqit.matrices import softmax
+from networkqit.graphtheory.matrices import softmax
 from scipy.optimize import minimize, least_squares, OptimizeResult
 from networkqit.graphtheory import * # imports GraphModel
 from networkqit.infotheory.density import *
@@ -437,7 +437,7 @@ class StochasticOptimizer:
             model (nq.GraphModel): the graph model to optimize the likelihood of.
         """
         self.G = G
-        self.L = graph_laplacian(self.A) # compute graph laplacian
+        self.L = graph_laplacian(self.G) # compute graph laplacian
         self.x0 = x0
         self.model = model
         self.sol = OptimizeResult(x=self.x0,
@@ -456,9 +456,9 @@ class StochasticOptimizer:
         
         self.model.ls_bounds = np.ravel(self.model.bounds).astype(float)
         self.model.ls_bounds[np.isnan(self.model.ls_bounds)] = np.inf
+
         self.model.min_bounds = self.model.ls_bounds.reshape([len(self.x0),2])[:,0]
         self.model.max_bounds = self.model.ls_bounds.reshape([len(self.x0),2])[:,1]
-        #self.model.ls_bounds = np.reshape(self.model.ls_bounds,[len(self.x0),2])#.T.tolist()
 
     def gradient(self, x, rho, beta, batch_size=1):
         # Compute the relative entropy between rho and sigma, using tensors with autograd support
@@ -468,7 +468,7 @@ class StochasticOptimizer:
         #entropy = -np.sum(lambd_rho * np.log(lambd_rho))
 
         def log_likelihood(z):
-            N = len(self.A)
+            N = len(self.G)
             # advanced broadcasting here!
             # Sample 'batch_size' adjacency matrices shape=[batch_size,N,N]
             Amodel = self.model.sample_adjacency(theta=z, batch_size=batch_size, with_grads=True)
@@ -484,10 +484,21 @@ class StochasticOptimizer:
             dkl = loglike # - entropy # Tr[rho log(rho)] - Tr[rho log(sigma)]
             # Add a penalty term accouting for boundaries violation
             # Follows these ideas https://www.cs.jhu.edu/~ijwang/pub/01271742.pdf
-            def qi(z):
-                softmax()
-                0.5*np.sum([])
-            dkl += 
+            def quadratic_penalty(theta):
+                z = np.zeros(theta.shape)
+                # compute the penalty with respect to low bounds violation 
+                penalty_low = np.sum(np.max(np.hstack([z, -theta + self.model.min_bounds]))**2)
+                # compute the penalty with respect to high bounds violation 
+                penalty_high = np.sum(np.max(np.hstack([z, theta - self.model.max_bounds]))**2)
+                return 0.5 * (penalty_low + penalty_high)
+            def absolute_value_penalty(theta):
+                z = np.zeros(theta.shape)
+                # compute the penalty with respect to low bounds violation 
+                penalty_low = np.max(np.hstack([z, -theta + self.model.min_bounds]))
+                # compute the penalty with respect to high bounds violation 
+                penalty_high = np.max(np.hstack([z, theta - self.model.max_bounds]))
+                return np.max(np.hstack(penalty_low,penalty_high))
+            dkl += beta*penalty(z)
             return dkl
 
         # value and gradient of relative entropy as a function
@@ -508,6 +519,7 @@ class Adam(StochasticOptimizer):
     def run(self,
             beta,
             rho=None,
+            maxiter=1E4,
             learning_rate=1E-3,
             beta1=0.9,
             beta2=0.999,
@@ -515,11 +527,10 @@ class Adam(StochasticOptimizer):
             nu2=1.0,
             epsilon=1E-8,
             batch_size=16,
-            maxiter=1E4,
             ftol=1E-10,
             gtol=1E-5,
             xtol=1E-8,
-            maxiter=1E4,
+            last_iters = 100
             **kwargs):
         
         opts = {'ftol': ftol,
@@ -533,13 +544,13 @@ class Adam(StochasticOptimizer):
                 'iprint': kwargs.get('verbose', 0)
                 }
 
-        mt, vt = np.zeros(self.sol.x0.shape), np.zeros(self.sol.x0.shape)
+        mt, vt = np.zeros(self.sol.x.shape), np.zeros(self.sol.x.shape)
                 
         # if rho is provided, user rho is used, otherwise is computed at every beta
         if rho is None:
             rho = (compute_vonneuman_density(L=self.L, beta=beta))
         
-        for _ in range(maxiter):
+        for t in range(1,int(maxiter)+1):
             self.sol.nit += 1
             # get the relative entropy value and its gradient w.r.t. variables
             dkl, grad_t = self.gradient(self.sol.x, rho, beta, batch_size=batch_size)
@@ -549,7 +560,6 @@ class Adam(StochasticOptimizer):
                 self.sol.message = 'Exceeded minimum gradient |grad| < %g' % gtol
             
             # check the convergence based on the slope of dkl of the last 10 iterations
-            # last_iters = 100
             # if len(all_dkl) > last_iters:
             #     dkl_iters = np.arange(last_iters)
             #     slope, intercept, r_value, p_value, std_err = linregress(x=dkl_iters, y=all_dkl[-last_iters:])
@@ -557,21 +567,16 @@ class Adam(StochasticOptimizer):
             #             converged = True
             #             adam_logger.info('Optimization terminated for flatness')
 
-            # TODO implement check boundaries in Adam
-            # self.bounds = [(EPS, None) for i in range(0, self.N)]
-            # if np.any(np.ravel(self.model.bounds)):
-            #    raise RuntimeError('variable bounds exceeded')
-
             mt = beta1 * mt + (1.0 - beta1) * grad_t
             vt = beta2 * vt + (1.0 - beta2) * (grad_t * grad_t)
             mttilde = mt / (1.0 - (beta1 ** t))  # compute bias corrected first moment estimate
             vttilde = vt / (1.0 - (beta2 ** t))  # compute bias-corrected second raw moment estimate
-            if quasi_hyperbolic: # quasi hyperbolic adam
-                deltax = ((1-nu1) * grad_t + nu1 * mttilde)/(np.sqrt((1-nu2) * (grad_t**2) + nu2 * vttilde ) + epsilon)
-            else: # vanilla Adam
-                deltax = mttilde / np.sqrt(vttilde + epsilon)
-            x -= learning_rate * deltax
-
+            #if quasi_hyperbolic: # quasi hyperbolic adam
+            #deltax = ((1-nu1) * grad_t + nu1 * mttilde)/(np.sqrt((1-nu2) * (grad_t**2) + nu2 * vttilde ) + epsilon)
+            #else: # vanilla Adam
+            deltax = mttilde / np.sqrt(vttilde + epsilon)
+            self.sol.x -= learning_rate * deltax
+            print(self.sol.x.sum())
         self.sol = sol
         return sol
 
