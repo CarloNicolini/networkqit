@@ -63,8 +63,9 @@ import autograd
 import autograd.numpy as np
 from autograd.numpy.linalg import eigh
 from autograd.scipy.misc import logsumexp
-from scipy.optimize import minimize, least_squares
-from networkqit.graphtheory import *
+from networkqit.matrices import softmax
+from scipy.optimize import minimize, least_squares, OptimizeResult
+from networkqit.graphtheory import * # imports GraphModel
 from networkqit.infotheory.density import *
 
 
@@ -90,11 +91,11 @@ class MLEOptimizer:
         self.sol = None
         super().__init__(**kwargs)
 
-    def run(self, **kwargs):
+    def run(self, method, ftol=1E-10, gtol=1E-5, xtol=1E-8, maxiter=1E4, **kwargs):
         """
         Maximimize the likelihood of the model given the observed network G.
 
-        Kwargs:
+        Args:
             method (str): optimization method to use. Can be either 'MLE' or 'saddle_point'.
                           'MLE' uses L-BFGS-B method to optimize the likelihood of the model
                           'saddle_point' finds the saddle point solution solving a system of
@@ -114,10 +115,12 @@ class MLEOptimizer:
             gtol:       (float) set the termination tolerance on gradients
                         (default 1E-10)
 
+            maxiter:    (int) set the maximum number of iteration. Default 10.000 iterations
+
+        Kwargs:
             maxfun:     (int) set the maximum number of evaluations of the cost.
                         Default value is very large ten thousand (1E4)
 
-            maxiter:    (int) set the maximum number of iteration. Default 10.000 iterations
             verbose:    (int) Verbosity level. No output=0, 2=iterations output.
 
             basin_hopping: (bool) whether to run global optimization with local
@@ -129,12 +132,12 @@ class MLEOptimizer:
             sol: (scipy.optimize.OptimizeResult) parameters at optimal likelihood
         """
 
-        opts = {'ftol': kwargs.get('ftol', 1E-10),
-                'gtol': kwargs.get('gtol', 1E-5), # as default of LBFGSB
+        opts = {'ftol': ftol,
+                'gtol': gtol, # as default of LBFGSB
+                'xtol': xtol,
+                'maxiter': maxiter,
                 'eps': kwargs.get('eps', 1E-8), # as default of LBFGSB
-                'xtol': kwargs.get('xtol', 1E-8),
                 'maxfun': kwargs.get('maxfun', 1E10),
-                'maxiter': kwargs.get('maxiter', 1E4),
                 'verbose' : kwargs.get('verbose', 0),
                 'disp':  bool(kwargs.get('verbose', 0)),
                 'iprint': kwargs.get('verbose', 0)
@@ -423,12 +426,39 @@ class StochasticOptimizer:
     Alternatively you can use github.com/HIPS/autograd method for full CPU support.
     """
 
-    def __init__(self, A, x0, beta_range, model, **kwargs):
-        self.A = A
-        self.L = graph_laplacian(self.A)
+    def __init__(self, G: np.array, x0 : np.array, model : GraphModel, **kwargs):
+        """
+        Initialize the stochastic optimizer with the observed graph, an initial guess and the 
+        model to optimize.
+
+        Args:
+            G (numpy.array) :is the empirical network to study. A N x N adjacency matrix as numpy.array.
+            x0 (numpy.array): is the k-element array of initial parameters estimates. Typically set as random.
+            model (nq.GraphModel): the graph model to optimize the likelihood of.
+        """
+        self.G = G
+        self.L = graph_laplacian(self.A) # compute graph laplacian
         self.x0 = x0
-        self.beta_range = beta_range
         self.model = model
+        self.sol = OptimizeResult(x=self.x0,
+                                  success=False,
+                                  status=None,
+                                  message='',
+                                  fun=None,
+                                  jac=None,
+                                  hess=None,
+                                  hess_inv=None,
+                                  nfev=0, # number of function evaluations
+                                  njev=0, # number of jacobian evaluations
+                                  nhev=0, # number of hessian evaluations
+                                  nit=0,  # number of iterations
+                                  maxcv=-1) # maximum constraint violation
+        
+        self.model.ls_bounds = np.ravel(self.model.bounds).astype(float)
+        self.model.ls_bounds[np.isnan(self.model.ls_bounds)] = np.inf
+        self.model.min_bounds = self.model.ls_bounds.reshape([len(self.x0),2])[:,0]
+        self.model.max_bounds = self.model.ls_bounds.reshape([len(self.x0),2])[:,1]
+        #self.model.ls_bounds = np.reshape(self.model.ls_bounds,[len(self.x0),2])#.T.tolist()
 
     def gradient(self, x, rho, beta, batch_size=1):
         # Compute the relative entropy between rho and sigma, using tensors with autograd support
@@ -452,7 +482,13 @@ class StochasticOptimizer:
             Fmodel = - np.mean(logsumexp(-beta * lambd_model, axis=1) / beta)
             loglike = beta * (Emodel - Fmodel) # - Tr[rho log(sigma)]
             dkl = loglike # - entropy # Tr[rho log(rho)] - Tr[rho log(sigma)]
-            return dkl / beta
+            # Add a penalty term accouting for boundaries violation
+            # Follows these ideas https://www.cs.jhu.edu/~ijwang/pub/01271742.pdf
+            def qi(z):
+                softmax()
+                0.5*np.sum([])
+            dkl += 
+            return dkl
 
         # value and gradient of relative entropy as a function
         dkl_and_dkldx = autograd.value_and_grad(log_likelihood)
@@ -466,125 +502,196 @@ class Adam(StochasticOptimizer):
     Diederik P. Kingma, Jimmy Ba
 
     https://arxiv.org/abs/1412.6980
+    However here we use quasi-hyperbolic adam by default, with parameters nu1,nu2
+    https://arxiv.org/pdf/1810.06801.pdf
     """
-
-    def run(self, **kwargs):
-        x = self.x0
-        batch_size = kwargs.get('batch_size', 1)
-        max_iters = kwargs.get('max_iters', 1000)
-        # ADAM parameters
-        eta = kwargs.get('eta', 1E-3)
-        gtol = kwargs.get('gtol', 1E-4)
-        xtol = kwargs.get('xtol', 1E-3)
-        beta1 = 0.9
-        beta2 = 0.999
-        epsilon = 1E-8 # avoid nan with large learning rates
-        # Use quasi-hyperbolic adam by default
-        # https://arxiv.org/pdf/1810.06801.pdf
-        quasi_hyperbolic = kwargs.get('quasi_hyperbolic', True)
-        nu1 = 0.7 # for quasi-hyperbolic adam
-        nu2 = 1.0 # for quasi-hyperbolic adam
-        # visualization options
-        refresh_frames = kwargs.get('refresh_frames', 100)
-        from drawnow import drawnow, figure
-        figure(figsize=(8,8))
-        import matplotlib.pyplot as plt
-        #plt.figure(figsize=(8, 8))
-
-        # Populate the solution list as function of beta
-        # the list sol contains all optimization points
-        sol = []
-        # Iterate over all beta provided by the user
-        mt, vt = np.zeros(self.x0.shape), np.zeros(self.x0.shape)
-        all_dkl = []
+    def run(self,
+            beta,
+            rho=None,
+            learning_rate=1E-3,
+            beta1=0.9,
+            beta2=0.999,
+            nu1=1.0,
+            nu2=1.0,
+            epsilon=1E-8,
+            batch_size=16,
+            maxiter=1E4,
+            ftol=1E-10,
+            gtol=1E-5,
+            xtol=1E-8,
+            maxiter=1E4,
+            **kwargs):
         
-        # TODO implement model boundaries in Adam
-        frames = 0
-        filename = 'adam.log'
-        logfile = open(filename,'w')
-        from scipy.stats import linregress
-        import logging
-        import sys
-        logging.basicConfig(stream=sys.stderr, level=logging.INFO)
-        adam_logger = logging.getLogger('ADAM')
-        adam_logger.setLevel(logging.INFO)
+        opts = {'ftol': ftol,
+                'gtol': gtol, # as default of LBFGSB
+                'xtol': xtol,
+                'maxiter': maxiter,
+                'eps': kwargs.get('eps', 1E-8), # as default of LBFGSB
+                'maxfun': kwargs.get('maxfun', 1E10),
+                'verbose' : kwargs.get('verbose', 0),
+                'disp':  bool(kwargs.get('verbose', 0)),
+                'iprint': kwargs.get('verbose', 0)
+                }
 
-        for beta in self.beta_range:
-            adam_logger.info('Changed beta to %g' % beta)
-            # if rho is provided, user rho is used, otherwise is computed at every beta
-            rho = kwargs.get('rho', compute_vonneuman_density(L=self.L, beta=beta))
-            # initialize at x0
-            x = self.x0
-            converged = False
-            t = 0  # t is the iteration number
-            while not converged:
-                t += 1
-                # get the relative entropy value and its gradient w.r.t. variables
-                dkl, grad_t = self.gradient(x, rho, beta, batch_size=batch_size)
-                # Convergence status
-                if np.linalg.norm(grad_t) < gtol:
-                    converged = True
-                    adam_logger.info('Exceeded minimum gradient |grad|<%g' % gtol)
+        mt, vt = np.zeros(self.sol.x0.shape), np.zeros(self.sol.x0.shape)
                 
-                if t > max_iters:
-                    adam_logger.info('Exceeded maximum iterations')
-                    converged = True
+        # if rho is provided, user rho is used, otherwise is computed at every beta
+        if rho is None:
+            rho = (compute_vonneuman_density(L=self.L, beta=beta))
+        
+        for _ in range(maxiter):
+            self.sol.nit += 1
+            # get the relative entropy value and its gradient w.r.t. variables
+            dkl, grad_t = self.gradient(self.sol.x, rho, beta, batch_size=batch_size)
+            # Convergence status
+            if np.linalg.norm(grad_t) < gtol:
+                self.sol.success = True
+                self.sol.message = 'Exceeded minimum gradient |grad| < %g' % gtol
+            
+            # check the convergence based on the slope of dkl of the last 10 iterations
+            # last_iters = 100
+            # if len(all_dkl) > last_iters:
+            #     dkl_iters = np.arange(last_iters)
+            #     slope, intercept, r_value, p_value, std_err = linregress(x=dkl_iters, y=all_dkl[-last_iters:])
+            #     if np.abs(slope - 1E-3) < 0:
+            #             converged = True
+            #             adam_logger.info('Optimization terminated for flatness')
 
-                # check the convergence based on the slope of dkl of the last 10 iterations
-                last_iters = 100
-                if len(all_dkl) > last_iters:
-                    dkl_iters = np.arange(last_iters)
-                    slope, intercept, r_value, p_value, std_err = linregress(x=dkl_iters, y=all_dkl[-last_iters:])
-                    if np.abs(slope - 1E-3) < 0:
-                            converged = True
-                            adam_logger.info('Optimization terminated for flatness')
+            # TODO implement check boundaries in Adam
+            # self.bounds = [(EPS, None) for i in range(0, self.N)]
+            # if np.any(np.ravel(self.model.bounds)):
+            #    raise RuntimeError('variable bounds exceeded')
 
-                # TODO implement check boundaries in Adam
-                # if np.any(np.ravel(self.model.bounds)):
-                #    raise RuntimeError('variable bounds exceeded')
-                mt = beta1 * mt + (1.0 - beta1) * grad_t
-                vt = beta2 * vt + (1.0 - beta2) * (grad_t * grad_t)
-                mttilde = mt / (1.0 - (beta1 ** t))  # compute bias corrected first moment estimate
-                vttilde = vt / (1.0 - (beta2 ** t))  # compute bias-corrected second raw moment estimate
-                if quasi_hyperbolic: # quasi hyperbolic adam
-                    deltax = ((1-nu1) * grad_t + nu1 * mttilde)/(np.sqrt((1-nu2) * (grad_t**2) + nu2 * vttilde ) + epsilon)
-                else: # vanilla Adam
-                    deltax = mttilde / np.sqrt(vttilde + epsilon)
-                x -= eta * deltax
-                all_dkl.append(dkl)
-                #print(np.hstack([t, x,beta,dkl]))
-                logfile.write( u"%g\t%g\t%g\n" % (x[0],beta,dkl) )
-                if t % refresh_frames == 0:
-                    frames += 1
-                    def draw_fig():
-                        plot_beta_range = np.logspace(-3,3,100)
-                        sol.append({'x': x.copy()})
-                        #plt.figure(figsize=(8, 8))
-                        A0 = np.mean(self.model.sample_adjacency(theta=x, batch_size=batch_size), axis=0)
-                        plt.subplot(2, 2, 1)
-                        im = plt.imshow(self.A)
-                        plt.colorbar(im)
-                        plt.title('Data')
-                        plt.subplot(2, 2, 2)
-                        im = plt.imshow(A0)
-                        plt.colorbar(im)
-                        plt.title('<Model>')
-                        plt.subplot(2, 2, 3)
-                        plt.plot(all_dkl)
-                        plt.xlabel('iteration')
-                        plt.ylabel('$S(\\rho,\\sigma)$')
-                        plt.subplot(2, 2, 4)
-                        plt.semilogx(plot_beta_range, batch_compute_vonneumann_entropy(self.L, plot_beta_range), '.-', label='data')
-                        plt.semilogx(plot_beta_range, batch_compute_vonneumann_entropy(graph_laplacian(A0), plot_beta_range), '.-', label='model')
-                        plt.plot(beta, batch_compute_vonneumann_entropy(graph_laplacian(A0), [beta]), 'ko', label='model')
-                        plt.xlabel('$\\beta$')
-                        plt.ylabel('$S$')
-                        plt.title('Entropy')
-                        plt.legend(loc='best')
-                        plt.suptitle('$\\beta=$' + '{0:0>3}'.format(beta))
-                        #plt.tight_layout()
-                    drawnow(draw_fig)
+            mt = beta1 * mt + (1.0 - beta1) * grad_t
+            vt = beta2 * vt + (1.0 - beta2) * (grad_t * grad_t)
+            mttilde = mt / (1.0 - (beta1 ** t))  # compute bias corrected first moment estimate
+            vttilde = vt / (1.0 - (beta2 ** t))  # compute bias-corrected second raw moment estimate
+            if quasi_hyperbolic: # quasi hyperbolic adam
+                deltax = ((1-nu1) * grad_t + nu1 * mttilde)/(np.sqrt((1-nu2) * (grad_t**2) + nu2 * vttilde ) + epsilon)
+            else: # vanilla Adam
+                deltax = mttilde / np.sqrt(vttilde + epsilon)
+            x -= learning_rate * deltax
+
         self.sol = sol
-        adam_logger.info('Optimization finished\n' + str(self.sol))
         return sol
+
+    # def run(self, **kwargs):
+    #     x = self.x0
+    #     batch_size = kwargs.get('batch_size', 1)
+    #     max_iters = kwargs.get('max_iters', 1000)
+    #     # ADAM parameters
+    #     eta = kwargs.get('eta', 1E-3)
+    #     gtol = kwargs.get('gtol', 1E-4)
+    #     xtol = kwargs.get('xtol', 1E-3)
+    #     beta1 = 0.9
+    #     beta2 = 0.999
+    #     epsilon = 1E-8 # avoid nan with large learning rates
+    #     # Use quasi-hyperbolic adam by default
+    #     # https://arxiv.org/pdf/1810.06801.pdf
+    #     quasi_hyperbolic = kwargs.get('quasi_hyperbolic', True)
+    #     nu1 = 0.7 # for quasi-hyperbolic adam
+    #     nu2 = 1.0 # for quasi-hyperbolic adam
+    #     # visualization options
+    #     refresh_frames = kwargs.get('refresh_frames', 100)
+    #     from drawnow import drawnow, figure
+    #     figure(figsize=(8,8))
+    #     import matplotlib.pyplot as plt
+    #     #plt.figure(figsize=(8, 8))
+
+    #     # Populate the solution list as function of beta
+    #     # the list sol contains all optimization points
+    #     sol = []
+    #     # Iterate over all beta provided by the user
+    #     mt, vt = np.zeros(self.x0.shape), np.zeros(self.x0.shape)
+    #     all_dkl = []
+        
+    #     # TODO implement model boundaries in Adam
+    #     frames = 0
+    #     filename = 'adam.log'
+    #     logfile = open(filename,'w')
+    #     from scipy.stats import linregress
+    #     import logging
+    #     import sys
+    #     logging.basicConfig(stream=sys.stderr, level=logging.INFO)
+    #     adam_logger = logging.getLogger('ADAM')
+    #     adam_logger.setLevel(logging.INFO)
+
+    #     for beta in self.beta_range:
+    #         adam_logger.info('Changed beta to %g' % beta)
+    #         # if rho is provided, user rho is used, otherwise is computed at every beta
+    #         rho = kwargs.get('rho', compute_vonneuman_density(L=self.L, beta=beta))
+    #         # initialize at x0
+    #         x = self.x0
+    #         converged = False
+    #         t = 0  # t is the iteration number
+    #         while not converged:
+    #             t += 1
+    #             # get the relative entropy value and its gradient w.r.t. variables
+    #             dkl, grad_t = self.gradient(x, rho, beta, batch_size=batch_size)
+    #             # Convergence status
+    #             if np.linalg.norm(grad_t) < gtol:
+    #                 converged = True
+    #                 adam_logger.info('Exceeded minimum gradient |grad|<%g' % gtol)
+                
+    #             if t > max_iters:
+    #                 adam_logger.info('Exceeded maximum iterations')
+    #                 converged = True
+
+    #             # check the convergence based on the slope of dkl of the last 10 iterations
+    #             last_iters = 100
+    #             if len(all_dkl) > last_iters:
+    #                 dkl_iters = np.arange(last_iters)
+    #                 slope, intercept, r_value, p_value, std_err = linregress(x=dkl_iters, y=all_dkl[-last_iters:])
+    #                 if np.abs(slope - 1E-3) < 0:
+    #                         converged = True
+    #                         adam_logger.info('Optimization terminated for flatness')
+
+    #             # TODO implement check boundaries in Adam
+    #             # if np.any(np.ravel(self.model.bounds)):
+    #             #    raise RuntimeError('variable bounds exceeded')
+    #             mt = beta1 * mt + (1.0 - beta1) * grad_t
+    #             vt = beta2 * vt + (1.0 - beta2) * (grad_t * grad_t)
+    #             mttilde = mt / (1.0 - (beta1 ** t))  # compute bias corrected first moment estimate
+    #             vttilde = vt / (1.0 - (beta2 ** t))  # compute bias-corrected second raw moment estimate
+    #             if quasi_hyperbolic: # quasi hyperbolic adam
+    #                 deltax = ((1-nu1) * grad_t + nu1 * mttilde)/(np.sqrt((1-nu2) * (grad_t**2) + nu2 * vttilde ) + epsilon)
+    #             else: # vanilla Adam
+    #                 deltax = mttilde / np.sqrt(vttilde + epsilon)
+    #             x -= eta * deltax
+    #             #all_dkl.append(dkl)
+    #             #print(np.hstack([t, x,beta,dkl]))
+    #             #logfile.write( u"%g\t%g\t%g\n" % (x,beta,dkl) )
+    #             # if t % refresh_frames == 0:
+    #             #     frames += 1
+    #             #     def draw_fig():
+    #             #         plot_beta_range = np.logspace(-3,3,100)
+    #             #         sol.append({'x': x.copy()})
+    #             #         #plt.figure(figsize=(8, 8))
+    #             #         A0 = np.mean(self.model.sample_adjacency(theta=x, batch_size=batch_size), axis=0)
+    #             #         plt.subplot(2, 2, 1)
+    #             #         im = plt.imshow(self.A)
+    #             #         plt.colorbar(im)
+    #             #         plt.title('Data')
+    #             #         plt.subplot(2, 2, 2)
+    #             #         im = plt.imshow(A0)
+    #             #         plt.colorbar(im)
+    #             #         plt.title('<Model>')
+    #             #         plt.subplot(2, 2, 3)
+    #             #         plt.plot(all_dkl)
+    #             #         plt.xlabel('iteration')
+    #             #         plt.ylabel('$S(\\rho,\\sigma)$')
+    #             #         plt.subplot(2, 2, 4)
+    #             #         plt.semilogx(plot_beta_range, batch_compute_vonneumann_entropy(self.L, plot_beta_range), '.-', label='data')
+    #             #         plt.semilogx(plot_beta_range, batch_compute_vonneumann_entropy(graph_laplacian(A0), plot_beta_range), '.-', label='model')
+    #             #         plt.plot(beta, batch_compute_vonneumann_entropy(graph_laplacian(A0), [beta]), 'ko', label='model')
+    #             #         plt.xlabel('$\\beta$')
+    #             #         plt.ylabel('$S$')
+    #             #         plt.title('Entropy')
+    #             #         plt.legend(loc='best')
+    #             #         plt.suptitle('$\\beta=$' + '{0:0>3}'.format(beta))
+    #             #         #plt.tight_layout()
+    #             #     drawnow(draw_fig)
+    #     self.sol = sol
+    #     adam_logger.info('Optimization finished\n' + str(self.sol))
+    #     return sol
 
