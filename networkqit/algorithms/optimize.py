@@ -530,7 +530,7 @@ class Adam(StochasticOptimizer):
             ftol=1E-10,
             gtol=1E-5,
             xtol=1E-8,
-            last_iters = 100
+            last_iters = 100,
             **kwargs):
         
         opts = {'ftol': ftol,
