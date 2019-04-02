@@ -10,18 +10,22 @@ import networkqit as nq
 from networkqit import Adam
 import networkx as nx
 
-A = np.loadtxt('/home/carlo/workspace/communityalg/data/karate.adj')
+#A = np.loadtxt('/home/carlo/workspace/communityalg/data/karate.adj')
 
-#A = nq.ring_of_custom_cliques([24,12,8,4,2])
+A = nq.ring_of_custom_cliques([24,12,8])
 N = len(A)
 M = nq.IsingModel(N=N)
 p = A.sum() / (N*(N-1))
 L = nq.graph_laplacian(A)
 
-beta = 0.1
+beta = 1
 opt = Adam(G=A, L=L, x0=np.random.random([N*N,]), model=M)
 rho = nq.compute_vonneuman_density(L=L, beta=beta)
-sol = opt.run(beta)
+for rep in range(10):
+      sol = opt.run(beta, learning_rate=1E-3, batch_size=32, maxiter=1000)
+      nq.plot_mle(A, M.expected_adjacency(sol['x']))
+      plt.show()
+
 #sol = opt.run(refresh_frames=5000, quasi_hyperbolic=True, eta=1E-3, max_iters=5, gtol=1E-5, batch_size=64)
 
 

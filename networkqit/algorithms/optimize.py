@@ -498,6 +498,7 @@ class StochasticOptimizer:
                 # compute the penalty with respect to high bounds violation 
                 penalty_high = np.max(np.hstack([z, theta - self.model.max_bounds]))
                 return np.max(np.hstack(penalty_low,penalty_high))
+            penalty = quadratic_penalty
             dkl += beta*penalty(z)
             return dkl
 
@@ -526,11 +527,12 @@ class Adam(StochasticOptimizer):
             nu1=1.0,
             nu2=1.0,
             epsilon=1E-8,
-            batch_size=16,
+            batch_size=64,
             ftol=1E-10,
             gtol=1E-5,
             xtol=1E-8,
             last_iters = 100,
+            callback=None,
             **kwargs):
         
         opts = {'ftol': ftol,
@@ -576,9 +578,8 @@ class Adam(StochasticOptimizer):
             #else: # vanilla Adam
             deltax = mttilde / np.sqrt(vttilde + epsilon)
             self.sol.x -= learning_rate * deltax
-            print(self.sol.x.sum())
-        self.sol = sol
-        return sol
+            print(dkl)
+        return self.sol
 
     # def run(self, **kwargs):
     #     x = self.x0

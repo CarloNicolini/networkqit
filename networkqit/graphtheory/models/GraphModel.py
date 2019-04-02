@@ -232,13 +232,14 @@ class IsingModel(GraphModel):
     def sample_adjacency(self, theta, batch_size=1, with_grads=False, slope=500):
         # sample symmetric random uniforms
         rij = batched_symmetric_random(batch_size, self.N)
-        pij = np.reshape(np.tile(np.reshape(theta,[self.N,self.N]), [batch_size,1]),[batch_size, self.N, self.N])
+        pij = np.reshape(theta,[self.N,self.N])
+        #pij = np.reshape(np.tile(np.reshape(theta,[self.N,self.N]), [batch_size,1]),[batch_size, self.N, self.N])
         if with_grads:
             A = expit(slope*(pij-rij))
         else:
             A = (pij>rij).astype(float)
-        A = np.triu(A, 1)
-        A += np.transpose(A,axes=[0,2,1])
+        #A = np.triu(A, 1)
+        #A += np.transpose(A,axes=[0,2,1])
         return A
 
 class Edr(GraphModel):
