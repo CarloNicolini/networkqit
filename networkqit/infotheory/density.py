@@ -182,7 +182,7 @@ def batch_relative_entropy(Lobs : np.array, Lmodel: np.array, beta : float, one_
         return SpectralDivergence(Lobs=Lobs, Lmodel=Lmodel, beta=beta).rel_entropy
 
 
-def batch_beta_relative_entropy(Lobs : np.array, Lmodel : np.array, beta_range : np.array):
+def batch_beta_relative_entropy(Lobs : np.array, Lmodel : np.array, beta_range : np.array, pade_expm = False):
     if len(Lobs.shape) != 2:
         raise RuntimeError('Must provide a square, non batched observed laplacian')
     
@@ -196,9 +196,15 @@ def batch_beta_relative_entropy(Lobs : np.array, Lmodel : np.array, beta_range :
     loglike_beta = np.zeros([nbeta,])
     dkl_beta = np.zeros([nbeta,])
     lambd_model = eigh(Lmodel)[0] # batched eigenvalues
-    expmLobs = expm(-Lobs)
+    if not pade_expm:
+        lambd_obs, Q_obs = np.linalg.eigh(Lobs) # this trick makes it possible to compute rho once
+    # and then play just with beta
     for i, beta in enumerate(beta_range):
-        rho_beta = compute_vonneuman_density(L=Lobs, beta=beta)
+        if pade_expm: # use the expm to compute von neumann density
+            rho_beta = compute_vonneuman_density(L=Lobs, beta=beta)
+        else:
+            rho_beta = np.linalg.multi_dot([Q_obs,np.diag(np.exp(-beta*lambd_obs)),Q_obs.T])
+            rho_beta /= np.trace(rho_beta)
         Emodel_beta[i] = np.mean(np.sum(np.sum(Lmodel * rho_beta, axis=2), axis=1))
         Fmodel_beta[i] =  - np.mean(logsumexp(-beta * lambd_model, axis=1))/beta
         loglike_beta[i] = beta * (Emodel_beta[i] - Fmodel_beta[i])
