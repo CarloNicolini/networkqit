@@ -474,6 +474,52 @@ class TopoJaccard(GraphModel):
     def sample_adjacency(self, theta, batch_size=1, with_grads=False, slope=500):
         return None
 
+class EconomicalClustering(GraphModel):
+    """
+    # We use the Matching Index model of
+    # Generative models of the human connectome
+    # Betzel, Richard F. et al, Neuroimage (2016)
+    """
+    def __init__(self, G, dij, **kwargs):
+        if kwargs is not None:
+            super().__init__(**kwargs)
+        self.G = G # save the adjacency matrix        
+        self.model_type = 'topological'
+        self.dij = dij
+        self.normalized = kwargs.get('normalized', True)
+        if self.normalized:
+            self.formula = r'$c_{jacc} (J_{ij})^{-\mu_{jacc}}$'
+        else:
+            self.formula = r'$c_{commnei} (\sum_l A_{il}A_{lj})^{-\mu_{commnei}}$'
+        self._generate_matching() # then generate the matching
+        self.bounds = [(None, None), (None, None)]
+
+    def _generate_matching(self):
+        from scipy.spatial.distance import cdist
+        # https://mathoverflow.net/questions/123339/weighted-jaccard-similarity
+        # https://docs.scipy.org/doc/scipy-1.0.0/reference/generated/scipy.spatial.distance.cdist.html
+        if self.normalized:
+            self.K = cdist(self.G, self.G, lambda u, v: (np.minimum(u,v).sum())/(np.maximum(u,v).sum()) )
+        else:
+            self.K = cdist(self.G, self.G, lambda u, v: np.minimum(u,v).sum() )
+        
+    def expected_adjacency(self, theta):
+        p1 = (np.eye(self.N) + self.dij)**(theta[0])
+        p1 *= (1-np.eye(self.N))
+        p2 = (self.K**(theta[1]))
+        return  p1 * p2
+
+
+    def sample_adjacency(self, theta, batch_size=1, with_grads=False, slope=500):
+        rij = batched_symmetric_random(batch_size, self.N)
+        pij = self.expected_adjacency(theta)
+        if with_grads:
+            A = expit(slope*(pij-rij)) # sampling, approximates binomial with continuos
+        else:
+            A = (pij>rij).astype(float)
+        A = np.triu(A, 1) # make it symmetric
+        A += np.transpose(A, axes=[0, 2, 1])
+        return A
 
 
 # class ModelFactory():

@@ -550,12 +550,13 @@ class Adam(StochasticOptimizer):
                 
         # if rho is provided, user rho is used, otherwise is computed at every beta
         if rho is None:
-            rho = (compute_vonneuman_density(L=self.L, beta=beta))
+            rho = compute_vonneuman_density(L=self.L, beta=beta)
         
         for t in range(1,int(maxiter)+1):
             self.sol.nit += 1
             # get the relative entropy value and its gradient w.r.t. variables
             dkl, grad_t = self.gradient(self.sol.x, rho, beta, batch_size=batch_size)
+            
             # Convergence status
             if np.linalg.norm(grad_t) < gtol:
                 self.sol.success = True
