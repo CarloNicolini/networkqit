@@ -21,5 +21,8 @@
 import networkqit.infotheory.density
 from networkqit.infotheory.density import *
 
+import networkqit.infotheory.density2
+from networkqit.infotheory.density2 import *
+
 import networkqit.infotheory.spectral_density
 from networkqit.infotheory.spectral_density import *
