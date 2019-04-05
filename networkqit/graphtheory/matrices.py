@@ -39,7 +39,7 @@ def graph_laplacian(A):
     """
     if len(A.shape)==3:
         N = A.shape[-1] # last dimension is number of nodes
-        D = np.eye(N) * np.transpose(np.zeros([1, 1, N]) + np.einsum('ijk->ik', A), [1, 0, 2])
+        D = np.eye(N) * np.transpose(np.zeros([1, 1, N]) + np.einsum('ijk->ik', A,optimize=True), [1, 0, 2])
         return D - A
     else:
         return np.diag(A.sum(axis=0)) - A
@@ -100,7 +100,7 @@ def normalized_graph_laplacian(A):
     """
     if len(A.shape)==3:
         N = A.shape[-1]
-        invSqrtD = np.eye(N) * np.transpose(np.zeros([1, 1, N]) + 1/np.sqrt(np.einsum('ijk->ik', A)), [1, 0, 2])
+        invSqrtD = np.eye(N) * np.transpose(np.zeros([1, 1, N]) + 1/np.sqrt(np.einsum('ijk->ik', A,optimize=True)), [1, 0, 2])
         return  np.eye(N) - invSqrtD @ A @ invSqrtD
     else:
         invSqrtT = np.diag(1.0 / np.sqrt(A.sum(axis=0)))
@@ -119,7 +119,7 @@ def bethe_hessian_matrix(A,r):
     """
     N = A.shape[-1]
     if len(A.shape)==3:
-        D = np.eye(N) * np.transpose(np.zeros([1, 1, N]) + np.einsum('ijk->ik', A), [1, 0, 2])
+        D = np.eye(N) * np.transpose(np.zeros([1, 1, N]) + np.einsum('ijk->ik', A, optimize=True), [1, 0, 2])
         return (r**2 - 1)*np.ones(A.shape) - r*A + D
     else:        
         D = np.diag(A.sum(0))
@@ -221,8 +221,8 @@ def modularity_matrix(A):
     if len(A.shape)==3:
         N = A.shape[-1]
         b  = A.shape[0]
-        k = np.einsum('ijk->ik', A)
-        kikj = np.einsum('ij,ik->ijk', k, k)
+        k = np.einsum('ijk->ik', A, optimize=True)
+        kikj = np.einsum('ij,ik->ijk', k, k, optimize=True)
         m = np.sum(np.sum(A,axis=1), axis=1, keepdims=True)
         B = A - (kikj/np.broadcast_to(np.expand_dims(m,axis=2),A.shape))    # batched kikj/2m
         return  B
@@ -238,7 +238,7 @@ def signed_laplacian(A):
     """
     if len(A.shape)==3:
         N = A.shape[-1] # last dimension is number of nodes
-        D = np.eye(N) * np.transpose(np.zeros([1, 1, N]) + np.einsum('ijk->ik', A), [1, 0, 2])
+        D = np.eye(N) * np.transpose(np.zeros([1, 1, N]) + np.einsum('ijk->ik', A,optimize=True), [1, 0, 2])
         return np.abs(D) - A
     else:
         return np.diag(np.abs(A.sum(axis=0))) - A

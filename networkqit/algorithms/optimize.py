@@ -474,7 +474,7 @@ class StochasticOptimizer:
             Amodel = self.model.sample_adjacency(theta=z, batch_size=batch_size, with_grads=True)
             #print('Amodel nan?:', np.any(np.isnan(Amodel.ravel())))
             # Here exploit broadcasting to create batch_size diagonal matrices with the degrees
-            Dmodel = np.eye(N) * np.transpose(np.zeros([1, 1, N]) + np.einsum('ijk->ik', Amodel), [1, 0, 2])
+            Dmodel = np.eye(N) * np.transpose(np.zeros([1, 1, N]) + np.einsum('ijk->ik', Amodel, optimize=True), [1, 0, 2])
             Lmodel = Dmodel - Amodel  # returns a batch_size x N x N tensor
             # do average over batches of the sum of product of matrix elements (done with * operator)
             Emodel = np.mean(np.sum(np.sum(Lmodel * rho, axis=2), axis=1))
