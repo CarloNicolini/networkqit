@@ -233,7 +233,16 @@ def relative_entropy_one_component(Lobs : np.array, Lmodel : np.array, beta_rang
     if not pade_expm:
         lambd_obs, Q_obs = np.linalg.eigh(Lobs) # this trick makes it possible to compute rho once
     
-    # compute the quantities at every beta    
+    # keep only same eigenvalues set as observed
+    same_components = False
+    if same_components:
+        idx_obs = np.argwhere(lambd_obs<1E-12)
+        num_obs_connected_components = len(idx_obs)
+        idx = np.argwhere( (lambd_model<1E-12).astype(int).sum(axis=1) == num_obs_connected_components ).flatten()
+        Lmodel = Lmodel[idx,:]
+        lambd_model = lambd_model[idx,:]
+    
+    # compute the quantities at every beta
     for i, beta in enumerate(beta_range):
         if pade_expm: # use the expm to compute von neumann density
             rho = density(L=Lobs, beta_range=[beta])
@@ -244,7 +253,7 @@ def relative_entropy_one_component(Lobs : np.array, Lmodel : np.array, beta_rang
         beta_Fm[i] =  - np.mean(logsumexp(-beta * lambd_model, axis=1)) # quenched log partition funtion
         loglike[i] = beta * Em[i] - beta_Fm[i]
         dkl[i] = loglike[i] - Srho[i]
-    return dkl,loglike,Em,beta_Fm
+    return dkl, loglike, Em, beta_Fm
 
 def relative_entropy(Lobs : np.array, Lmodel : np.array, beta_range : np.array):
     import bct
@@ -260,7 +269,7 @@ def relative_entropy(Lobs : np.array, Lmodel : np.array, beta_range : np.array):
         for c in np.unique(idx):
             avg_dkl += relative_entropy_one_component(Lobs = Lobs[np.ix_(idx==c,idx==c)],
                                                       Lmodel=Lmodel[np.ix_(batches,idx==c,idx==c)],
-                                                      beta_range=beta_range)[0]
+                                                      beta_range=beta_range)[0]/beta_range
         return avg_dkl/ncomps
     else:
         return relative_entropy_one_component(Lobs, Lmodel, beta_range)
