@@ -13,7 +13,7 @@ plt.axhline(y=0.174,color='r',label='$\lambda^*$')
 plt.title('$\\lambda$')
 plt.xlabel('$\\beta$')
 plt.ylabel('$\\lambda$')
-plt.legend()
+plt.legend(['S','$\\theta$','$p^\\star$'],loc='top')
 plt.savefig('adam_macaque_fig1.pdf')
 
 plt.figure()

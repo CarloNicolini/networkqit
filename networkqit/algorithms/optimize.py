@@ -460,6 +460,7 @@ class StochasticOptimizer:
         self.model.min_bounds = self.model.ls_bounds.reshape([len(self.x0),2])[:,0]
         self.model.max_bounds = self.model.ls_bounds.reshape([len(self.x0),2])[:,1]
 
+
     def gradient(self, x, rho, beta, batch_size=1):
         # Compute the relative entropy between rho and sigma, using tensors with autograd support
         # Entropy of rho is constant over the iterations
@@ -480,8 +481,9 @@ class StochasticOptimizer:
             Emodel = np.mean(np.sum(np.sum(Lmodel * rho, axis=2), axis=1))
             lambd_model = eigh(Lmodel)[0]  # eigh is a batched operation, take the eigenvalues only
             Fmodel = - np.mean(logsumexp(-beta * lambd_model, axis=1) / beta)
-            loglike = beta * (Emodel - Fmodel) # - Tr[rho log(sigma)]
-            dkl = loglike # - entropy # Tr[rho log(rho)] - Tr[rho log(sigma)]
+            loglike = -beta * Emodel + Fmodel # - Tr[rho log(sigma)]
+            #loglike  #- entropy # Tr[rho log(rho)] - Tr[rho log(sigma)]
+            
             # Add a penalty term accouting for boundaries violation
             # Follows these ideas https://www.cs.jhu.edu/~ijwang/pub/01271742.pdf
             def quadratic_penalty(theta):
@@ -499,8 +501,8 @@ class StochasticOptimizer:
                 penalty_high = np.max(np.hstack([z, theta - self.model.max_bounds]))
                 return np.max(np.hstack(penalty_low,penalty_high))
             penalty = quadratic_penalty
-            dkl += beta*penalty(z)
-            return dkl
+            cost = -loglike + beta*penalty(z)
+            return cost
 
         # value and gradient of relative entropy as a function
         dkl_and_dkldx = autograd.value_and_grad(log_likelihood)
@@ -517,6 +519,11 @@ class Adam(StochasticOptimizer):
     However here we use quasi-hyperbolic adam by default, with parameters nu1,nu2
     https://arxiv.org/pdf/1810.06801.pdf
     """
+    def __init__(self, G: np.array, x0 : np.array, model : GraphModel, **kwargs):
+        super().__init__(G, x0, model, **kwargs)
+        self.logfile = open('adam.log','w')
+        self.mt, self.vt = np.zeros(self.sol.x.shape), np.zeros(self.sol.x.shape)
+
     def run(self,
             beta,
             rho=None,
@@ -524,7 +531,7 @@ class Adam(StochasticOptimizer):
             learning_rate=1E-3,
             beta1=0.9,
             beta2=0.999,
-            nu1=1.0,
+            nu1=0.7,
             nu2=1.0,
             epsilon=1E-8,
             batch_size=64,
@@ -532,6 +539,7 @@ class Adam(StochasticOptimizer):
             gtol=1E-5,
             xtol=1E-8,
             last_iters = 100,
+            quasi_hyperbolic = True,
             callback=None,
             **kwargs):
         
@@ -546,40 +554,48 @@ class Adam(StochasticOptimizer):
                 'iprint': kwargs.get('verbose', 0)
                 }
 
-        mt, vt = np.zeros(self.sol.x.shape), np.zeros(self.sol.x.shape)
-                
         # if rho is provided, user rho is used, otherwise is computed at every beta
         if rho is None:
             rho = compute_vonneuman_density(L=self.L, beta=beta)
         
+        #logging.basicConfig(stream=sys.stderr, level=logging.INFO)
+        #import logging
+        #adam_logger = logging.getLogger('ADAM')
+        #adam_logger.setLevel(logging.INFO)
+        #all_dkl = []
+        #from scipy.stats import linregress
+
         for t in range(1,int(maxiter)+1):
             self.sol.nit += 1
             # get the relative entropy value and its gradient w.r.t. variables
             dkl, grad_t = self.gradient(self.sol.x, rho, beta, batch_size=batch_size)
-            
+            print('\rIteration %d beta=%.3f' % (t,beta),end='')
             # Convergence status
             if np.linalg.norm(grad_t) < gtol:
                 self.sol.success = True
                 self.sol.message = 'Exceeded minimum gradient |grad| < %g' % gtol
-            
+                break
+            #all_dkl.append(dkl)
             # check the convergence based on the slope of dkl of the last 10 iterations
-            # if len(all_dkl) > last_iters:
-            #     dkl_iters = np.arange(last_iters)
-            #     slope, intercept, r_value, p_value, std_err = linregress(x=dkl_iters, y=all_dkl[-last_iters:])
-            #     if np.abs(slope - 1E-3) < 0:
-            #             converged = True
-            #             adam_logger.info('Optimization terminated for flatness')
+            #if t > last_iters:
+            #    dkl_iters = np.arange(last_iters)
+            #    slope, intercept, r_value, p_value, std_err = linregress(x=dkl_iters, y=all_dkl[-last_iters:])
+            #    if np.abs(slope - 1E-3) < 0:
+            #        converged = True
+            #        print('Optimization terminated for flatness')
 
-            mt = beta1 * mt + (1.0 - beta1) * grad_t
-            vt = beta2 * vt + (1.0 - beta2) * (grad_t * grad_t)
-            mttilde = mt / (1.0 - (beta1 ** t))  # compute bias corrected first moment estimate
-            vttilde = vt / (1.0 - (beta2 ** t))  # compute bias-corrected second raw moment estimate
-            #if quasi_hyperbolic: # quasi hyperbolic adam
-            #deltax = ((1-nu1) * grad_t + nu1 * mttilde)/(np.sqrt((1-nu2) * (grad_t**2) + nu2 * vttilde ) + epsilon)
-            #else: # vanilla Adam
-            deltax = mttilde / np.sqrt(vttilde + epsilon)
+            self.mt = beta1 * self.mt + (1.0 - beta1) * grad_t
+            self.vt = beta2 * self.vt + (1.0 - beta2) * (grad_t * grad_t)
+            mttilde = self.mt / (1.0 - (beta1 ** t))  # compute bias corrected first moment estimate
+            vttilde = self.vt / (1.0 - (beta2 ** t))  # compute bias-corrected second raw moment estimate
+            if quasi_hyperbolic: # quasi hyperbolic adam
+                deltax = ((1-nu1) * grad_t + nu1 * mttilde)/(np.sqrt((1-nu2) * (grad_t**2) + nu2 * vttilde ) + epsilon)
+            else: # vanilla Adam
+                deltax = mttilde / np.sqrt(vttilde + epsilon)
             self.sol.x -= learning_rate * deltax
-            print(dkl)
+            self.logfile.write( u"%g\t%g\t%g\n" % (self.sol.x,beta,dkl) )
+            if t % 50:
+                self.logfile.flush()
         return self.sol
 
     # def run(self, **kwargs):
