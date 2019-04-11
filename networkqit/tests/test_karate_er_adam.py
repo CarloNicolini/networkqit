@@ -23,15 +23,15 @@ print(p)
 L = nq.graph_laplacian(A)
 
 from scipy.optimize import OptimizeResult
-sol = OptimizeResult(x=np.array([0.8]))
+sol = OptimizeResult(x=np.array([0.2]))
 
 plt.semilogx(np.logspace(-3,3,100),nq.density2.entropy(L=L,beta_range=np.logspace(-3,3,100)))
 plt.grid()
 plt.title('Entropy')
 plt.show()
 opt = Adam(G=A, x0=sol['x'], model=M)
-burnin = 2000
-sample_iteration = 1000
+burnin = 1000
+sample_iteration = 10
 
 def get_beta_at_s(L,beta_range,Sval):
     return beta_range[np.where(nq.density2.entropy(nq.graph_laplacian(A),beta_range=beta_range) > Sval)[0][-1]]
@@ -39,6 +39,6 @@ def get_beta_at_s(L,beta_range,Sval):
 minbeta = get_beta_at_s(nq.graph_laplacian(A),np.logspace(-3,3,200),0.05)
 print(minbeta)
 
-for i,beta in enumerate(np.linspace(0.1,0.01,100)):
+for i,beta in enumerate(np.linspace(0.5,0.01,100)):
 	opt.sol['x'] = sol['x']
 	sol = opt.run(beta, learning_rate=1E-3, batch_size=2, maxiter= burnin if i==0 else sample_iteration, gtol=1E-8)

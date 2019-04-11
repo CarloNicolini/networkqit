@@ -17,40 +17,44 @@ import autograd.numpy as np
 def plot_mle(G,pij,wij=None, **kwargs):
     import matplotlib.pyplot as plt
     fig, ax = plt.subplots(nrows=2,ncols=3,figsize=(12,8))
-    im = ax[0,0].imshow(G,interpolation='none')
+    im = ax[0,0].imshow(G,interpolation='none',cmap='viridis')
     plt.colorbar(im,ax=ax[0,0],fraction=0.046, pad=0.04)
     ax[0,0].grid(False)
     ax[0,0].set_title('Weighted empirical')
+    ax[0,0].set_axis_off()
 
-    im = ax[1,0].imshow((G>0).astype(float),interpolation='none')
+    im = ax[1,0].imshow((G>0).astype(float),interpolation='none',cmap='viridis')
     plt.colorbar(im,ax=ax[1,0],fraction=0.046, pad=0.04)
     ax[1,0].grid(False)
     ax[1,0].set_title('Binary empirical')
+    ax[1,0].set_axis_off()
 
     if wij is not None:
-        im = ax[0,1].imshow(wij,interpolation='none')
+        im = ax[0,1].imshow(wij,interpolation='none',cmap='viridis')
         plt.colorbar(im, ax=ax[0,1],fraction=0.046, pad=0.04)
         ax[0,1].grid(False)
-        ax[0,1].set_title('$<w_{ij}>$')
+        ax[0,1].set_title('$\\langle w_{ij}\\rangle$')
+        ax[0,1].set_axis_off()
 
-    im = ax[1,1].imshow(pij,interpolation='none')
+    im = ax[1,1].imshow(pij,interpolation='none',cmap='viridis')
     plt.colorbar(im,ax=ax[1,1],fraction=0.046, pad=0.04)
     ax[1,1].grid(False)
     ax[1,1].set_title('$p_{ij}$')
+    ax[1,1].set_axis_off()
 
-    ax[1,2].plot((G>0).sum(axis=0)-np.diag(G>0),pij.sum(axis=0) - np.diag(pij), 'b.')
+    ax[1,2].plot((G>0).sum(axis=0)-np.diag(G>0),pij.sum(axis=0) - np.diag(pij), 'b.',MarkerSize=2)
     ax[1,2].plot(np.linspace(0,pij.sum(axis=0).max()),np.linspace(0,pij.sum(axis=0).max()),'r-')
-    ax[1,2].grid(True)
+    ax[1,2].grid(which='both',linestyle='dashed')
     ax[1,2].set_title('Degrees reconstruction')
     ax[1,2].set_ylabel('model')
     ax[1,2].set_xlabel('empirical')
 
     if wij is not None:
-        ax[0,2].plot(G.sum(axis=0), wij.sum(axis=0) - np.diag(wij), 'b.')
+        ax[0,2].plot(G.sum(axis=0), wij.sum(axis=0) - np.diag(wij), 'b.',MarkerSize=2)
         ax[0,2].plot(np.linspace(0,wij.sum(axis=0).max()),np.linspace(0,wij.sum(axis=0).max()),'r-')
         ax[0,2].set_title('Strength reconstruction')
         ax[0,2].axis('equal')
-        ax[0,2].grid(True)
+        ax[0,2].grid(which='both',linestyle='dashed')
         ax[0,2].set_ylabel('model')
         ax[0,2].set_xlabel('empirical')
 

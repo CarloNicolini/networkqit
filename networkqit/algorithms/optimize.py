@@ -140,10 +140,11 @@ class MLEOptimizer:
                 'maxfun': kwargs.get('maxfun', 1E10),
                 'verbose' : kwargs.get('verbose', 0),
                 'disp':  bool(kwargs.get('verbose', 0)),
-                'iprint': kwargs.get('verbose', 0)
+                'iprint': kwargs.get('verbose', 0),
+                'maxls' : 100
                 }
 
-        if kwargs.get('method', 'MLE') is 'MLE':
+        if method is 'MLE':
             # If the model has non-linear constraints, must use Sequential Linear Square Programming SLSQP
             from autograd import jacobian # using automatic jacobian from autograd
             J = jacobian(lambda z : -self.model.loglikelihood(self.G,z))
@@ -173,7 +174,7 @@ class MLEOptimizer:
                 if self.sol['status'] != 0:
                     RuntimeWarning(self.sol['message'])
                 #raise Exception('Method did not converge to maximum likelihood: ')
-        elif kwargs.get('method', 'saddle_point') is 'saddle_point':
+        elif method is 'saddle_point':
             if hasattr(self.model, 'constraints'):
                 raise RuntimeError('Cannot solve saddle_point_equations with non-linear constraints')
             # Use the Dogbox method to optimize likelihood
