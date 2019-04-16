@@ -296,6 +296,9 @@ class ContinuousOptimizer:
 
             xtol (float):
                 tolerance in the solution change
+
+        Output:
+            sol: (scipy.optimize.OptimizeResult) parameters at optimal likelihood
         """
 
         self.method = kwargs.get('method', 'BFGS')

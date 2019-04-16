@@ -154,7 +154,7 @@ Doing this in **networkqit** is simple, as the library relies on the `autograd` 
 
 With the optimization method `Adam` which is borrowed from machine learning, we can optimize the expected relative entropy of the Erdos-Renyi model with respect to our model karate-club network,represented by **A** and see the effects of changing the inverse temperature parameter `beta` on the optimization process.
 
-At every iteration, a number of random networks (batch_size) are sampled from the model, and their average spectral properties are used to compute an approximation to the expected relative entropy.
+At every iteration, a `batch_size` number of random networks are sampled from the model, and their average spectral properties are used to compute an approximation to the expected relative entropy.
 In this example we see how to optimze a model with `N (N-1)` free Bernoulli random variables that describe links in a graph.
 At each stage in the `for` loop we replot the result, compared with the original network. We sample at each iteration of Adam a number of 32 independent networks, in order to form a good statistic for the calculation of the Laplacian spectrum.
 
@@ -173,3 +173,27 @@ At each stage in the `for` loop we replot the result, compared with the original
         sol = opt.run(beta, learning_rate=1E-3, batch_size=32, maxiter=1000)
         nq.plot_mle(A, M.expected_adjacency(sol['x']))
         plt.show()
+
+# TODO
+
+I would like to find someone helping in implementing XLA instead of autograd as the basic package for automatic differentiation. Indeed XLA has the possibility to extend calculations on the GPU and (in future) on MultiGPU or TPU systems, effortlessly. It would be possible to scale to much larger problems.
+
+# Citing 
+To cite **networkqit** please include the following publication in BibTeX format:
+
+    @article{PhysRevE.98.022322,
+      title = {Thermodynamics of network model fitting with spectral entropies},
+      author = {Nicolini, Carlo and Vlasov, Vladimir and Bifone, Angelo},
+      journal = {Phys. Rev. E},
+      volume = {98},
+      issue = {2},
+      pages = {022322},
+      numpages = {10},
+      year = {2018},
+      month = {Aug},
+      publisher = {American Physical Society},
+      doi = {10.1103/PhysRevE.98.022322},
+      url = {https://link.aps.org/doi/10.1103/PhysRevE.98.022322}
+    }
+
+It is also vailable [at this link ](https://journals.aps.org/pre/abstract/10.1103/PhysRevE.98.022322)

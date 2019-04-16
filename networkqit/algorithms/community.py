@@ -71,7 +71,7 @@ def comm_assortativity(A, memb):
     of the Peixoto paper "Nonparametric weighted stochastic block models"
     https://arxiv.org/pdf/1708.01432.pdf
 
-    Input:
+    Args:
         A (np.array): the (weighted) adjacency matrix
         memb (list): the node block membership 
     Output:
@@ -101,7 +101,7 @@ def reindex_membership(memb, key='community_size', compress_singletons=False, ad
     This function has the membership as input and output the membership
     where the communities number are ordered by the number of nodes in that community
 
-    Input:
+    Args:
         memb (list): a list of nodes membership
         key (str): by default it sorts the community indices by decreasing number of nodes in each community.
                    other arguments are 'community_weight' (sum of all internal community weights)
@@ -152,8 +152,11 @@ def reassign_singletons(memb):
     Set all the singleton communities into the same community.
     If membership has C communities, S of which are singletons, then
     this function sets the singleton communities with the label C + 1
-    Input:
-
+    Args:
+        memb (np.array): the input membership vector
+    Output:
+        an array where all the nodes with a single community are merged 
+        into one.
     """
     memb2 = np.array(reindex_membership(memb))
     max_memb = np.max(memb2) + 1
