@@ -29,80 +29,102 @@ from networkqit.graphtheory.matrices import graph_laplacian
 from autograd.numpy.linalg import eigh
 from autograd.scipy.misc import logsumexp
 
-
-def compute_vonneuman_density(L, beta):
-    """ Get the von neumann density matrix :math:`\\frac{e^{-\\beta L}}{\\mathrm{Tr}[e^{-\\beta L}]}` """
-    rho = expm(-beta * L)
-    return rho / np.trace(rho)
-
-
-def batch_compute_vonneuman_density(L, beta_range):
-    """ Get the von neumann density matrix :math:`\\frac{e^{-\\beta L}}{\\mathrm{Tr}[e^{-\\beta L}]}` """
-    return np.asarray([compute_vonneuman_density(L,b) for b in beta_range])
-
-
-def compute_vonneumann_entropy(**kwargs):
+def density(L : np.array, beta_range : np.array):
     """
-    Get the von neumann entropy of the density matrix :math:`S(\\rho) = -\\mathrm{Tr}[\\rho \log \\rho]`
+    Get the von neumann density matrix rho
+    over a range of beta values, for single or batched laplacians
+
+    :math:`\\frac{e^{-\\beta L}}{\\mathrm{Tr}[e^{-\\beta L}]}`
+
+    Parameters
+    ----------
+    L: np.array
+        A nxn square graph laplacian, or a batch [batch_size,n,n] of Laplacians
+
+    beta: float, beta_range
+        a single value of beta if float is passed, otherwise an array of different betas
+        the numbers of values in beta_range in denoted as b
+
+    Returns
+    -------
+    rho (np.array): the shape of the output rho array depends on the shape of the inputs
+                    it is always [b,batch_size,n,n]. If both a square Laplacian and a float
+                    beta are passed, then the output is simply [n,n].
+                    Final dimensions are squeezed
     """
+    n,m = L.shape[-1],L.shape[-2]
+    if n != m:
+        raise RuntimeError('Must input square or batched square laplacian [batch_size,n,n]')
+    _beta_range = beta_range
+    if isinstance(beta_range, float) or isinstance(beta_range, int):
+        _beta_range = np.asarray([beta_range])
+    lambd, Q = np.linalg.eigh(L) # eigenvalues and eigenvectors of (batched) Laplacian
+    ndim = len(L.shape)
 
-    def entropy(L, beta):
-        lambd = eigvalsh(L)
-        # l = l[l > 0] # introduces an error, entropy doesn't tend to 0 in beta=inf
-        lrho = np.exp(-beta * lambd)
-        Z = lrho.sum()
-        return np.log(Z) + beta * (lambd * lrho).sum() / Z
-
-    if 'density' in kwargs.keys():
-        lambd = eigvalsh(kwargs['density'])
-        return entropy(lambd[lambd > 0])
-
-    elif 'A' in kwargs.keys() and 'beta' in kwargs.keys():
-        A = kwargs['A']
-        L = graph_laplacian(A)
-        return entropy(L, kwargs['beta'])
-
-    elif 'L' in kwargs.keys() and 'beta' in kwargs.keys():
-        return entropy(kwargs['L'], kwargs['beta'])
+    if ndim==3:
+        batch_size = L.shape[0]
+        def batched_eigvals_to_batched_diag(beta,v):
+            return np.einsum('lij,li->lij', (np.eye(n) + np.zeros([batch_size,n,n])), np.exp(-beta*v), optimize=True)
+        rho = np.asarray([np.einsum('mij,mjk,mkl->mil', Q, batched_eigvals_to_batched_diag(beta, lambd) , np.transpose(Q,[0,2,1]), optimize=True)  for beta in _beta_range])
+    elif ndim==2:
+        rho = np.asarray([np.linalg.multi_dot([Q, np.diag(np.exp(-beta*lambd)) , Q.T]) for beta in _beta_range])[:,None,:,:]
+    rho /= np.trace(rho,axis1=2,axis2=3)[:, :, None, None]
+    return np.squeeze(rho)
 
 
-def batch_compute_vonneumann_entropy(L, beta_range):
+def entropy(L : np.array, beta_range: np.array):
     """
-    This function computes spectral entropy over a range of beta, given that L remains the same
+    This function computes Von Neumann spectral entropy over a range of beta values
+    for a (batched) network with Laplacian L
+    :math:`S(\\rho) = -\\mathrm{Tr}[\\rho \\log \\rho]`
+
+    Parameters
+    ----------
+    L: np.array
+        The (batched) n x n graph laplacian. If batched, the input dimension is [batch_size,n,n]
+    
+    beta_range: (iterable) list or numpy.array
+        The range of beta
+
+    Returns
+    -------
+    np.array
+        The unnormalized Von Neumann entropy over the beta values and over all batches.
+        Final dimension is [b,batch_size]. If 2D input, final dimension is [b]
+        where b is the number of elements in the array beta_range
+
+    Raises
+    ------
+    None
     """
-    lambd = eigvalsh(L)
-    entropy = []
-    for b in beta_range:
-        lrho = np.exp(-b * lambd)
-        Z = lrho.sum()
-        entropy.append(np.log(Z) + b * (lambd * lrho).sum() / Z)
-    entropy = np.array(entropy)
+    ndim = len(L.shape)
+    lambd, Q = np.linalg.eigh(L) # eigenvalues and eigenvectors of (batched) Laplacian
+    if ndim==3:
+        batch_size = L.shape[0]
+        entropy = np.zeros([batch_size, len(beta_range)])
+        lrho = np.exp(-np.multiply.fun.outer(beta_range,lambd))
+        Z = np.sum(lrho, axis=2)
+        entropy = np.log(Z) + beta_range[:,None]*np.sum(lambd*lrho,axis=2)/Z
+    elif ndim==2:
+        entropy = np.zeros_like(beta_range)
+        for i,b in enumerate(beta_range):
+            lrho = np.exp(-b * lambd)
+            Z = lrho.sum()
+            entropy[i] = np.log(np.abs(Z)) + b * (lambd * lrho).sum() / Z
+    else:
+        raise RuntimeError('Must provide a 2D or 3D array (as batched 2D arrays)')
     entropy[np.isnan(entropy)] = 0
-    return np.array(entropy)
+    return entropy
 
 
-def compute_vonneumann_entropy_beta_deriv(**kwargs):
+def entropy_beta_deriv(L, beta_range):
     """
-    Get the derivative of entropy with respect to inverse temperature :math:`\\frac{\\partial S(\\rho)}{\\partial \\beta}`
-    """
-    if 'A' in kwargs.keys() and 'beta' in kwargs.keys():
-        A = kwargs['A']
-        L = graph_laplacian(A)
-        rho = compute_vonneuman_density(L, kwargs['beta'])
-        logmrho = logm(rho)
-        # Tr [ Lρ log ρ ] − Tr [ ρ log ρ ] Tr [ Lρ ]
-        return np.trace(L @ rho @ logmrho) - np.trace(rho @ logmrho) * np.trace(L @ rho)
-
-    elif 'L' in kwargs.keys() and 'beta' in kwargs.keys():
-        L = kwargs['L']
-        rho = compute_vonneuman_density(L, kwargs['beta'])
-        return np.trace(L @ rho @ logm(rho)) - np.trace(rho @ logm(rho)) * np.trace(L @ rho)
-
-
-def batch_compute_vonneumann_entropy_beta_deriv(L, beta_range):
-    """
-    Compute the Von Neumann entropy of a graph laplacian over the range of beta parameters
-
+    Computes the derivative of Von Neumann entropy with
+    respect to the beta parameter
+    :math:`\\frac{\\partial S(\\rho)}{\\partial \\beta}`
+    
+    Note: this function uses autograd method to get the derivatives
+    
     Parameters
     ----------
     L: np.array
@@ -121,19 +143,19 @@ def batch_compute_vonneumann_entropy_beta_deriv(L, beta_range):
     """
 
     lambd = eigvalsh(L)
-    def entropy(b):
+    def _entropy(b):
         lambd_rho = np.exp(-b * lambd)
         Z = lambd_rho.sum()
         return np.log(Z) + b * (lambd * lambd_rho).sum() / Z
     from autograd import grad
-    dsdb = grad(lambda y: entropy(y))
+    dsdb = grad(lambda y: _entropy(y))
     return np.array([dsdb(x) for x in beta_range])
 
 
 def find_beta_logc(L, c, a=1E-5, b=1E5):
     """
     Computes the exact beta such that the Von Neumann entropy is S=log(c) where c is a float.
-    This method uses the bisection method to solve find the solution.
+    This method uses the bisection method to find the solution.
 
     Parameters
     ----------
@@ -165,51 +187,120 @@ def find_beta_logc(L, c, a=1E-5, b=1E5):
         return np.log(Z) + b * (l * lrho).sum() / Z
     return bisect(lambda x: s(x, lambd) - np.log(c), a, b)
 
+def relative_entropy_one_component(Lobs : np.array, Lmodel : np.array, beta_range : np.array):
+    """
+    This function makes it possible to efficiently compute the average relative entropy E[S(rho || sigma)]
+    over a batch of model laplacians, and given a range of beta.
+    This function efficiently computes exploiting some numerical tricks
 
-def batch_relative_entropy(Lobs : np.array, Lmodel: np.array, beta : float, one_connected_component=False):
-    if len(Lobs.shape) != 2:
-        raise RuntimeError('Must provide a square, non batched observed laplacian')
-    Srho = compute_vonneumann_entropy(L=Lobs, beta=beta)
-    rho = compute_vonneuman_density(L=Lobs, beta=beta)
-    if len(Lmodel.shape) == 3: # compute the average relative entropy over batched laplacians
-        Emodel = np.mean(np.sum(np.sum(Lmodel * rho, axis=2), axis=1))
-        lambd_model = eigh(Lmodel)[0] # batched eigenvalues            
-        Fmodel = - np.mean(logsumexp(-beta * lambd_model, axis=1) / beta)
-        loglike = beta * (Emodel - Fmodel) # - Tr[rho log(sigma)]
-        dkl = loglike  - Srho # Tr[rho log(rho)] - Tr[rho log(sigma)]
-        return dkl
-    else:
-        return SpectralDivergence(Lobs=Lobs, Lmodel=Lmodel, beta=beta).rel_entropy
+    Parameters
+    ----------
+    Lobs: np.array
+        a square laplacian nxn matrix of the empirical network
+    Lmodel: np.array
+        a square (or batched) laplacian matrix of model network.
+        if a [b,n,n] array is given, the first dimension is considered the batch size
 
+    beta_range: np.array or float
+        the range of beta values over which to compute the relative entropy
+    
+    Returns
+    --------
+    dkl: np.array
+            the array of expected relative entropy between empirical and model networks,
+            evalued at each beta
 
-def batch_beta_relative_entropy(Lobs : np.array, Lmodel : np.array, beta_range : np.array, pade_expm = False):
+    Raises
+    ------
+    None
+    """
     if len(Lobs.shape) != 2:
         raise RuntimeError('Must provide a square, non batched observed laplacian')
     
     if len(Lmodel.shape)==2:
         Lmodel = np.expand_dims(Lmodel,0) # add the zero dimension to have batched 
 
-    Srho = batch_compute_vonneumann_entropy(L=Lobs, beta_range=beta_range)
+    Srho = entropy(L=Lobs, beta_range=beta_range)
+    batch_size = Lmodel.shape[0]
     nbeta = len(beta_range)
-    Emodel_beta = np.zeros([nbeta,])
-    Fmodel_beta = np.zeros([nbeta,])
-    loglike_beta = np.zeros([nbeta,])
-    dkl_beta = np.zeros([nbeta,])
-    lambd_model = eigh(Lmodel)[0] # batched eigenvalues
+    Em = np.zeros([nbeta,])
+    beta_Fm = np.zeros([nbeta,])
+    loglike = np.zeros([nbeta,])
+    dkl = np.zeros([nbeta,])
+    lambd_model = np.linalg.eigh(Lmodel)[0] # batched eigenvalues
+
+    pade_expm = False
     if not pade_expm:
         lambd_obs, Q_obs = np.linalg.eigh(Lobs) # this trick makes it possible to compute rho once
-    # and then play just with beta
+    
+    # keep only same eigenvalues set as observed
+    same_components = False
+    if same_components:
+        idx_obs = np.argwhere(lambd_obs<1E-12)
+        num_obs_connected_components = len(idx_obs)
+        idx = np.argwhere( (lambd_model<1E-12).astype(int).sum(axis=1) == num_obs_connected_components ).flatten()
+        Lmodel = Lmodel[idx,:]
+        lambd_model = lambd_model[idx,:]
+    
+    # compute the quantities at every beta
     for i, beta in enumerate(beta_range):
         if pade_expm: # use the expm to compute von neumann density
-            rho_beta = compute_vonneuman_density(L=Lobs, beta=beta)
-        else:
-            rho_beta = np.linalg.multi_dot([Q_obs,np.diag(np.exp(-beta*lambd_obs)),Q_obs.T])
-            rho_beta /= np.trace(rho_beta)
-        Emodel_beta[i] = np.mean(np.sum(np.sum(Lmodel * rho_beta, axis=2), axis=1))
-        Fmodel_beta[i] =  - np.mean(logsumexp(-beta * lambd_model, axis=1))/beta
-        loglike_beta[i] = beta * (Emodel_beta[i] - Fmodel_beta[i])
-        dkl_beta[i] = loglike_beta[i] - Srho[i]
-    return dkl_beta
+            rho = density(L=Lobs, beta_range=[beta])
+        else: # no need of batched operations here, one only observation!
+            rho = np.linalg.multi_dot([Q_obs,np.diag(np.exp(-beta*lambd_obs)),Q_obs.T])
+            rho /= np.trace(rho)
+        Em[i] = np.mean(np.sum(np.sum(Lmodel * rho, axis=2), axis=1)) # average energy
+        beta_Fm[i] =  - np.mean(logsumexp(-beta * lambd_model, axis=1)) # quenched log partition funtion
+        loglike[i] = beta * Em[i] - beta_Fm[i]
+        dkl[i] = loglike[i] - Srho[i]
+    return dkl, loglike, Em, beta_Fm
+
+def relative_entropy(Lobs : np.array, Lmodel : np.array, beta_range : np.array):
+    """
+    This function makes it possible to efficiently compute the average relative entropy E[S(rho || sigma)]
+    over a batch of model Laplacians, and given a range of beta.
+    This function efficiently computes S(rho || sigma) with some numerical tricks to avoid recalculation
+    of the rho matrix over a range of beta values.
+
+    Parameters
+    ----------
+    Lobs: np.array
+        a square laplacian nxn matrix of the empirical network
+    Lmodel: np.array
+        a square (or batched) laplacian matrix of model network.
+        if a [b,n,n] array is given, the first dimension is considered the batch size
+
+    beta_range: np.array or float
+        the range of beta values over which to compute the relative entropy
+    
+    Returns
+    --------
+    dkl: np.array
+            the array of expected relative entropy between empirical and model networks,
+            evalued at each beta
+
+    Raises
+    ------
+    None
+    """
+    import bct
+    Aobs = Lobs.copy()
+    np.fill_diagonal(Aobs,0)
+    Aobs = -Aobs
+    idx, comps = bct.get_components(Aobs)
+    ncomps = len(comps)
+    batches = range(Lmodel.shape[0])
+    avg_dkl = np.zeros_like(beta_range)
+
+    if ncomps>1: # disconnected graph, need to average over this function
+        for c in np.unique(idx):
+            avg_dkl += relative_entropy_one_component(Lobs = Lobs[np.ix_(idx==c,idx==c)],
+                                                      Lmodel=Lmodel[np.ix_(batches,idx==c,idx==c)],
+                                                      beta_range=beta_range)[0]/beta_range
+        return avg_dkl/ncomps
+    else:
+        return relative_entropy_one_component(Lobs, Lmodel, beta_range)
+
 
 class SpectralDivergence(object):
     """
@@ -221,7 +312,9 @@ class SpectralDivergence(object):
 
     kwargs:
         rho (numpy.array): you can avoid computation of rho, if in some optimization method this is kept constant.
-        fast_mode (bool): if fast_mode is set to True (default) the average model and observed energy are coompuuted as sum of elementwise products, otherwise trace of matrix product is used. Moreover computation of eigenvalues instead of tracing of matrix exponential is used.
+        fast_mode (bool): if fast_mode is set to True (default) the average model and observed energy are compuuted
+                          as sum of elementwise products, otherwise trace of matrix product is used. 
+                          Moreover computation of eigenvalues instead of tracing of matrix exponential is used.
     """
 
     def __init__(self, Lobs: np.array, Lmodel: np.array, beta: float, **kwargs):
@@ -247,8 +340,8 @@ class SpectralDivergence(object):
         self.deltaE = self.Em - self.Eo
         # Computation of partition functions
         if self.fast_mode:  # prefer faster implementation based on eigenvalues
-            lm = eigvalsh(Lmodel)
-            lo = eigvalsh(Lobs)
+            lm = np.linalg.eigvalsh(Lmodel)
+            lo = np.linalg.eigvalsh(Lobs)
             self.Zm = np.exp(-beta * lm).sum()
             self.Zo = np.exp(-beta * lo).sum()
         else:  # otherwise compute with matrix exponentials
@@ -270,7 +363,7 @@ class SpectralDivergence(object):
         self.rel_entropy = np.abs(self.loglike - self.entropy)
 
         if kwargs.get('compute_js', False):
-            l = eigvalsh(self.rho + self.sigma)
+            l = np.linalg.eigvalsh(self.rho + self.sigma)
             self.jensen_shannon = entropy(
                 l[l > 0]) - 0.5 * (entropy(eigvalsh(self.rho) + entropy(eigvalsh(self.sigma))))
         self.options = kwargs

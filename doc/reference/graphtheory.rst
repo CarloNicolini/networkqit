@@ -9,7 +9,6 @@ All the maximum entropy models are enclosed in the `MEModels` submodule.
 
 .. automodule:: networkqit.graphtheory
 .. autosummary::
-   :toctree: generated/
 
    graphs
    matrices

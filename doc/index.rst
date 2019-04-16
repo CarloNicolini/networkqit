@@ -4,15 +4,16 @@
 
 Overview
 ========
+
 .. html
 
     :Release: |version|
     :Date: |today|
 
-================ =================== ==================  ==========  ===============
-   **Date**      **Python Versions**   **Main Author**   **GitHub**      **pypl**
-|date|                3.5+      `Carlo Nicolini`_  `Source`_   `Distribution`_
-================ =================== ==================  ==========  ===============
+================ =================== ==================  ========================================
+   **Date**      **Python Versions**   **Main Author**   **GitHub**                          
+    |today|           3.5+              Carlo Nicolini    `github.com/carlonicolini/networkqit`
+================ =================== ==================  ========================================
 
 **networkqit** is a Python package for working within the spectral entropy framework of complex networks.
 However networkqit is of huge help also in developing, testing and using other Maximum Entropy network
@@ -20,16 +21,20 @@ models, such as the Erdos-Renyi, Configuration model and other complex variants 
 
 The spectral entropies framework was firstly introduced in the paper:
 
- Spectral Entropies as Information-Theoretic Tools for Complex Network Comparison, Phys. Rev. X 6, 041062 (2016)
+.. [Dedomenico2016] Dedomenico M., Biamonte J.
+                    Spectral Entropies as Information-Theoretic Tools for Complex Network Comparison
+                    Phys. Rev. X 6, 041062 (2016)
 
 This toolbox is among the first implementations of the spectral entropy framework.
 It entails both computation of the density matrices, as well as number of methods of model fitting methods.
 If you are using **networkqit** please cite the following paper:
 
- Nicolini C., Vlasov V. Bifone A. "Thermodynamics of network model fitting with spectral entropies",
- Phys. Rev. E 98, 022322 (2018)
+.. [Nicolini2018] Nicolini C., Vlasov V. Bifone A.
+                  Thermodynamics of network model fitting with spectral entropies,
+                  Phys. Rev. E 98, 022322 (2018)
 
 **networkqit** depends heavily on a number of math libraries, the typical scientific python stack.
+
 
 Installing
 ----------
@@ -37,10 +42,12 @@ Installing
 **networkqit** is only available for Python 3 users.
 You can install the latest stable version of networkqit with pip:
 
+::
+
     pip3 install networkqit
 
 All the dependencies of **networkqit** are installed automatically.
-Follow the :doc:`</install>` instructions for further information.
+Follow the install instructions for further information.
 
 Documentation
 ----------------
@@ -67,4 +74,4 @@ Free software
 **networkqit** is free software; you can redistribute it and/or modify it under
 the terms of the :doc:`3-clause BSD License </license>`.
 I appreciate and welcome contributions to the code.
-Join me on `Bitbucket <https://bitbucket.org/carlonicolini/networkqit>`_.
+Join me on `Bitbucket <https://github.com/carlonicolini/networkqit>`_.

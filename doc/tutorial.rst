@@ -25,7 +25,7 @@ This example shows how to generate the spectral entropy plots shown in our main 
    >>> import matplotlib.pyplot as plt
    >>> plt.style.use('ggplot')
    >>> beta_range = np.logspace(-3,3,200)
-   >>> Sbeta = nq.batch_compute_vonneumann_entropy(L=nq.graph_laplacian(A),beta_range=beta_range)
+   >>> Sbeta = nq.entropy(L=nq.graph_laplacian(A), beta_range=beta_range)
    >>> plt.semilogx(beta_range, Sbeta)
    >>> plt.xlabel('$\\beta$')
    >>> plt.ylabel('$S$')
@@ -39,9 +39,10 @@ Generative network models
 -------------------------
 
 **networkqit** features a large number of network models, mainly those obtained from within the Maximum Entropy
-framework. You can create a number of models and call methods on them by a consistent nomenclature:
+framework, and some other models from brain networks connectivity.
+You can create a number of models and call methods on them by a consistent nomenclature.
 Here we create an instance of the Undirected Binary Configuration model (UBCM), and sample 10 random networks from this
-ensemble, based on the fitness parameters .. :math: x_i created at  random in the [0,1] domain.
+ensemble, based on the fitness parameters $x_i$ created at  random in the $\lbrack 0,1 \rbrack$ domain.
 
 .. nbplot::
 
@@ -52,8 +53,8 @@ ensemble, based on the fitness parameters .. :math: x_i created at  random in th
    >>> adj_graphs = model.sample_adjacency(xi, batch_size=5)
    >>> print(adj_graphs.shape)
 
-The call returns a [5,N,N] numpy array, where the last two dimensions embed with the adjacency matrix of the 5 random graphs.
-The method `sample_adjacency` is available for every generative model implemented in **networkqit** and is at the base  of the *maximize and sample* approach used for the optimization of the spectral entropy. 
+The call returns a `[5,N,N]` numpy array, where the last two dimensions embed with the adjacency matrix of the $5$ random graphs.
+The method `sample_adjacency` is available for every generative model implemented in **networkqit** and is at the base of the *maximize and sample* approach used for the optimization of the spectral entropy. 
 
 Model optimization
 ------------------
@@ -83,8 +84,9 @@ We can call the `ermodel` as if it is a simple function:
 
    >>> print(ermodel([0.5]))
 
-This returns the expected adjacency matrix, a 34x34 matrix with 0.5 off diagonal and 0 on diagonal.
-The `ermodel` also allows to call methods like the expected laplacian or the expected laplacian gradient.
+This returns the expected adjacency matrix, a `34x34` matrix with `0.5` off diagonal and `0` on diagonal.
+Alternatively, any model inherited from `GraphModel` such as our `ermodel` instance,
+ also allows to call methods like the expected laplacian or the expected laplacian gradient.
 
 .. nbplot::
 
@@ -110,7 +112,10 @@ Finally the `beta_range` is a numpy array with the range of `beta` over which to
 Stochastic optimization of spectral entropy
 -------------------------------------------
 
-Most of the models do not allow an analytical treatment of their spectral likelihood. This involves knowing exact analytical formulations of the laplacian eigenvalues spectral density and this is still an unsolved problem for most of the useful network models.
+Most of the models do not allow an analytical treatment of their spectral likelihood.
+We may also want to see the effects of sparse structure on the eigenvalue spectrum of model laplacian, instead of working 
+in the dense networks limit, as in the previous example.
+This involves knowing exact analytical formulations of the laplacian eigenvalues spectral density and this is still an unsolved problem for most of the useful network models.
 To perform spectral likelihood optimization we can do stochastic optimization and find the parameters of the empirical graph such that the expected relative entropy averaged over the model ensemble 
 is minimized. 
 Doing this in **networkqit** is simple, as the library relies on the `autograd` package for the automatic calculation of complicated gradients of stochastic functions.
@@ -121,7 +126,17 @@ At every iteration, a number of random networks (batch_size) are sampled from th
 
 
 .. nbplot::
-
-   >>> solver = opt = Adam(A=A, L=L, x0=x0, beta_range=beta_range, model=ermodel)
-   >>> sol = opt.run(refresh_frames=100, eta=0.001, max_iters=5000, gtol=1E-5, batch_size=128)
-
+   
+   >>> import networkqit as nq
+   >>> A = nq.ring_of_custom_cliques([24,12,8])
+   >>> N = len(A)
+   >>> M = nq.IsingModel(N=N)
+   >>> p = A.sum() / (N*(N-1))
+   >>> L = nq.graph_laplacian(A)
+   >>> beta = 1
+   >>> opt = Adam(G=A, L=L, x0=np.random.random([N*N,]), model=M)
+   >>> rho = nq.compute_vonneuman_density(L=L, beta=beta)
+   >>> for rep in range(10):
+   >>>       sol = opt.run(beta, learning_rate=1E-3, batch_size=32, maxiter=1000)
+   >>>       nq.plot_mle(A, M.expected_adjacency(sol['x']))
+   >>>       plt.show()

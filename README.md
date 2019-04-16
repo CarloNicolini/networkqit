@@ -11,7 +11,7 @@ These results enable the practical application of this novel and powerful framew
 The full documentation for this package under development and is currently being written, its current version is available at:
 
 <div align="center">
-[https://networkqit.github.io/](https://networkqit.github.io/)
+<a href="https://networkqit.github.io/">https://networkqit.github.io/</a>
 </div>
 
 ## Installation
@@ -25,12 +25,11 @@ Here we report instructions for usage in a standard Ubuntu linux installation.
 1. Open a terminal, install `pip` and `virtualenv` and clone this repository
     
 ```bash
-cd
 sudo apt-get install python3-pip
 sudo pip3 install virtualenv
 virtualenv workspace
 cd workspace
-git clone https://bitbucket.org/carlonicolini/networkqit
+git clone https://github.com/carlonicolini/networkqit
 ```
     
 2. You cloned the repository. Now start the virtualenv session.
@@ -84,8 +83,8 @@ plt.title('Unnormalized spectral entropy')
 plt.show()
 ```
 
-The spectral entropy is always in the range $[0,\log N]$, so if we simply divide by $\log N$ where $N$ is the number
-of nodes, we renormalize it in the $[0,1]$ range.
+The spectral entropy is always in the range `[0, log(N)]`, so if we simply divide by `log N` where $N$ is the number
+of nodes, we renormalize it in the `[0,1]` range.
 
 ## Generative network models
 
@@ -190,9 +189,9 @@ for rep in range(10):
     plt.show()
 ```
 
-<div align="center">
+
 ![](doc/images/animation_ising_batchsize_128_eta1E-3_refresh_10_maxiter_5000_beta_5E-1.gif)<!-- -->
-</div>
+
 
 ## Classical maximum likelihood estimation
 
@@ -200,15 +199,15 @@ for rep in range(10):
 You can simply fit these models onto empirical data, with a few calls.
 For example here we fit the Lagrange multipliers of the Undirected Configuration Model onto an empirical network `A` and then sample 100 networks from the optimal values of this model:
 
-    import networkqit as nq
-    A = nq.ring_of_custom_cliques([24,12,8])
-    M = nq.UBCM(N=len(A)) # defines the model class
-    sol = M.fit(G=A, ftol=1E-9)
-    M.sample_adjacency(theta=sol['x'], batch_size=100)
+```python
+import networkqit as nq
+A = nq.ring_of_custom_cliques([24,12,8])
+M = nq.UBCM(N=len(A)) # defines the model class
+sol = M.fit(G=A, ftol=1E-9)
+M.sample_adjacency(theta=sol['x'], batch_size=100)
+```
 
-<div align="center">
 ![](doc/images/example_ubcm.png)
-</div>
 
 In this case we don't plot the expected weights, as this model supports only binary networks, but if you prefer, we can fit the Undirected Enhanced Configuration Model:
 
@@ -220,9 +219,7 @@ sol = M.fit(G=A, ftol=1E-9)
 M.sample_adjacency(theta=sol['x'], batch_size=100)
 ```
 
-<div align="center">
 ![](doc/images/example_uecm.png)
-</div>
 
 As you can see using the Enhanced Configuration model, both the weights and the link probabilities are correctly fitted in the model, even if this network is unweighted.
 

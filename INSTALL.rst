@@ -51,13 +51,13 @@ Install the development version
 At the moment **networkqit** is in alpha stage and its API could change very fast.
 For this reason **networkqit** is still not available on `pip`.
 However you can manually download **networkqit** from the repository:
-`Bitbucket <https://bitbucket.org/carlonicolini/networkqit/>`_ 
+`Bitbucket <https://github.com/carlonicolini/networkqit/>`_ 
 
 If you have `Git <https://git-scm.com/>`_ installed on your system, do
 
 ::
 
-    git clone https://bitbucket.org/carlonicolini/networkqit
+    git clone https://github.com/carlonicolini/networkqit
     cd networkqit
     pip install -e .
 

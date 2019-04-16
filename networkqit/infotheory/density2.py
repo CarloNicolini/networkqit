@@ -256,6 +256,33 @@ def relative_entropy_one_component(Lobs : np.array, Lmodel : np.array, beta_rang
     return dkl, loglike, Em, beta_Fm
 
 def relative_entropy(Lobs : np.array, Lmodel : np.array, beta_range : np.array):
+    """
+    This function makes it possible to efficiently compute the average relative entropy E[S(rho || sigma)]
+    over a batch of model Laplacians, and given a range of beta.
+    This function efficiently computes S(rho || sigma) with some numerical tricks to avoid recalculation
+    of the rho matrix over a range of beta values.
+
+    Parameters
+    ----------
+    Lobs: np.array
+        a square laplacian nxn matrix of the empirical network
+    Lmodel: np.array
+        a square (or batched) laplacian matrix of model network.
+        if a [b,n,n] array is given, the first dimension is considered the batch size
+
+    beta_range: np.array or float
+        the range of beta values over which to compute the relative entropy
+    
+    Returns
+    --------
+    dkl: np.array
+            the array of expected relative entropy between empirical and model networks,
+            evalued at each beta
+
+    Raises
+    ------
+    None
+    """
     import bct
     Aobs = Lobs.copy()
     np.fill_diagonal(Aobs,0)

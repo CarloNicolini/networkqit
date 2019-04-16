@@ -29,14 +29,14 @@ In this class the gradients are defined as:
 
 .. math::
     
-        \\frac{\\partial S(\\rho \\| \\sigma(\\mathbb{E}_{\\theta}[L]))}{\\partial \\theta_k} = \\beta \\textrm{Tr}\\biggl \\lbrack \\left(\\rho - \\sigma(\\mathbb{E}_{\\theta}[L])\\right)\\frac{\\partial \\mathbb{E}_{\\theta}[L]}{\\partial \\theta_k} \\biggr \\rbrack
+        \\frac{\\partial S(\\boldsymbol \\rho \\| \\boldsymbol \\sigma(\\mathbb{E}_{\\boldsymbol \\theta}[\\mathbf{L}]))}{\\partial \\boldsymbol \\theta_k} = \\beta \\textrm{Tr}\\biggl \\lbrack \\left(\\boldsymbol \\rho - \\boldsymbol \\sigma(\\mathbb{E}_{\\boldsymbol \\theta}[L])\\right)\\frac{\\partial \\mathbb{E}_{\\boldsymbol \\theta}[\mathbf{L}]}{\\partial \\theta_k} \\biggr \\rbrack
 
 In the `StochasticOptimizer` class we instead address the issue to implement stochastic gradient descent methods.
 In these methods the gradients are defined as:
 
 .. math::
    
-   \\frac{\\partial \\mathbb{E}_{\\theta}[S(\\rho \\| \\sigma)]}{\\partial \\theta_k} = \\beta \\textrm{Tr}\\biggl \\lbrack \\rho \\frac{\\partial  \\mathbb{E}_{\\theta}[L]}{\\partial \\theta_k}\\biggr \\rbrack + \\frac{\\partial}{\\partial \\theta_k}\\mathbb{E}_{\\theta}\\biggl \\lbrack \\log \\left( \\textrm{Tr}\\left \\lbrack e^{-\\beta L(\\theta)} \\right \\rbrack \\right) \\biggr \\rbrack
+   \\frac{\\partial \\mathbb{E}_{\\boldsymbol \\theta}[S(\\boldsymbol \\rho \\| \\boldsymbol \\sigma)]}{\\partial \\theta_k} = \\beta \\textrm{Tr}\\biggl \\lbrack \\boldsymbol \\rho \\frac{\\partial  \\mathbb{E}_{\\boldsymbol \\theta}[L]}{\\partial \\boldsymbol \\theta_k}\\biggr \\rbrack + \\frac{\\partial}{\\partial \\theta_k}\\mathbb{E}_{\\boldsymbol \\theta}\\biggl \\lbrack \\log \\left( \\textrm{Tr}\\left \\lbrack e^{-\\beta L(\\boldsymbol \\theta)} \\right \\rbrack \\right) \\biggr \\rbrack
 
 The stochastic optimizer is the **correct** optimizer, as it makes no approximation on the Laplacian eigenvalues.
 It is more suitable for small graphs and intermediate $\\beta$, where the differences between the random matrix s
@@ -46,8 +46,8 @@ as the optimization landscape is smooth.
 
 In order to minimize the expected relative entropy then, we need both the expected Laplacian formula, which is simple
 to get, and a way to estimate the second summand in the gradient, that involves averaging over different realizations
-of the log trace of  $e^{-\\beta L(\\theta)}$.
-A good the approximation to the expected logtrace $\\mathbb{E}_{\\theta}[\\log \\textrm{Tr}[\\exp{(-\\beta L)}]]$ is,
+of the log trace of  $e^{-\\beta L(\\boldsymbol \\theta)}$.
+A good the approximation to the expected logtrace $\\mathbb{E}_{\\boldsymbol \\theta}[\\log \\textrm{Tr}[\\exp{(-\\beta L)}]]$ is,
 makes a better is the estimate of the gradients.
 
 Finally, the `MLEOptimizer` maximizes the standard likelihood of a model and it is not related to the spectral entropies
@@ -68,6 +68,10 @@ from scipy.optimize import minimize, least_squares, OptimizeResult
 from networkqit.graphtheory import * # imports GraphModel
 from networkqit.infotheory.density import *
 
+__all__ = ['MLEOptimizer',
+           'ContinuousOptimizer',
+           'StochasticOptimizer',
+           'Adam']
 
 class MLEOptimizer:
     """
@@ -258,7 +262,7 @@ class ContinuousOptimizer:
         """
         This method computes the gradient as 
         
-        :math:`\\frac{s(\\rho \| \\sigma)}{\\partial \\theta_k} = \\beta \textrm{Tr}\left \lbrack \left( \rho - \sigma(\theta)\right) \frac{\mathbb{E}\mathbf{L}(\theta)}{\partial \theta_k} \right \rbrack`
+        :math:`\\frac{s(\\boldsymbol \\rho \| \\boldsymbol \\sigma)}{\\partial \\boldsymbol \\theta_k} = \\beta \textrm{Tr}\left \lbrack \left( \rho - \sigma(\theta)\right) \frac{\mathbb{E}\mathbf{L}(\theta)}{\partial \theta_k} \right \rbrack`
         
         args:
             x (numpy.array): the current parameters
@@ -706,7 +710,7 @@ class Adam(StochasticOptimizer):
     #             #         plt.subplot(2, 2, 3)
     #             #         plt.plot(all_dkl)
     #             #         plt.xlabel('iteration')
-    #             #         plt.ylabel('$S(\\rho,\\sigma)$')
+    #             #         plt.ylabel('$S(\\boldsymbol \\rho,\\boldsymbol \\sigma)$')
     #             #         plt.subplot(2, 2, 4)
     #             #         plt.semilogx(plot_beta_range, batch_compute_vonneumann_entropy(self.L, plot_beta_range), '.-', label='data')
     #             #         plt.semilogx(plot_beta_range, batch_compute_vonneumann_entropy(graph_laplacian(A0), plot_beta_range), '.-', label='model')

@@ -8,6 +8,5 @@ This module contains classes and functions to work with information theory. Here
 
 .. automodule:: networkqit.infotheory
 .. autosummary::
-   :toctree: generated/
    
    density

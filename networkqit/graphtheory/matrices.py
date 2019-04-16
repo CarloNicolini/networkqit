@@ -30,6 +30,31 @@ import autograd.numpy as np
 from autograd.scipy.special import expit
 EPS = np.finfo(float).eps
 
+__all__ =  ['graph_laplacian',
+            'directed_graph_laplacian',
+            'normalized_graph_laplacian',
+            'bethe_hessian_matrix',
+            'incidence_matrix',
+            'negative_laplacian',
+            'nonbacktracking_matrix',
+            'reduced_nonbacktracking_matrix',
+            'modularity_matrix',
+            'signed_laplacian',
+            'planted_partition_graph',
+            'sbm',
+            'dcsbm',
+            'sbm_p',
+            'wsbm',
+            'batched_symmetric_random',
+            'trunc_exp_rv',
+            'batched_gumbel',
+            'softmax',
+            'gumbel_softmax_sample', 
+            'gumbel_softmax',
+            'multiexpit',
+            'multiexpit2',
+            'ilessjsum']
+
 def graph_laplacian(A):
     """
     Get the graph Laplacian from the adjacency matrix

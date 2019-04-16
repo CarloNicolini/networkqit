@@ -20,6 +20,11 @@
 
 import autograd.numpy as np
 
+__all__ = ['comm_mat',
+            'comm_assortativity',
+            'reindex_membership',
+            'reassign_singletons'
+            ]
 
 def comm_mat(adj, memb):
     """

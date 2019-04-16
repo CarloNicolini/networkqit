@@ -15,7 +15,7 @@ from __future__ import print_function
 import sys
 import os
 from datetime import date
-sys.path.insert(0, os.path.abspath('../..'))
+sys.path.insert(0, os.path.abspath('../'))
 
 #from sphinx_gallery.sorting import ExplicitOrder
 
@@ -87,7 +87,7 @@ copyright = '2017-{}, networkqit Developers'.format(date.today().year)
 #
 # The short X.Y version.
 #import networkqit
-version = '0.2'
+version = '0.3'
 # The full version, including dev info
 release = 'beta'
 
