@@ -28,36 +28,36 @@ How to install on Linux
 -----------------------
 
 1. Open a terminal, install `pip` and `virtualenv` and clone this repository
-	
-	
+    
+    
     cd
-	sudo apt-get install python3-pip
-	sudo pip3 install virtualenv
-	virtualenv workspace
-	cd workspace
-	git clone https://bitbucket.org/carlonicolini/networkqit
-	
+    sudo apt-get install python3-pip
+    sudo pip3 install virtualenv
+    virtualenv workspace
+    cd workspace
+    git clone https://bitbucket.org/carlonicolini/networkqit
+    
 2. You cloned the repository. Now start the virtualenv session.
 
 
-	source bin/activate
+    source bin/activate
 
 3. If you are inside the `virtualenv` session, check that the Python version you are using is the one provided by `virtualenv`.
 
 
-	which python3
+    which python3
 
 4. Now install the networkqit package within the `virtualenv` environment.
 
 
-	cd networkqit
-	python3 setup.py sdist
+    cd networkqit
+    python3 setup.py sdist
 
 Now install the created Python package, that should come with all its dependencies `matplotlib`, `numpy`, `networkx`, `pandas`, `numdifftools`, `bctpy`
 
 
-	cd ..
-	pip3 install networkqit/dist/networkqit-0.1.tar.gz 
+    cd ..
+    pip3 install networkqit/dist/networkqit-0.1.tar.gz 
 
 Quick start
 -----------
@@ -155,6 +155,21 @@ Doing this in **networkqit** is simple, as the library relies on the `autograd` 
 With the optimization method `Adam` which is borrowed from machine learning, we can optimize the expected relative entropy of the Erdos-Renyi model with respect to our model karate-club network,represented by **A** and see the effects of changing the inverse temperature parameter `beta` on the optimization process.
 
 At every iteration, a number of random networks (batch_size) are sampled from the model, and their average spectral properties are used to compute an approximation to the expected relative entropy.
+In this example we see how to optimze a model with `N (N-1)` free Bernoulli random variables that describe links in a graph.
+At each stage in the `for` loop we replot the result, compared with the original network. We sample at each iteration of Adam a number of 32 independent networks, in order to form a good statistic for the calculation of the Laplacian spectrum.
 
-    solver = opt = Adam(A=A, L=L, x0=x0, beta_range=beta_range, model=ermodel)
-    sol = opt.run(refresh_frames=100, eta=0.001, max_iters=5000, gtol=1E-5, batch_size=128)
+    import matplotlib.pyplot as plt
+    from autograd import numpy as np
+    import networkqit as nq
+    from networkqit import Adam
+    A = nq.ring_of_custom_cliques([24,12,8])
+    N = len(A)
+    M = nq.IsingModel(N=N)
+    L = nq.graph_laplacian(A)
+    beta = 1
+    opt = Adam(G=A, L=L, x0=np.random.random([N*N,]), model=M)
+    rho = nq.compute_vonneuman_density(L=L, beta=beta)
+    for rep in range(10):
+        sol = opt.run(beta, learning_rate=1E-3, batch_size=32, maxiter=1000)
+        nq.plot_mle(A, M.expected_adjacency(sol['x']))
+        plt.show()
