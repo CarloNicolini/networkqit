@@ -174,6 +174,8 @@ At each stage in the `for` loop we replot the result, compared with the original
         nq.plot_mle(A, M.expected_adjacency(sol['x']))
         plt.show()
 
+![](doc/images/animation_ising_batchsize_128_eta1E-3_refresh_10_maxiter_5000_beta_5E-1.gif)<!-- -->
+
 # TODO
 
 I would like to find someone helping in implementing XLA instead of autograd as the basic package for automatic differentiation. Indeed XLA has the possibility to extend calculations on the GPU and (in future) on MultiGPU or TPU systems, effortlessly. It would be possible to scale to much larger problems.
