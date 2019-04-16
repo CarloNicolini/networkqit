@@ -158,6 +158,8 @@ At every iteration, a `batch_size` number of random networks are sampled from th
 In this example we see how to optimze a model with `N (N-1)` free Bernoulli random variables that describe links in a graph.
 At each stage in the `for` loop we replot the result, compared with the original network. We sample at each iteration of Adam a number of 32 independent networks, in order to form a good statistic for the calculation of the Laplacian spectrum.
 
+This is the result of this optimization loop. Look how the spectral entropies of the model approximates the one of the empirical network.
+
     import matplotlib.pyplot as plt
     from autograd import numpy as np
     import networkqit as nq
