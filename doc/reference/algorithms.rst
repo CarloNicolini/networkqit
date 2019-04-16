@@ -22,13 +22,13 @@ Optimization methods
 
 Basinhopping modified
 ---------------------
-.. automodule:: networkqit.algorithms.hasinhoppingmod
+.. automodule:: networkqit.algorithms.basinhoppingmod
 .. autosummary::
    :toctree: generated/
 
    Storage
    BasinHoppingRunner
-   AdaptiveStepSize
+   AdaptiveStepsize
    RandomDisplacement
    MinimizerWrapper
    Metropolis
@@ -42,3 +42,8 @@ Community detection utilities
 .. automodule:: networkqit.algorithms.community
 .. autosummary::
    :toctree: generated/
+
+   comm_mat
+   comm_assortativity
+   reindex_membership
+   reassign_singletons

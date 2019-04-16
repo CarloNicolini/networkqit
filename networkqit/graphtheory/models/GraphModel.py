@@ -18,18 +18,21 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""
-Base class for the implementation of different graph models.
-Here are specified many possible models of sparse and dense graphs with 
-dependency on some input parameters.
-"""
 
 import autograd.numpy as np
-from autograd import grad as agrad
+from autograd import grad
 from networkqit.graphtheory import graph_laplacian as graph_laplacian
 from autograd.scipy.special import expit
 from ..matrices import batched_symmetric_random, multiexpit
 EPS = np.finfo(float).eps
+
+"""
+Base class for the implementation of different graph models.
+Here are specified many possible models of sparse and dense graphs with 
+dependency on some input parameters.
+All the graph models depend on the `GraphModel` class, and inherit its methods.
+M
+"""
 
 class GraphModel:
     """
@@ -127,7 +130,7 @@ class GraphModel:
         args:
             theta (numpy.array): parameters vector.
         """
-        return agrad(lambda z : self.expected_laplacian(z))(theta)
+        return grad(lambda z : self.expected_laplacian(z))(theta)
 
     def loglikelihood(self, observed_adj, theta):
         """
@@ -168,7 +171,6 @@ class GraphModel:
 class ErdosRenyi(GraphModel):
     """
     Erdos-Renyi expected model.
-    When called it returns an adjacency matrix that is constant everywhere and zero on the diagonal.
     """
     def __init__(self, **kwargs):
         if kwargs is not None:

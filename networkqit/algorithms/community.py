@@ -18,9 +18,14 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+"""
+Here a number of community detection utilities are implemented for the manipulation
+of membership vectors, as well as for the detection of block structures in networks.
+"""
+
 import autograd.numpy as np
 
-__all__ = ['comm_mat',
+__all__ =  ['comm_mat',
             'comm_assortativity',
             'reindex_membership',
             'reassign_singletons'
@@ -51,6 +56,7 @@ def comm_mat(adj, memb):
        Carnegie-Mellon University, Pittsburgh, PA 15213, U.S.A.,
        :doi:`10.1016/0378-8733(83)90021-7`.
     """
+
     u = np.unique(memb)
     C = np.zeros([len(u), len(memb)])
     for i in range(C.shape[0]):
@@ -86,10 +92,11 @@ def comm_assortativity(A, memb):
 
     References
     ----------
-    .. [peixoto2017-weighted] Tiago Peixoto, "Non parametric weighted stochastic block model",
+    .. [Peixoto2017] Tiago Peixoto, "Non parametric weighted stochastic block model",
        https://arxiv.org/pdf/1708.01432.pdf
-       :url:`https://arxiv.org/pdf/1708.01432.pdf`.
+       :url: `https://arxiv.org/pdf/1708.01432.pdf`.
     """
+
     B = len(np.unique(memb))
     E = np.triu(A,1).sum()
     ers,ersnorm = comm_mat(A, memb)
@@ -115,6 +122,7 @@ def reindex_membership(memb, key='community_size', compress_singletons=False, ad
         compress_singletons (bool): if set to True assign all singleton communities into a single community.
         adj (np.array): the adjacency matrix where to read the
     """
+
     ds = {}
     for u, v in enumerate(memb):
         if v not in ds.keys():
@@ -163,6 +171,7 @@ def reassign_singletons(memb):
         an array where all the nodes with a single community are merged 
         into one.
     """
+    
     memb2 = np.array(reindex_membership(memb))
     max_memb = np.max(memb2) + 1
     memb3 = memb2.copy()

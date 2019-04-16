@@ -29,6 +29,20 @@ from networkqit.graphtheory.matrices import graph_laplacian
 from autograd.numpy.linalg import eigh
 from autograd.scipy.misc import logsumexp
 
+"""
+Definitions to work within the spectral entropies framework.
+All these functions work for batched matrices, i.e. square matrices represented 
+as numpy arrays where the first dimension is the batch size.
+If the first dimension is missing then the functions work as on normal square matrices
+automatically, otherwise a number of computational tricks are adopted.
+"""
+
+__all__ = ['density', 'entropy', 
+           'entropy_beta_deriv',
+           'find_beta_logc',
+           'relative_entropy_one_component',
+           'relative_entropy']
+
 def density(L : np.array, beta_range : np.array):
     """
     Get the von neumann density matrix rho
