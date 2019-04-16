@@ -69,7 +69,6 @@ Let us start by studying the spectral entropy of the density matrix of the famou
 This example shows how to generate the spectral entropy plots shown in our main paper.
 
 
-
     import networkx as nx
     G = nx.karate_club_graph()
     A = nx.to_numpy_array(G)
@@ -93,7 +92,7 @@ of nodes, we renormalize it in the $[0,1]$ range.
 **networkqit** features a large number of network models, mainly those obtained from within the Maximum Entropy
 framework. You can create a number of models and call methods on them by a consistent nomenclature:
 Here we create an instance of the Undirected Binary Configuration model (UBCM), and sample 10 random networks from this
-ensemble, based on the fitness parameters .. :math: x_i created at  random in the [0,1] domain.
+ensemble, based on the fitness parameters `x_i` created at random in the `[0,1]` domain.
 
     import networkqit as nq
     N=10
@@ -102,7 +101,7 @@ ensemble, based on the fitness parameters .. :math: x_i created at  random in th
     adj_graphs = model.sample_adjacency(xi, batch_size=5)
     print(adj_graphs.shape)
 
-The call returns a [5,N,N] numpy array, where the last two dimensions embed with the adjacency matrix of the 5 random graphs.
+The call returns a `[5,N,N]` numpy array, where the last two dimensions embed with the adjacency matrix of the 5 random graphs.
 The method `sample_adjacency` is available for every generative model implemented in **networkqit** and is at the base  of the *maximize and sample* approach used for the optimization of the spectral entropy. 
 
 ## Model optimization
@@ -177,6 +176,31 @@ This is the result of this optimization loop. Look how the spectral entropies of
         plt.show()
 
 ![](doc/images/animation_ising_batchsize_128_eta1E-3_refresh_10_maxiter_5000_beta_5E-1.gif)<!-- -->
+
+## Classical maximum likelihood estimation
+
+**networkqit** is also featuring a number of Maximum Entropy random graph models, from the soft-configuration model, to the Erdos-Renyi, the Weighted Random graph model and the Enhanced Configuration model.
+You can simply fit these models onto empirical data, with a few calls.
+For example here we fit the Lagrange multipliers of the Undirected Configuration Model onto an empirical network `A` and then sample 100 networks from the optimal values of this model:
+
+    import networkqit as nq
+    A = nq.ring_of_custom_cliques([24,12,8])
+    M = nq.UBCM(N=len(A)) # defines the model class
+    sol = M.fit(G=A, ftol=1E-9)
+    M.sample_adjacency(theta=sol['x'], batch_size=100)
+
+![](doc/images/example_ubcm.png)
+
+In this case we don't plot the expected weights, as this model supports only binary networks, but if you prefer, we can fit the Undirected Enhanced Configuration Model:
+
+    import networkqit as nq
+    A = nq.ring_of_custom_cliques([24,12,8])
+    M = nq.UECM3(N=len(A)) # defines the model class
+    sol = M.fit(G=A, ftol=1E-9)
+    M.sample_adjacency(theta=sol['x'], batch_size=100)
+
+![](doc/images/example_uecm.png)
+As you can see using the Enhanced Configuration model, both the weights and the link probabilities are correctly fitted in the model, even if this network is unweighted.
 
 # TODO
 
