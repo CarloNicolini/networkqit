@@ -183,8 +183,7 @@ def negative_laplacian(A):
     I = incidence_matrix(A)
     return I.T @ I
 
-def nonbacktracking_matrix(A):
-    return NotImplementedError('Not a reliable implementation')
+def nonbacktracking_matrix(A, weighted=False):
     """
     Get the nonbacktracking matrix, a 2m by 2m matrix, also called DEA 
     Directed Edge Adjacency matrix, or Hashimoto non-backtracking operator.
@@ -207,9 +206,26 @@ def nonbacktracking_matrix(A):
         [2] http://lib.itp.ac.cn/html/panzhang/
         [3] Spectral redemption in clustering sparse networks, Krzkala et al PNAS (2013)
     """
-    I = incidence_matrix(A)
-    H = (I>0).T @ (I<0)
-    return H
+    import networkx as nx
+    G = nx.DiGraph()
+    G.add_nodes_from(list(range(A.shape[0])))
+    G = nx.from_numpy_array(A, create_using=G)
+    m = len(G.edges())
+    H = nx.DiGraph()
+    H.add_nodes_from(list(range(m)))
+    if not weighted:
+        for ie1,e1 in enumerate(G.edges()):
+            for ie2,e2 in enumerate(G.edges()):
+                if e1[0]==e2[1] and e1[1]!=e2[0]:
+                    H.add_edge(ie1,ie2)
+    else: # weighted case
+        for ie1,e1 in enumerate(G.edges(data=True)):
+                for ie2,e2 in enumerate(G.edges(data=True)):
+                    if e1[0]==e2[1] and e1[1]!=e2[0]:
+                        H.add_edge(ie1,ie2, weight=(e1[2]['weight'] * e2[2]['weight']))
+    return nx.to_numpy_array(H).astype(int)
+
+
 
 def reduced_nonbacktracking_matrix(A):
     """
