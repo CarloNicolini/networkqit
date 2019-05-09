@@ -18,8 +18,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import networkqit.infotheory.density
-from networkqit.infotheory.density import *
+#import networkqit.infotheory.density
+#from networkqit.infotheory.density import *
 
 import networkqit.infotheory.density2
 from networkqit.infotheory.density2 import *
