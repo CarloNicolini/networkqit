@@ -187,12 +187,12 @@ def get_info(dynamic=True):
 ## Version information
 name = 'networkqit'
 major = '0'
-minor = '1'
+minor = '2'
 
 
 ## Declare current release as a development release.
 ## Change to False before tagging a release; then change back.
-dev = False
+dev = True
 
 
 description = "Python package for creating and manipulating graphs and networks"
