@@ -289,17 +289,27 @@ def relative_entropy(Lobs : np.array, Lmodel : np.array, beta_range : np.array):
     Aobs = -Aobs
     idx, comps = bct.get_components(Aobs)
     ncomps = len(comps)
-    batches = range(Lmodel.shape[0])
+    if len(Lmodel.shape)==3:
+        batches = Lmodel.shape[0]
+    else:
+        batches = 1
+    
     avg_dkl = np.zeros_like(beta_range)
 
-    if ncomps>1: # disconnected graph, need to average over this function
+    if ncomps > 1: # disconnected graph, need to average over this function
         for c in np.unique(idx):
-            avg_dkl += relative_entropy_one_component(Lobs = Lobs[np.ix_(idx==c,idx==c)],
-                                                      Lmodel=Lmodel[np.ix_(batches,idx==c,idx==c)],
-                                                      beta_range=beta_range)[0]/beta_range
-        return avg_dkl/ncomps
+            if batches == 1:
+                avg_dkl += relative_entropy_one_component(Lobs =  Lobs[np.ix_(idx==c,idx==c)],
+                                                          Lmodel= Lmodel[np.ix_(idx==c,idx==c)],
+                                                          beta_range=beta_range)[0]
+            else:
+                for b in range(batches):
+                    avg_dkl += relative_entropy_one_component(Lobs =  Lobs[np.ix_(idx==c,idx==c)],
+                                                              Lmodel= Lmodel[b,...][np.ix_(idx==c,idx==c)],
+                                                              beta_range=beta_range)[0]
     else:
-        return relative_entropy_one_component(Lobs, Lmodel, beta_range)
+        avg_dkl =  relative_entropy_one_component(Lobs, Lmodel, beta_range)
+    return avg_dkl/(ncomps*batches)
 
 
 class SpectralDivergence(object):
