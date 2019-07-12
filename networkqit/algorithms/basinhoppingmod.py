@@ -19,9 +19,14 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """
-basinhopping: The basinhopping global optimization algorithm with modifications 
-to work within the spectral entropies framework
+The basinhopping global optimization algorithm with modifications 
+to work within the spectral entropies framework.
+The modification are very small compared to the original implementation 
+of basinhopping from scipy, but necessary to work with problems with a number
+of local minima and fitting classical maximum entropy models with highly
+non-linear saddle-point equations.
 """
+
 from __future__ import division, print_function, absolute_import
 
 import autograd.numpy as np
