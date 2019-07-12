@@ -231,7 +231,7 @@ class IsingModel(GraphModel):
     def expected_adjacency(self, theta):
         return np.reshape(theta,[self.N,self.N])
     
-    def sample_adjacency(self, theta, batch_size=1, with_grads=False, slope=500):
+    def sample_adjacency(self, theta, batch_size=1, with_grads=False, slope=50):
         # sample symmetric random uniforms
         rij = batched_symmetric_random(batch_size, self.N)
         pij = np.reshape(theta,[self.N,self.N])
@@ -240,8 +240,7 @@ class IsingModel(GraphModel):
             A = expit(slope*(pij-rij))
         else:
             A = (pij>rij).astype(float)
-        #A = np.triu(A, 1)
-        #A += np.transpose(A,axes=[0,2,1])
+        A *= (1-np.eye(self.N))
         return A
 
 class Edr(GraphModel):

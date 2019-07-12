@@ -270,7 +270,7 @@ class ContinuousOptimizer:
             the gradient as a three index numpy array. The last index is the one pertaining to the k-th component of x
         """
 
-        sigma = compute_vonneuman_density(graph_laplacian(self.model.expected_adjacency(x)), beta)
+        sigma = density(graph_laplacian(self.model.expected_adjacency(x)), beta)
         # Here instead of tracing over the matrix product, we just sum over the entrywise product of the two matrices
         # (rho-sigma) and the ∂E_θ[L]/.
         return np.array([np.sum(np.multiply(rho - sigma, self.model.expected_laplaplacian_grad(x)[:, i, :].T)) for i in
@@ -327,7 +327,7 @@ class ContinuousOptimizer:
             # If user provides gradients of the model, use them, redefyining fgrad to pass to solver
             if self.model.expected_laplaplacian_grad is not None:
                 # compute rho for each beta, just once
-                rho = compute_vonneuman_density(L=self.L, beta=beta)
+                rho = density(L=self.L, beta=beta)
                 # define the gradient of the Dkl, given rho at current beta
                 fgrad = lambda x: self.gradient(x, rho, beta)
 
@@ -360,8 +360,8 @@ class ContinuousOptimizer:
             sol[-1]['DeltaL'] = (np.trace(self.L) - np.trace(graph_laplacian(self.model.expected_adjacency(sol[-1].x)))) / 2
             if kwargs.get('compute_sigma', False):
                 Lmodel = graph_laplacian(self.model.expected_adjacency(sol[-1].x))
-                rho = compute_vonneuman_density(L=self.L, beta=beta)
-                sigma = compute_vonneuman_density(L=Lmodel, beta=beta)
+                rho = density(L=self.L, beta_range=[beta])
+                sigma = density(L=Lmodel, beta_range=[beta])
                 sol[-1]['<DeltaL>'] = np.sum((rho-sigma)*Lmodel)
             sol[-1]['T'] = 1 / beta
             sol[-1]['beta'] = beta
@@ -564,13 +564,13 @@ class Adam(StochasticOptimizer):
 
         # if rho is provided, user rho is used, otherwise is computed at every beta
         if rho is None:
-            rho = compute_vonneuman_density(L=self.L, beta=beta)
+            rho = density(L=self.L, beta_range=[beta])
 
         for t in range(1,int(maxiter)+1):
             self.sol.nit += 1
             # get the relative entropy value and its gradient w.r.t. variables
             dkl, grad_t = self.gradient(self.sol.x, rho, beta, batch_size=batch_size)
-            print('\rIteration %d beta=%.3f' % (t,beta),end='')
+            print('\rIteration %d beta=%.3f dkl=%.3f x=%f' % (t,beta,dkl,self.sol.x), end='')
             # Convergence status
             if np.linalg.norm(grad_t) < gtol:
                 self.sol.success = True
@@ -586,7 +586,9 @@ class Adam(StochasticOptimizer):
             else: # vanilla Adam
                 deltax = mttilde / np.sqrt(vttilde + epsilon)
             self.sol.x -= learning_rate * deltax
-            self.logfile.write( u"%g\t%g\t%g\n" % (self.sol.x,beta,dkl) )
+            #print(self.sol.x.shape)
+            #print(beta,dkl)
+            #self.logfile.write( u"%g\t%g\t%g\n" % (self.sol.x, beta, dkl) )
             if t % 50:
                 self.logfile.flush()
         return self.sol

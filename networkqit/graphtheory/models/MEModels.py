@@ -532,7 +532,7 @@ class CWTECM(GraphModel):
             W = -wij*np.log(rij)/pij
         else:
             A = (pij>rij).astype(float)
-            W = np.random.exponential(wij/pij,size=[batch_size,self.N,self.N])
+            W = t + np.random.exponential(wij/pij,size=[batch_size,self.N,self.N])
         W = np.triu(A*W,1)
         W +=  np.transpose(W, axes=[0, 2, 1])
         return W
