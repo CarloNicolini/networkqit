@@ -14,7 +14,16 @@ Visualization utilities for model optimization and entropy visualization
 
 import autograd.numpy as np
 
+from scipy.stats import linregress
+def fitting_stats(x,y):
+    slope, intercept, r_value, p_value, std_err = linregress(x, y)
+    return slope, intercept, r_value, p_value, std_err
+
 def plot_mle(G,pij,wij=None, **kwargs):
+    
+    strength_slope, strength_intercept, strength_r_value, strength_p_value, strength_std_err = fitting_stats(G.sum(axis=0), wij.sum(axis=0) - np.diag(wij))
+    degree_slope, degree_intercept, degree_r_value, degree_p_value, degree_std_err = fitting_stats((G>0).sum(axis=0)-np.diag(G>0),pij.sum(axis=0) - np.diag(pij))
+    props = dict(boxstyle='round', facecolor='white', alpha=0.5)
     import matplotlib.pyplot as plt
     fig, ax = plt.subplots(nrows=2,ncols=3,figsize=(12,8))
     im = ax[0,0].imshow(G,interpolation='none',cmap='viridis')
@@ -48,6 +57,7 @@ def plot_mle(G,pij,wij=None, **kwargs):
     ax[1,2].set_title('Degrees reconstruction')
     ax[1,2].set_ylabel('model')
     ax[1,2].set_xlabel('empirical')
+    ax[1,2].text(0.05,0.95,'Fit $y \\sim \\alpha x + \\beta $:\n$\\alpha=$%.3f\n$\\beta=$%.3f\n$R^2=$%.3f\npval=%g' % (degree_slope,degree_intercept,degree_r_value,degree_p_value),bbox=props,transform=ax[1,2].transAxes,verticalalignment='top')
 
     if wij is not None:
         ax[0,2].plot(G.sum(axis=0), wij.sum(axis=0) - np.diag(wij), 'b.',MarkerSize=2)
@@ -57,7 +67,7 @@ def plot_mle(G,pij,wij=None, **kwargs):
         ax[0,2].grid(which='both',linestyle='dashed')
         ax[0,2].set_ylabel('model')
         ax[0,2].set_xlabel('empirical')
-
+        ax[0,2].text(0.05,0.95,'Fit $y \\sim \\alpha x + \\beta $:\n$\\alpha=$%.3f\n$\\beta=$%.3f\n$R^2=$%.3f\npval=%g' % (strength_slope,strength_intercept,strength_r_value,strength_p_value),bbox=props,transform=ax[0,2].transAxes, verticalalignment='top')
     if kwargs.get('title',None) is not None:
         plt.suptitle(kwargs.get('title',None))
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
