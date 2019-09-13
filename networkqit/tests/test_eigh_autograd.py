@@ -5,9 +5,8 @@ from autograd.numpy.linalg import eigh
 def f(x):
     A = np.ones([2,2])
     L = np.diag(np.sum(A,axis=0)) - A
-    return np.multiply(L, x)
+    I = np.eye(2)
+    return np.sum(np.log(eigh(x*I + L)[0])) - np.log(x)
 
-F = lambda x : np.sum(eigh(f(x))[0])
-G = grad(lambda x: F(x))
-print(F([1.0]))
-print(G([1.0]))
+g = grad(lambda x: f(x))
+print(g(1.0))

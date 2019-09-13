@@ -58,7 +58,7 @@ framework introduced in the paper on which **networkqit** is based.
 import autograd
 import autograd.numpy as np
 from autograd.numpy.linalg import eigh
-from autograd.scipy.misc import logsumexp
+#from autograd.scipy.misc import logsumexp
 from networkqit.graphtheory.matrices import softmax
 from scipy.optimize import minimize, least_squares, OptimizeResult
 from networkqit.graphtheory import * # imports GraphModel

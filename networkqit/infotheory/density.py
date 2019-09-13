@@ -27,7 +27,7 @@ from scipy.stats import entropy
 from networkqit.graphtheory.matrices import graph_laplacian
 
 from autograd.numpy.linalg import eigh
-from autograd.scipy.misc import logsumexp
+#from autograd.scipy.misc import logsumexp
 
 """
 Definitions to work within the spectral entropies framework.
