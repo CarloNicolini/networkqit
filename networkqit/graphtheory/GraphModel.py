@@ -1,8 +1,8 @@
 import autograd.numpy as np
 from autograd import grad
-from networkqit.graphtheory import graph_laplacian as graph_laplacian
+from networkqit.graphtheory.matrices import graph_laplacian as graph_laplacian
 from autograd.scipy.special import expit
-from ..matrices import batched_symmetric_random, multiexpit
+from networkqit.graphtheory.matrices import batched_symmetric_random
 
 EPS = np.finfo(float).eps
 
@@ -195,7 +195,7 @@ class ErdosRenyi(GraphModel):
         return np.array([Lstar - avgL])
 
     def fit(self, G, x0=None, **opt_kwargs):
-        from networkqit import MLEOptimizer
+        from networkqit.algorithms.optimize import MLEOptimizer
 
         A = (G > 0).astype(float)
         if x0 is None:
