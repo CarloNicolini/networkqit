@@ -1,11 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Mon Jan  7 16:30:36 2019
-
-@author: carlo2
-"""
-
 import sys
 sys.path.append('/home/carlo2/workspace/networkqit')
 from networkqit.graphtheory import UBCM, UWCM

@@ -1,8 +1,3 @@
-#!/usr/bin/env python3
-
-import sys
-sys.path.append('/home/carlo/workspace/networkqit/')
-
 import numpy as np
 import matplotlib.pyplot as plt
 import bct

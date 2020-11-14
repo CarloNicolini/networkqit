@@ -1,29 +1,9 @@
-#! /usr/bin/env python
-# -*- coding: utf-8 -*-
-#
-# networkqit -- a python module for manipulations of spectral entropies framework
-#
-# Copyright (C) 2017-2018 Carlo Nicolini <carlo.nicolini@iit.it>
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-
 import autograd.numpy as np
 from autograd import grad
 from networkqit.graphtheory import graph_laplacian as graph_laplacian
 from autograd.scipy.special import expit
 from ..matrices import batched_symmetric_random, multiexpit
+
 EPS = np.finfo(float).eps
 
 """
@@ -34,6 +14,7 @@ All the graph models depend on the `GraphModel` class, and inherit its methods.
 M
 """
 
+
 class GraphModel:
     """
     GraphModel is the base class that defines all the operations inherited
@@ -41,23 +22,24 @@ class GraphModel:
     expected laplacian and random graph models. It defines the behaviour of model
     operations such as addition or multiplication.
     """
+
     def __init__(self, **kwargs):
         """
         Optional arguments:
         kwargs:
-            model_type: can be or topological or spatial and it is used 
-                when inheriting from this class. In geometrical models, the 
-                spatial distance matrix must be specified parameters: 
+            model_type: can be or topological or spatial and it is used
+                when inheriting from this class. In geometrical models, the
+                spatial distance matrix must be specified parameters:
                     contains all the kwargs, used to memorize all the options.
-            bounds: if necessary, provide a bound on the values of the model 
-                    parameters.  Bounds must be provided in the form of list 
+            bounds: if necessary, provide a bound on the values of the model
+                    parameters.  Bounds must be provided in the form of list
                     of tuples.
         """
         super().__init__()
-        self.N = kwargs['N']
+        self.N = kwargs["N"]
         self.args_mapping = None
         self.num_classes = len(GraphModel.__subclasses__())
-        self.model_type = kwargs.get('model_type', None)
+        self.model_type = kwargs.get("model_type", None)
         self.parameters = kwargs
         self.bounds = None
 
@@ -101,7 +83,7 @@ class GraphModel:
         """
         In this base class the expected weighted adjacency is not implemented and has to be implemented by every single inherited class.
         """
-        raise NotImplementedError        
+        raise NotImplementedError
 
     def expected_laplacian(self, theta):
         """
@@ -119,7 +101,9 @@ class GraphModel:
         args:
             theta (numpy.array): the parameters of the model.
         """
-        return self.expected_adjacency(*[theta[i] for i in range(0, len(self.args_mapping))])
+        return self.expected_adjacency(
+            *[theta[i] for i in range(0, len(self.args_mapping))]
+        )
 
     def expected_laplacian_grad(self, theta):
         """
@@ -130,7 +114,7 @@ class GraphModel:
         args:
             theta (numpy.array): parameters vector.
         """
-        return grad(lambda z : self.expected_laplacian(z))(theta)
+        return grad(lambda z: self.expected_laplacian(z))(theta)
 
     def loglikelihood(self, observed_adj, theta):
         """
@@ -172,76 +156,83 @@ class ErdosRenyi(GraphModel):
     """
     Erdos-Renyi expected model.
     """
+
     def __init__(self, **kwargs):
         if kwargs is not None:
             super().__init__(**kwargs)
-        self.args_mapping = ['c_er']
-        self.model_type = 'topological'
-        self.formula = '$c_{er}$'
-        self.bounds = [(EPS, 1-EPS)]
+        self.args_mapping = ["c_er"]
+        self.model_type = "topological"
+        self.formula = "$c_{er}$"
+        self.bounds = [(EPS, 1 - EPS)]
 
     def expected_adjacency(self, theta):
-        P = theta*(1 - np.eye(self.parameters['N']))
+        P = theta * (1 - np.eye(self.parameters["N"]))
         return P
-    
+
     def sample_adjacency(self, theta, batch_size=1, with_grads=False, slope=500):
         rij = batched_symmetric_random(batch_size, self.N)
         P = self.expected_adjacency(theta)
         if with_grads:
-            A = expit(slope*(P-rij)) # broadcasting of P over rij
+            A = expit(slope * (P - rij))  # broadcasting of P over rij
         else:
             A = (P > rij).astype(float)
         A = np.triu(A, 1)
-        A += np.transpose(A,axes=[0,2,1])
+        A += np.transpose(A, axes=[0, 2, 1])
         return A
 
     def loglikelihood(self, observed_adj, theta):
-        A = (observed_adj>0).astype(float)
+        A = (observed_adj > 0).astype(float)
         Lstar = A.sum() / 2
-        loglike = Lstar*np.log(theta) + (self.N*(self.N-1)/2 - Lstar)*(np.log(1-theta))
+        loglike = Lstar * np.log(theta) + (self.N * (self.N - 1) / 2 - Lstar) * (
+            np.log(1 - theta)
+        )
         return loglike
 
     def saddle_point(self, observed_adj, theta):
-        A = (observed_adj>0).astype(float)
+        A = (observed_adj > 0).astype(float)
         Lstar = A.sum() / 2
-        avgL = np.sum(theta * (self.N*(self.N-1)) / 2)
+        avgL = np.sum(theta * (self.N * (self.N - 1)) / 2)
         return np.array([Lstar - avgL])
 
     def fit(self, G, x0=None, **opt_kwargs):
         from networkqit import MLEOptimizer
-        A = (G>0).astype(float)
+
+        A = (G > 0).astype(float)
         if x0 is None:
             x0 = [0.1]
         opt = MLEOptimizer(A, x0=x0, model=self)
         sol = opt.run(**opt_kwargs)
         return sol
 
+
 class IsingModel(GraphModel):
     """
     A model of N^2 independent Bernoulli variables
     """
+
     def __init__(self, **kwargs):
         if kwargs is not None:
             super().__init__(**kwargs)
-        #self.args_mapping = ['c_er']
-        self.model_type = 'topological'
-        #self.formula = '$c_{er}$'
+        # self.args_mapping = ['c_er']
+        self.model_type = "topological"
+        # self.formula = '$c_{er}$'
         self.bounds = [(0, None)] * self.N * self.N
 
     def expected_adjacency(self, theta):
-        return np.reshape(theta,[self.N,self.N])
-    
+        return np.reshape(theta, [self.N, self.N])
+
     def sample_adjacency(self, theta, batch_size=1, with_grads=False, slope=50):
         # sample symmetric random uniforms
         rij = batched_symmetric_random(batch_size, self.N)
-        pij = np.reshape(theta,[self.N,self.N])
-        #pij = np.reshape(np.tile(np.reshape(theta,[self.N,self.N]), [batch_size,1]),[batch_size, self.N, self.N])
+        pij = np.reshape(theta, [self.N, self.N])
+        # pij = np.reshape(np.tile(np.reshape(theta,[self.N,self.N]), [batch_size,1]),[batch_size, self.N, self.N])
         if with_grads:
-            A = expit(slope*(pij-rij))
+            A = expit(slope * (pij - rij))
         else:
-            A = (pij>rij).astype(float)
-        A *= (1-np.eye(self.N))
+            A = (pij > rij).astype(float)
+        A *= 1 - np.eye(self.N)
         return A
+
 
 class Edr(GraphModel):
     """
@@ -253,15 +244,16 @@ class Edr(GraphModel):
     def __init__(self, dij, **kwargs):
         if kwargs is not None:
             super().__init__(**kwargs)
-        self.args_mapping = ['lambd_edr']
-        self.model_type = 'spatial'
-        self.formula = r'$e^{-\lambda_{edr} d_{ij}}$'
+        self.args_mapping = ["lambd_edr"]
+        self.model_type = "spatial"
+        self.formula = r"$e^{-\lambda_{edr} d_{ij}}$"
         self.bounds = [(0, None)]
         import copy
+
         self.dij = copy.deepcopy(dij)
-        np.fill_diagonal(self.dij,1) # to avoid division warning
-        self.invdij = 1/self.dij
-        np.fill_diagonal(self.invdij,0) # set it back to 0
+        np.fill_diagonal(self.dij, 1)  # to avoid division warning
+        self.invdij = 1 / self.dij
+        np.fill_diagonal(self.invdij, 0)  # set it back to 0
 
     def expected_adjacency(self, theta):
         P = theta[0] * np.exp(-theta[1] * self.dij)
@@ -272,12 +264,20 @@ class Edr(GraphModel):
         if with_grads:
             rij = batched_symmetric_random(batch_size, self.N)
             # to generate random weights, needs a second decorrelated random source
-            W = -(theta[0]*(self.invdij))*np.log(1-rij) # oneline for exponential distribution
+            W = -(theta[0] * (self.invdij)) * np.log(
+                1 - rij
+            )  # oneline for exponential distribution
         else:
-            W = np.random.exponential(-(self.dij)*theta[0], size=[batch_size,self.N,self.N])*theta[0]
+            W = (
+                np.random.exponential(
+                    -(self.dij) * theta[0], size=[batch_size, self.N, self.N]
+                )
+                * theta[0]
+            )
             W = np.triu(W, 1)
-            W += np.transpose(W, axes=[0,2,1])
+            W += np.transpose(W, axes=[0, 2, 1])
         return W
+
 
 # class EdrTruncated(GraphModel):
 #     """
@@ -378,7 +378,7 @@ class Edr(GraphModel):
 #             return np.outer([*args[0:-1]], [*args[0:-1]])**(-args[-1])
 #         return np.outer([*args],[*args])
 
-        
+
 # class TopoDegreeProd(GraphModel):
 #     """
 #     Topological product of graph degrees (strengths) with powerlaw
@@ -435,6 +435,7 @@ class Edr(GraphModel):
 #         T = np.outer(k, np.ones([1, len(k)]))
 #         return args[0]*(np.abs(T-T.T))**(-args[1])
 
+
 class TopoJaccard(GraphModel):
     """
     Topological models with probability link given by Jaccard coefficient
@@ -443,37 +444,44 @@ class TopoJaccard(GraphModel):
     "Economical Preferential Attachment model"
     Here we set the powerlaw exponent to be unbounded
     Reference:
-    Vertes et al. Simple models of human brain functional networks. 
+    Vertes et al. Simple models of human brain functional networks.
     PNAS (2012) https://doi.org/10.1073/pnas.1111738109
     """
+
     def __init__(self, **kwargs):
         if kwargs is not None:
             super().__init__(**kwargs)
-        self.args_mapping = ['c_nei', 'mu_nei']
-        self.model_type = 'topological'
-        self.normalized = kwargs.get('normalized', True)
+        self.args_mapping = ["c_nei", "mu_nei"]
+        self.model_type = "topological"
+        self.normalized = kwargs.get("normalized", True)
         if self.normalized:
-            self.formula = r'$c_{jacc} (J_{ij})^{-\mu_{jacc}}$'
+            self.formula = r"$c_{jacc} (J_{ij})^{-\mu_{jacc}}$"
         else:
-            self.formula = r'$c_{commnei} (\sum_l A_{il}A_{lj})^{-\mu_{commnei}}$'
-        self.A = kwargs['A'] # save the adjacency matrix        
-        self._generate_matching() # then generate the matching
+            self.formula = r"$c_{commnei} (\sum_l A_{il}A_{lj})^{-\mu_{commnei}}$"
+        self.A = kwargs["A"]  # save the adjacency matrix
+        self._generate_matching()  # then generate the matching
         self.bounds = [(0, None), (0, None)]
 
     def _generate_matching(self):
         from scipy.spatial.distance import cdist
+
         # https://mathoverflow.net/questions/123339/weighted-jaccard-similarity
         # https://docs.scipy.org/doc/scipy-1.0.0/reference/generated/scipy.spatial.distance.cdist.html
         if self.normalized:
-            self.M = cdist(self.A, self.A, lambda u, v: (np.minimum(u,v).sum())/(np.maximum(u,v).sum()) )
+            self.M = cdist(
+                self.A,
+                self.A,
+                lambda u, v: (np.minimum(u, v).sum()) / (np.maximum(u, v).sum()),
+            )
         else:
-            self.M = cdist(self.A, self.A, lambda u, v: np.minimum(u,v).sum() )
-        
+            self.M = cdist(self.A, self.A, lambda u, v: np.minimum(u, v).sum())
+
     def expected_adjacency(self, theta):
-        return theta[0]*(self.M)**(-theta[1])
+        return theta[0] * (self.M) ** (-theta[1])
 
     def sample_adjacency(self, theta, batch_size=1, with_grads=False, slope=500):
         return None
+
 
 class EconomicalClustering(GraphModel):
     """
@@ -481,50 +489,57 @@ class EconomicalClustering(GraphModel):
     # Generative models of the human connectome
     # Betzel, Richard F. et al, Neuroimage (2016)
     """
+
     def __init__(self, G, dij, **kwargs):
         if kwargs is not None:
             super().__init__(**kwargs)
-        self.G = G # save the adjacency matrix        
-        self.model_type = 'topological'
+        self.G = G  # save the adjacency matrix
+        self.model_type = "topological"
         self.dij = dij
-        self.normalized = kwargs.get('normalized', True)
+        self.normalized = kwargs.get("normalized", True)
         if self.normalized:
-            self.formula = r'$c_{jacc} (J_{ij})^{-\mu_{jacc}}$'
+            self.formula = r"$c_{jacc} (J_{ij})^{-\mu_{jacc}}$"
         else:
-            self.formula = r'$c_{commnei} (\sum_l A_{il}A_{lj})^{-\mu_{commnei}}$'
-        self._generate_matching() # then generate the matching
+            self.formula = r"$c_{commnei} (\sum_l A_{il}A_{lj})^{-\mu_{commnei}}$"
+        self._generate_matching()  # then generate the matching
         self.bounds = [(None, None), (None, None)]
 
     def _generate_matching(self):
         from scipy.spatial.distance import cdist
+
         # https://mathoverflow.net/questions/123339/weighted-jaccard-similarity
         # https://docs.scipy.org/doc/scipy-1.0.0/reference/generated/scipy.spatial.distance.cdist.html
         if self.normalized:
-            self.K = cdist(self.G, self.G, lambda u, v: (np.minimum(u,v).sum())/(np.maximum(u,v).sum()) )
+            self.K = cdist(
+                self.G,
+                self.G,
+                lambda u, v: (np.minimum(u, v).sum()) / (np.maximum(u, v).sum()),
+            )
         else:
-            self.K = cdist(self.G, self.G, lambda u, v: np.minimum(u,v).sum() )
-        
-    def expected_adjacency(self, theta):
-        p1 = (np.eye(self.N) + self.dij)**(theta[0])
-        p1 *= (1-np.eye(self.N))
-        p2 = (self.K**(theta[1]))
-        return  p1 * p2
+            self.K = cdist(self.G, self.G, lambda u, v: np.minimum(u, v).sum())
 
+    def expected_adjacency(self, theta):
+        p1 = (np.eye(self.N) + self.dij) ** (theta[0])
+        p1 *= 1 - np.eye(self.N)
+        p2 = self.K ** (theta[1])
+        return p1 * p2
 
     def sample_adjacency(self, theta, batch_size=1, with_grads=False, slope=500):
         rij = batched_symmetric_random(batch_size, self.N)
         pij = self.expected_adjacency(theta)
         if with_grads:
-            A = expit(slope*(pij-rij)) # sampling, approximates binomial with continuos
+            A = expit(
+                slope * (pij - rij)
+            )  # sampling, approximates binomial with continuos
         else:
-            A = (pij>rij).astype(float)
-        A = np.triu(A, 1) # make it symmetric
+            A = (pij > rij).astype(float)
+        A = np.triu(A, 1)  # make it symmetric
         A += np.transpose(A, axes=[0, 2, 1])
         return A
 
 
 # class ModelFactory():
-    
+
 #     @staticmethod
 #     def factory(type, **kwargs):
 #         raise RuntimeError('Must implement all the models manually')

@@ -1,23 +1,3 @@
-#! /usr/bin/env python
-# -*- coding: utf-8 -*-
-#
-# networkqit -- a python module for manipulations of spectral entropies framework
-#
-# Copyright (C) 2017-2018 Carlo Nicolini <carlo.nicolini@iit.it>
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 """
 Here a number of community detection utilities are implemented for the manipulation
 of membership vectors, as well as for the detection of block structures in networks.
@@ -25,11 +5,13 @@ of membership vectors, as well as for the detection of block structures in netwo
 
 import autograd.numpy as np
 
-__all__ =  ['comm_mat',
-            'comm_assortativity',
-            'reindex_membership',
-            'reassign_singletons'
-            ]
+__all__ = [
+    "comm_mat",
+    "comm_assortativity",
+    "reindex_membership",
+    "reassign_singletons",
+]
+
 
 def comm_mat(adj, memb):
     """
@@ -64,17 +46,21 @@ def comm_mat(adj, memb):
             C[i, j] = memb[j] == u[i]
     B = np.dot(np.dot(C, adj), C.T)
     K = B.sum(axis=1)
-    #print(K**2)
-    np.fill_diagonal(B, B.diagonal()/2)
+    # print(K**2)
+    np.fill_diagonal(B, B.diagonal() / 2)
     # n = len(adj)
     # m = np.triu(W, 1).sum()
     # p = n * (n - 1) / 2
     commsizes = C.sum(axis=1)
-    commpairs = np.dot(np.diag(commsizes), np.diag(commsizes-1)) / 2
-    commpairs2 = np.dot(np.dot(np.diag(commsizes), np.ones([len(commsizes), len(commsizes)])), np.diag(commsizes))
-    blockpairs = np.multiply(commpairs2, (1-np.eye(len(commsizes)))) + commpairs
+    commpairs = np.dot(np.diag(commsizes), np.diag(commsizes - 1)) / 2
+    commpairs2 = np.dot(
+        np.dot(np.diag(commsizes), np.ones([len(commsizes), len(commsizes)])),
+        np.diag(commsizes),
+    )
+    blockpairs = np.multiply(commpairs2, (1 - np.eye(len(commsizes)))) + commpairs
     Bnorm = B / blockpairs
     return B, Bnorm
+
 
 def comm_assortativity(A, memb):
     """
@@ -84,7 +70,7 @@ def comm_assortativity(A, memb):
 
     Args:
         A (np.array): the (weighted) adjacency matrix
-        memb (list): the node block membership 
+        memb (list): the node block membership
     Output:
         qr: the group modular assortativity
         Q: the Newman modularity
@@ -98,17 +84,17 @@ def comm_assortativity(A, memb):
     """
 
     B = len(np.unique(memb))
-    E = np.triu(A,1).sum()
-    ers,ersnorm = comm_mat(A, memb)
-    np.fill_diagonal(ers,2*np.diagonal(ers))
+    E = np.triu(A, 1).sum()
+    ers, ersnorm = comm_mat(A, memb)
+    np.fill_diagonal(ers, 2 * np.diagonal(ers))
     err = np.diagonal(ers)
-    er2 = np.sum(ers,axis=0)**2
-    qr = B/(2.0*E)*(err-(er2/(2.0*E)))
-    Q = np.mean(qr) # newman modularity
+    er2 = np.sum(ers, axis=0) ** 2
+    qr = B / (2.0 * E) * (err - (er2 / (2.0 * E)))
+    Q = np.mean(qr)  # newman modularity
     return qr, Q
 
 
-def reindex_membership(memb, key='community_size', compress_singletons=False, adj=None):
+def reindex_membership(memb, key="community_size", compress_singletons=False, adj=None):
     """
     This function has the membership as input and output the membership
     where the communities number are ordered by the number of nodes in that community
@@ -139,14 +125,14 @@ def reindex_membership(memb, key='community_size', compress_singletons=False, ad
         return adj[np.ix_(x, x)].sum() / (len(x) * len(x) - 1)
 
     mykey = None
-    if key is not 'community_size' and adj is None:
-            raise AssertionError('Must input adjacency matrix too')
+    if key is not "community_size" and adj is None:
+        raise AssertionError("Must input adjacency matrix too")
     else:
-        if key is 'community_size':
+        if key is "community_size":
             mykey = community_size
-        elif key is 'community_weight':
+        elif key is "community_weight":
             mykey = community_weight
-        elif key is 'community_normalized_weight':
+        elif key is "community_normalized_weight":
             mykey = community_normalized_weight
 
     S = dict(zip(range(0, len(ds)), sorted(ds.values(), key=mykey, reverse=True)))
@@ -168,10 +154,10 @@ def reassign_singletons(memb):
     Args:
         memb (np.array): the input membership vector
     Output:
-        an array where all the nodes with a single community are merged 
+        an array where all the nodes with a single community are merged
         into one.
     """
-    
+
     memb2 = np.array(reindex_membership(memb))
     max_memb = np.max(memb2) + 1
     memb3 = memb2.copy()

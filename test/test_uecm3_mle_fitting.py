@@ -1,15 +1,8 @@
-#!/usr/bin/env python3
-
 from pathlib import Path
 home = str(Path.home())
-import sys
 import numpy as np
-import matplotlib.pyplot as plt
-import bct
-import sys
-sys.path.append(home + '/workspace/networkqit')
 import networkqit as nq
-from networkqit.graphtheory.models.MEModels import CWTECM, UBCM, UWCM, UECM3
+from networkqit.graphtheory.models.MEModels import UECM3
 from networkqit import plot_mle
 
 if __name__=='__main__':

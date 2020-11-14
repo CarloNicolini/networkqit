@@ -58,26 +58,25 @@ framework introduced in the paper on which **networkqit** is based.
 import autograd
 import autograd.numpy as np
 from autograd.numpy.linalg import eigh
-#from autograd.scipy.misc import logsumexp
+
+# from autograd.scipy.misc import logsumexp
 from networkqit.graphtheory.matrices import softmax
 from scipy.optimize import minimize, least_squares, OptimizeResult
-from networkqit.graphtheory import * # imports GraphModel
+from networkqit.graphtheory import *  # imports GraphModel
 from networkqit.infotheory.density import *
 
-__all__ = ['MLEOptimizer',
-           'ContinuousOptimizer',
-           'StochasticOptimizer',
-           'Adam']
+__all__ = ["MLEOptimizer", "ContinuousOptimizer", "StochasticOptimizer", "Adam"]
+
 
 class MLEOptimizer:
     """
-    This class, inheriting from the model optimizer class solves the problem of 
+    This class, inheriting from the model optimizer class solves the problem of
     maximum likelihood parameters estimation in the classical settings.
     """
 
     def __init__(self, G: np.array, x0: np.array, model: GraphModel, **kwargs):
         """
-        Initialize the optimizer with the observed graph, an initial guess and the 
+        Initialize the optimizer with the observed graph, an initial guess and the
         model to optimize.
 
         Args:
@@ -91,7 +90,7 @@ class MLEOptimizer:
         self.sol = None
         super().__init__(**kwargs)
 
-    def run(self, method, ftol=1E-10, gtol=1E-5, xtol=1E-8, maxiter=1E4, **kwargs):
+    def run(self, method, ftol=1e-10, gtol=1e-5, xtol=1e-8, maxiter=1e4, **kwargs):
         """
         Maximimize the likelihood of the model given the observed network G.
 
@@ -132,102 +131,124 @@ class MLEOptimizer:
             sol: (scipy.optimize.OptimizeResult) parameters at optimal likelihood
         """
 
-        opts = {'ftol': ftol,
-                'gtol': gtol, # as default of LBFGSB
-                'xtol': xtol,
-                'maxiter': maxiter,
-                'eps': kwargs.get('eps', 1E-8), # as default of LBFGSB
-                'maxfun': kwargs.get('maxfun', 1E10),
-                'verbose' : kwargs.get('verbose', 0),
-                'disp':  bool(kwargs.get('verbose', 0)),
-                'iprint': kwargs.get('verbose', 0),
-                'maxls' : 100
-                }
+        opts = {
+            "ftol": ftol,
+            "gtol": gtol,  # as default of LBFGSB
+            "xtol": xtol,
+            "maxiter": maxiter,
+            "eps": kwargs.get("eps", 1e-8),  # as default of LBFGSB
+            "maxfun": kwargs.get("maxfun", 1e10),
+            "verbose": kwargs.get("verbose", 0),
+            "disp": bool(kwargs.get("verbose", 0)),
+            "iprint": kwargs.get("verbose", 0),
+            "maxls": 100,
+        }
 
-        if method is 'MLE':
+        if method is "MLE":
             # If the model has non-linear constraints, must use Sequential Linear Square Programming SLSQP
-            from autograd import jacobian # using automatic jacobian from autograd
-            J = jacobian(lambda z : -self.model.loglikelihood(self.G,z))
-            if hasattr(self.model, 'constraints'):
-                #H=hessian(lambda z : -self.model.loglikelihood(self.G,z))
+            from autograd import jacobian  # using automatic jacobian from autograd
+
+            J = jacobian(lambda z: -self.model.loglikelihood(self.G, z))
+            if hasattr(self.model, "constraints"):
+                # H=hessian(lambda z : -self.model.loglikelihood(self.G,z))
                 # remove some options to avoid warnings
-                opts.pop('gtol'), opts.pop('verbose'), opts.pop('xtol'),opts.pop('maxfun')
-                self.sol = minimize(fun=lambda z: -self.model.loglikelihood(self.G, z),
-                                    x0=np.squeeze(self.x0),
-                                    method='SLSQP',
-                                    constraints={'fun':self.model.constraints, 'type':'ineq'},
-                                    bounds=self.model.bounds,
-                                    jac=J,
-                                    tol=opts['ftol'],
-                                    options=opts)
-            else: # the model has only bound-constraints, hence use L-BFGS-B
+                opts.pop("gtol"), opts.pop("verbose"), opts.pop("xtol"), opts.pop(
+                    "maxfun"
+                )
+                self.sol = minimize(
+                    fun=lambda z: -self.model.loglikelihood(self.G, z),
+                    x0=np.squeeze(self.x0),
+                    method="SLSQP",
+                    constraints={"fun": self.model.constraints, "type": "ineq"},
+                    bounds=self.model.bounds,
+                    jac=J,
+                    tol=opts["ftol"],
+                    options=opts,
+                )
+            else:  # the model has only bound-constraints, hence use L-BFGS-B
                 # Optimize using L-BFGS-B which typically returns good results
-                opts.pop('xtol'), opts.pop('verbose')
-                self.sol = minimize(fun=lambda z: -self.model.loglikelihood(self.G, z),
-                                    x0=np.squeeze(self.x0),
-                                    method='L-BFGS-B',
-                                    jac=J,
-                                    bounds=self.model.bounds,
-                                    options=opts)
-            if kwargs.get('verbose',0)>0:
-                print(self.sol['message'])
-                if self.sol['status'] != 0:
-                    RuntimeWarning(self.sol['message'])
-                #raise Exception('Method did not converge to maximum likelihood: ')
-        elif method is 'saddle_point':
-            if hasattr(self.model, 'constraints'):
-                raise RuntimeError('Cannot solve saddle_point_equations with non-linear constraints')
+                opts.pop("xtol"), opts.pop("verbose")
+                self.sol = minimize(
+                    fun=lambda z: -self.model.loglikelihood(self.G, z),
+                    x0=np.squeeze(self.x0),
+                    method="L-BFGS-B",
+                    jac=J,
+                    bounds=self.model.bounds,
+                    options=opts,
+                )
+            if kwargs.get("verbose", 0) > 0:
+                print(self.sol["message"])
+                if self.sol["status"] != 0:
+                    RuntimeWarning(self.sol["message"])
+                # raise Exception('Method did not converge to maximum likelihood: ')
+        elif method is "saddle_point":
+            if hasattr(self.model, "constraints"):
+                raise RuntimeError(
+                    "Cannot solve saddle_point_equations with non-linear constraints"
+                )
             # Use the Dogbox method to optimize likelihood
-            #ls_bounds = [np.min(np.ravel(self.model.bounds)), np.max(np.ravel(self.model.bounds))]
+            # ls_bounds = [np.min(np.ravel(self.model.bounds)), np.max(np.ravel(self.model.bounds))]
             ls_bounds = np.ravel(self.model.bounds).astype(float)
             ls_bounds[np.isnan(ls_bounds)] = np.inf
-            ls_bounds = np.reshape(ls_bounds,[len(self.x0),2]).T.tolist() # it is required in a different format
+            ls_bounds = np.reshape(
+                ls_bounds, [len(self.x0), 2]
+            ).T.tolist()  # it is required in a different format
+
             def basin_opt(*basin_opt_args, **basin_opt_kwargs):
-                opt_result = least_squares(fun=basin_opt_args[0],
-                                           x0=np.squeeze(basin_opt_args[1]),
-                                           bounds=ls_bounds,
-                                           method='trf',
-                                           xtol=opts['xtol'],
-                                           gtol=opts['gtol'],
-                                           tr_solver='lsmr',
-                                           max_nfev=opts['maxiter'],
-                                           verbose=opts['verbose'])
+                opt_result = least_squares(
+                    fun=basin_opt_args[0],
+                    x0=np.squeeze(basin_opt_args[1]),
+                    bounds=ls_bounds,
+                    method="trf",
+                    xtol=opts["xtol"],
+                    gtol=opts["gtol"],
+                    tr_solver="lsmr",
+                    max_nfev=opts["maxiter"],
+                    verbose=opts["verbose"],
+                )
                 # use this form with linear loss as in the basinhopping
                 # func argument to be consistent
-                opt_result['fun'] = 0.5 * np.sum(opt_result['fun'] ** 2)
+                opt_result["fun"] = 0.5 * np.sum(opt_result["fun"] ** 2)
                 return opt_result
 
             # If the model is convex, we simply run least_squares
-            if not kwargs.get('basinhopping', False):
-                self.sol = basin_opt(lambda z: self.model.saddle_point(self.G, z), self.x0)
+            if not kwargs.get("basinhopping", False):
+                self.sol = basin_opt(
+                    lambda z: self.model.saddle_point(self.G, z), self.x0
+                )
             else:
                 # otherwise combine local and global optimization with basinhopping
                 nlineq = lambda z: self.model.saddle_point(self.G, z)
                 from .basinhoppingmod import basinhopping, BHBounds, BHRandStepBounded
+
                 bounds = BHBounds(xmin=ls_bounds[0], xmax=ls_bounds[1])
-                bounded_step = BHRandStepBounded(ls_bounds[0], ls_bounds[1], stepsize=0.5)
-                self.sol = basinhopping(func=lambda z: (nlineq(z)**2).sum(),
-                                        x0=np.squeeze(self.x0),
-                                        T=kwargs.get('T', 1),
-                                        minimize_routine=basin_opt,
-                                        minimizer_kwargs={'saddle_point_equations': nlineq },
-                                        accept_test=bounds,
-                                        take_step=bounded_step,
-                                        niter=kwargs.get('basin_hopping_niter', 5),
-                                        disp=bool(kwargs.get('verbose')))
-        
+                bounded_step = BHRandStepBounded(
+                    ls_bounds[0], ls_bounds[1], stepsize=0.5
+                )
+                self.sol = basinhopping(
+                    func=lambda z: (nlineq(z) ** 2).sum(),
+                    x0=np.squeeze(self.x0),
+                    T=kwargs.get("T", 1),
+                    minimize_routine=basin_opt,
+                    minimizer_kwargs={"saddle_point_equations": nlineq},
+                    accept_test=bounds,
+                    take_step=bounded_step,
+                    niter=kwargs.get("basin_hopping_niter", 5),
+                    disp=bool(kwargs.get("verbose")),
+                )
+
         else:
-            raise RuntimeError('Only MLE and saddle_point methods are supported')
-        
+            raise RuntimeError("Only MLE and saddle_point methods are supported")
+
         # Compute the corrected Akaike information and Bayes information criteria
         # http://downloads.hindawi.com/journals/complexity/2019/5120581.pdf
-        K = len(self.sol['x'])
+        K = len(self.sol["x"])
         N = len(self.G)
-        n = N*(N-1)/2 # n is the sample size
+        n = N * (N - 1) / 2  # n is the sample size
         # Both AIC and BIC are minimum for the best explanatory model
-        L = self.model.loglikelihood(self.G,self.sol['x'])
-        self.sol['AIC'] = -2*L + 2*K + (2*K*(K+1)) / (n-K+1)
-        self.sol['BIC'] = -2*L + K*np.log(n)
+        L = self.model.loglikelihood(self.G, self.sol["x"])
+        self.sol["AIC"] = -2 * L + 2 * K + (2 * K * (K + 1)) / (n - K + 1)
+        self.sol["BIC"] = -2 * L + K * np.log(n)
         return self.sol
 
 
@@ -257,10 +278,10 @@ class ContinuousOptimizer:
 
     def gradient(self, x, rho, beta):
         """
-        This method computes the gradient as 
-        
+        This method computes the gradient as
+
         :math:`\\frac{s(\\boldsymbol \\rho \| \\boldsymbol \\sigma)}{\\partial \\boldsymbol \\theta_k} = \\beta \textrm{Tr}\left \lbrack \left( \rho - \sigma(\theta)\right) \frac{\mathbb{E}\mathbf{L}(\theta)}{\partial \theta_k} \right \rbrack`
-        
+
         args:
             x (numpy.array): the current parameters
             rho (numpy.array): the observed density matrix
@@ -273,8 +294,16 @@ class ContinuousOptimizer:
         sigma = density(graph_laplacian(self.model.expected_adjacency(x)), beta)
         # Here instead of tracing over the matrix product, we just sum over the entrywise product of the two matrices
         # (rho-sigma) and the ∂E_θ[L]/.
-        return np.array([np.sum(np.multiply(rho - sigma, self.model.expected_laplaplacian_grad(x)[:, i, :].T)) for i in
-                         range(0, len(self.x0))])
+        return np.array(
+            [
+                np.sum(
+                    np.multiply(
+                        rho - sigma, self.model.expected_laplaplacian_grad(x)[:, i, :].T
+                    )
+                )
+                for i in range(0, len(self.x0))
+            ]
+        )
 
     def run(self, **kwargs):
         """
@@ -284,7 +313,7 @@ class ContinuousOptimizer:
             method (string): 'BFGS'
             if the optimization problem is bounded, instead use one of the scipy constrained optimizer,
             which are 'L-BFGS-B', 'TNC', 'SLSQP' or 'least_squares'
-        
+
         Kwargs:
 
             gtol: (float)
@@ -303,10 +332,17 @@ class ContinuousOptimizer:
             sol: (scipy.optimize.OptimizeResult) parameters at optimal likelihood
         """
 
-        self.method = kwargs.get('method', 'BFGS')
-        if self.model.bounds is not None and self.method not in ['L-BFGS-B', 'TNC', 'SLSQP', 'least_squares']:
-            raise RuntimeWarning('This model has bounds. BFGS cannot handle constraints nor bounds, switch to either '
-                                 'L-BFGS-B, TNC or SLSQP')
+        self.method = kwargs.get("method", "BFGS")
+        if self.model.bounds is not None and self.method not in [
+            "L-BFGS-B",
+            "TNC",
+            "SLSQP",
+            "least_squares",
+        ]:
+            raise RuntimeWarning(
+                "This model has bounds. BFGS cannot handle constraints nor bounds, switch to either "
+                "L-BFGS-B, TNC or SLSQP"
+            )
 
         # Populate the solution list as function of beta
         # the list sol contains all optimization points
@@ -314,9 +350,11 @@ class ContinuousOptimizer:
         # Iterate over all beta provided by the user
         for beta in self.beta_range:
             # define the relative entropy function, dependent on current beta
-            self.rel_entropy_fun = lambda x: SpectralDivergence(Lobs=self.L,
-                                                                Lmodel=graph_laplacian(self.model.expected_adjacency(x)),
-                                                                beta=beta).rel_entropy
+            self.rel_entropy_fun = lambda x: SpectralDivergence(
+                Lobs=self.L,
+                Lmodel=graph_laplacian(self.model.expected_adjacency(x)),
+                beta=beta,
+            ).rel_entropy
 
             # Define initially fgrad as None, relying on numerical computation of it
             fgrad = None
@@ -334,41 +372,56 @@ class ContinuousOptimizer:
             # Append the solutions
             # Here we adopt two different strategies, either minimizing the residual of gradients of Dkl
             # using least_squares or minimizing the Dkl itself.
-            # The least_squares approach requires the gradients of the model, if they are not implemented 
+            # The least_squares approach requires the gradients of the model, if they are not implemented
             # in the model, the algorithmic differentiation is used, which is slower
 
-            sol.append(minimize(fun=self.rel_entropy_fun,
-                                x0=self.x0,
-                                jac=fgrad,
-                                method=self.method,
-                                options={'disp': kwargs.get('disp', False),
-                                         'gtol': kwargs.get('gtol', 1E-12),
-                                         'maxiter': kwargs.get('maxiter', 5E4),
-                                         'maxfun': kwargs.get('maxfun', 5E4)},
-                                bounds=self.model.bounds))
+            sol.append(
+                minimize(
+                    fun=self.rel_entropy_fun,
+                    x0=self.x0,
+                    jac=fgrad,
+                    method=self.method,
+                    options={
+                        "disp": kwargs.get("disp", False),
+                        "gtol": kwargs.get("gtol", 1e-12),
+                        "maxiter": kwargs.get("maxiter", 5e4),
+                        "maxfun": kwargs.get("maxfun", 5e4),
+                    },
+                    bounds=self.model.bounds,
+                )
+            )
 
             # important to reinitialize from the last solution, solution is restarted at every step otherwise
-            if kwargs.get('reinitialize', True):
+            if kwargs.get("reinitialize", True):
                 self.x0 = sol[-1].x
             # Call the step_callback function to print or display current solution
             if self.step_callback is not None:
                 self.step_callback(beta, sol[-1].x)
 
             # Here creates the output data structure as a dictionary of the optimization parameters and variables
-            spect_div = SpectralDivergence(Lobs=self.L, Lmodel=graph_laplacian(self.model.expected_adjacency(sol[-1].x)),
-                                           beta=beta)
-            sol[-1]['DeltaL'] = (np.trace(self.L) - np.trace(graph_laplacian(self.model.expected_adjacency(sol[-1].x)))) / 2
-            if kwargs.get('compute_sigma', False):
+            spect_div = SpectralDivergence(
+                Lobs=self.L,
+                Lmodel=graph_laplacian(self.model.expected_adjacency(sol[-1].x)),
+                beta=beta,
+            )
+            sol[-1]["DeltaL"] = (
+                np.trace(self.L)
+                - np.trace(graph_laplacian(self.model.expected_adjacency(sol[-1].x)))
+            ) / 2
+            if kwargs.get("compute_sigma", False):
                 Lmodel = graph_laplacian(self.model.expected_adjacency(sol[-1].x))
                 rho = density(L=self.L, beta_range=[beta])
                 sigma = density(L=Lmodel, beta_range=[beta])
-                sol[-1]['<DeltaL>'] = np.sum((rho-sigma)*Lmodel)
-            sol[-1]['T'] = 1 / beta
-            sol[-1]['beta'] = beta
-            sol[-1]['loglike'] = spect_div.loglike
-            sol[-1]['rel_entropy'] = spect_div.rel_entropy
-            sol[-1]['entropy'] = spect_div.entropy
-            sol[-1]['AIC'] = 2 * len(self.model.expected_adjacency.args_mapping) - 2 * sol[-1]['loglike']
+                sol[-1]["<DeltaL>"] = np.sum((rho - sigma) * Lmodel)
+            sol[-1]["T"] = 1 / beta
+            sol[-1]["beta"] = beta
+            sol[-1]["loglike"] = spect_div.loglike
+            sol[-1]["rel_entropy"] = spect_div.rel_entropy
+            sol[-1]["entropy"] = spect_div.entropy
+            sol[-1]["AIC"] = (
+                2 * len(self.model.expected_adjacency.args_mapping)
+                - 2 * sol[-1]["loglike"]
+            )
             for i in range(0, len(self.model.expected_adjacency.args_mapping)):
                 sol[-1][self.model.expected_adjacency.args_mapping[i]] = sol[-1].x[i]
         self.sol = sol
@@ -384,38 +437,42 @@ class ContinuousOptimizer:
 
         if to_dataframe:
             import pandas as pd
-            return pd.DataFrame(self.sol).set_index('T')  # it's 1/beta
+
+            return pd.DataFrame(self.sol).set_index("T")  # it's 1/beta
         else:
             s = "{:>20} " * (len(self.model.expected_adjacency.args_mapping) + 1)
-            print('=' * 20 * (len(self.model.expected_adjacency.args_mapping) + 1))
-            print('Summary:')
-            print('Model:\t' + str(self.model.expected_adjacency.formula))
-            print('=' * 20 * (len(self.model.expected_adjacency.args_mapping) + 1))
-            print('Optimization method: ' + self.method)
-            print('Variables bounds: ')
+            print("=" * 20 * (len(self.model.expected_adjacency.args_mapping) + 1))
+            print("Summary:")
+            print("Model:\t" + str(self.model.expected_adjacency.formula))
+            print("=" * 20 * (len(self.model.expected_adjacency.args_mapping) + 1))
+            print("Optimization method: " + self.method)
+            print("Variables bounds: ")
             for i, b in enumerate(self.bounds):
-                left = '-∞' if self.bounds[i][0] is None else str(
-                    self.bounds[i][0])
-                right = '+∞' if self.bounds[i][1] is None else str(
-                    self.bounds[i][1])
-                print("{: >1} {:} {: >10} {:} {: >1}".format(
-                    left, '<=', self.model.expected_adjacency.args_mapping[i], '<=', right))
-            print('=' * 20 * (len(self.model.expected_adjacency.args_mapping) + 1))
-            print('Results:')
-            print('=' * 20 * (len(self.model.expected_adjacency.args_mapping) + 1))
-            print('Von Neumann Log Likelihood:\t' +
-                  str(self.sol[-1]['loglike']))
-            print('Von Neumann Entropy:\t\t' + str(self.sol[-1]['entropy']))
-            print('Von Neumann Relative entropy:\t' +
-                  str(self.sol[-1]['rel_entropy']))
-            print('AIC:\t\t\t\t' + str(self.sol[-1]['AIC']))
-            print('=' * 20 * (len(self.model.expected_adjacency.args_mapping) + 1))
-            print('Estimate:')
-            print('=' * 20 * (len(self.model.expected_adjacency.args_mapping) + 1))
-            print(s.format('beta', *self.model.expected_adjacency.args_mapping))
+                left = "-∞" if self.bounds[i][0] is None else str(self.bounds[i][0])
+                right = "+∞" if self.bounds[i][1] is None else str(self.bounds[i][1])
+                print(
+                    "{: >1} {:} {: >10} {:} {: >1}".format(
+                        left,
+                        "<=",
+                        self.model.expected_adjacency.args_mapping[i],
+                        "<=",
+                        right,
+                    )
+                )
+            print("=" * 20 * (len(self.model.expected_adjacency.args_mapping) + 1))
+            print("Results:")
+            print("=" * 20 * (len(self.model.expected_adjacency.args_mapping) + 1))
+            print("Von Neumann Log Likelihood:\t" + str(self.sol[-1]["loglike"]))
+            print("Von Neumann Entropy:\t\t" + str(self.sol[-1]["entropy"]))
+            print("Von Neumann Relative entropy:\t" + str(self.sol[-1]["rel_entropy"]))
+            print("AIC:\t\t\t\t" + str(self.sol[-1]["AIC"]))
+            print("=" * 20 * (len(self.model.expected_adjacency.args_mapping) + 1))
+            print("Estimate:")
+            print("=" * 20 * (len(self.model.expected_adjacency.args_mapping) + 1))
+            print(s.format("beta", *self.model.expected_adjacency.args_mapping))
             for i in range(0, len(self.sol)):
                 row = [str(x) for x in self.sol[i].x]
-                print(s.format(self.sol[i]['beta'], *row))
+                print(s.format(self.sol[i]["beta"], *row))
 
 
 class StochasticOptimizer:
@@ -426,16 +483,16 @@ class StochasticOptimizer:
     Working out the expression for the gradients of the relative entropy, one remains with the following:
 
     :math: `\nabla_{\theta}S(\rho \| \sigma) = \beta \textrm\biggl \lbrack \rho \nabla_{\theta}\mathbb{E}_{\theta}[L]} \biggr \rbrack`
-        
+
     :math: `\frac{\partial S(\rho \| \sigma)}{\partial \theta_k} = \beta \textrm{Tr}\lbrack \rho \frac{\partial}{\partial \theta_k} \rbrack + \frac{\partial}{\partial \theta_k}\mathbb{E}_{\theta}\log \textrm{Tr} e^{-\beta L(\theta)}\lbrack \rbrack`
-    
+
     This class requires either Tensorflow or Pytorch to support backpropagation in the eigenvalues routines.
     Alternatively you can use github.com/HIPS/autograd method for full CPU support.
     """
 
-    def __init__(self, G: np.array, x0 : np.array, model : GraphModel, **kwargs):
+    def __init__(self, G: np.array, x0: np.array, model: GraphModel, **kwargs):
         """
-        Initialize the stochastic optimizer with the observed graph, an initial guess and the 
+        Initialize the stochastic optimizer with the observed graph, an initial guess and the
         model to optimize.
 
         Args:
@@ -444,29 +501,30 @@ class StochasticOptimizer:
             model (nq.GraphModel): the graph model to optimize the likelihood of.
         """
         self.G = G
-        self.L = graph_laplacian(self.G) # compute graph laplacian
+        self.L = graph_laplacian(self.G)  # compute graph laplacian
         self.x0 = x0
         self.model = model
-        self.sol = OptimizeResult(x=self.x0,
-                                  success=False,
-                                  status=None,
-                                  message='',
-                                  fun=None,
-                                  jac=None,
-                                  hess=None,
-                                  hess_inv=None,
-                                  nfev=0, # number of function evaluations
-                                  njev=0, # number of jacobian evaluations
-                                  nhev=0, # number of hessian evaluations
-                                  nit=0,  # number of iterations
-                                  maxcv=-1) # maximum constraint violation
-        
+        self.sol = OptimizeResult(
+            x=self.x0,
+            success=False,
+            status=None,
+            message="",
+            fun=None,
+            jac=None,
+            hess=None,
+            hess_inv=None,
+            nfev=0,  # number of function evaluations
+            njev=0,  # number of jacobian evaluations
+            nhev=0,  # number of hessian evaluations
+            nit=0,  # number of iterations
+            maxcv=-1,
+        )  # maximum constraint violation
+
         self.model.ls_bounds = np.ravel(self.model.bounds).astype(float)
         self.model.ls_bounds[np.isnan(self.model.ls_bounds)] = np.inf
 
-        self.model.min_bounds = self.model.ls_bounds.reshape([len(self.x0),2])[:,0]
-        self.model.max_bounds = self.model.ls_bounds.reshape([len(self.x0),2])[:,1]
-
+        self.model.min_bounds = self.model.ls_bounds.reshape([len(self.x0), 2])[:, 0]
+        self.model.max_bounds = self.model.ls_bounds.reshape([len(self.x0), 2])[:, 1]
 
     def gradient(self, x, rho, beta, batch_size=1):
         """
@@ -474,41 +532,54 @@ class StochasticOptimizer:
         Entropy of rho is constant over the iterations
         if beta is kept constant, otherwise a specific rho can be passed
         """
-        #lambd_rho = eigh(rho)[0]
-        #entropy = -np.sum(lambd_rho * np.log(lambd_rho))
+        # lambd_rho = eigh(rho)[0]
+        # entropy = -np.sum(lambd_rho * np.log(lambd_rho))
 
         def log_likelihood(z):
             N = len(self.G)
             # Sample 'batch_size' adjacency matrices shape=[batch_size,N,N]
-            Amodel = self.model.sample_adjacency(theta=z, batch_size=batch_size, with_grads=True)
+            Amodel = self.model.sample_adjacency(
+                theta=z, batch_size=batch_size, with_grads=True
+            )
             # Here exploit broadcasting to create batch_size diagonal matrices with the degrees
-            Dmodel = np.eye(N) * np.transpose(np.zeros([1, 1, N]) + np.einsum('ijk->ik', Amodel, optimize=True), [1, 0, 2])
+            Dmodel = np.eye(N) * np.transpose(
+                np.zeros([1, 1, N]) + np.einsum("ijk->ik", Amodel, optimize=True),
+                [1, 0, 2],
+            )
             Lmodel = Dmodel - Amodel  # returns a batch_size x N x N tensor
             # do average over batches of the sum of product of matrix elements (done with * operator)
             Emodel = np.mean(np.sum(np.sum(Lmodel * rho, axis=2), axis=1))
-            lambd_model = eigh(Lmodel)[0]  # eigh is a batched operation, take the eigenvalues only
-            Fmodel = - np.mean(logsumexp(-beta * lambd_model, axis=1) / beta)
-            loglike = -beta * Emodel + Fmodel # - Tr[rho log(sigma)]
-            #loglike  #- entropy # Tr[rho log(rho)] - Tr[rho log(sigma)]
-            
+            lambd_model = eigh(Lmodel)[
+                0
+            ]  # eigh is a batched operation, take the eigenvalues only
+            Fmodel = -np.mean(logsumexp(-beta * lambd_model, axis=1) / beta)
+            loglike = -beta * Emodel + Fmodel  # - Tr[rho log(sigma)]
+            # loglike  #- entropy # Tr[rho log(rho)] - Tr[rho log(sigma)]
+
             # Add a penalty term accouting for boundaries violation
             # Follows these ideas https://www.cs.jhu.edu/~ijwang/pub/01271742.pdf
             def quadratic_penalty(theta):
                 z = np.zeros(theta.shape)
-                # compute the penalty with respect to low bounds violation 
-                penalty_low = np.sum(np.max(np.hstack([z, -theta + self.model.min_bounds]))**2)
-                # compute the penalty with respect to high bounds violation 
-                penalty_high = np.sum(np.max(np.hstack([z, theta - self.model.max_bounds]))**2)
+                # compute the penalty with respect to low bounds violation
+                penalty_low = np.sum(
+                    np.max(np.hstack([z, -theta + self.model.min_bounds])) ** 2
+                )
+                # compute the penalty with respect to high bounds violation
+                penalty_high = np.sum(
+                    np.max(np.hstack([z, theta - self.model.max_bounds])) ** 2
+                )
                 return 0.5 * (penalty_low + penalty_high)
+
             def absolute_value_penalty(theta):
                 z = np.zeros(theta.shape)
-                # compute the penalty with respect to low bounds violation 
+                # compute the penalty with respect to low bounds violation
                 penalty_low = np.max(np.hstack([z, -theta + self.model.min_bounds]))
-                # compute the penalty with respect to high bounds violation 
+                # compute the penalty with respect to high bounds violation
                 penalty_high = np.max(np.hstack([z, theta - self.model.max_bounds]))
-                return np.max(np.hstack(penalty_low,penalty_high))
+                return np.max(np.hstack(penalty_low, penalty_high))
+
             penalty = quadratic_penalty
-            cost = -loglike + beta*penalty(z)
+            cost = -loglike + beta * penalty(z)
             return cost
 
         # value and gradient of relative entropy as a function
@@ -527,68 +598,80 @@ class Adam(StochasticOptimizer):
     https://arxiv.org/pdf/1810.06801.pdf
     """
 
-    def __init__(self, G: np.array, x0 : np.array, model : GraphModel, **kwargs):
+    def __init__(self, G: np.array, x0: np.array, model: GraphModel, **kwargs):
         super().__init__(G, x0, model, **kwargs)
-        self.logfile = open('adam.log','w')
+        self.logfile = open("adam.log", "w")
         self.mt, self.vt = np.zeros(self.sol.x.shape), np.zeros(self.sol.x.shape)
 
-    def run(self,
-            beta,
-            rho=None,
-            maxiter=1E4,
-            learning_rate=1E-3,
-            beta1=0.9,
-            beta2=0.999,
-            nu1=0.7,
-            nu2=1.0,
-            epsilon=1E-8,
-            batch_size=64,
-            ftol=1E-10,
-            gtol=1E-5,
-            xtol=1E-8,
-            last_iters = 100,
-            quasi_hyperbolic = True,
-            callback=None,
-            **kwargs):
-        
-        opts = {'ftol': ftol,
-                'gtol': gtol, # as default of LBFGSB
-                'xtol': xtol,
-                'maxiter': maxiter,
-                'eps': kwargs.get('eps', 1E-8), # as default of LBFGSB
-                'maxfun': kwargs.get('maxfun', 1E10),
-                'verbose' : kwargs.get('verbose', 0),
-                'disp':  bool(kwargs.get('verbose', 0)),
-                'iprint': kwargs.get('verbose', 0)
-                }
+    def run(
+        self,
+        beta,
+        rho=None,
+        maxiter=1e4,
+        learning_rate=1e-3,
+        beta1=0.9,
+        beta2=0.999,
+        nu1=0.7,
+        nu2=1.0,
+        epsilon=1e-8,
+        batch_size=64,
+        ftol=1e-10,
+        gtol=1e-5,
+        xtol=1e-8,
+        last_iters=100,
+        quasi_hyperbolic=True,
+        callback=None,
+        **kwargs
+    ):
+
+        opts = {
+            "ftol": ftol,
+            "gtol": gtol,  # as default of LBFGSB
+            "xtol": xtol,
+            "maxiter": maxiter,
+            "eps": kwargs.get("eps", 1e-8),  # as default of LBFGSB
+            "maxfun": kwargs.get("maxfun", 1e10),
+            "verbose": kwargs.get("verbose", 0),
+            "disp": bool(kwargs.get("verbose", 0)),
+            "iprint": kwargs.get("verbose", 0),
+        }
 
         # if rho is provided, user rho is used, otherwise is computed at every beta
         if rho is None:
             rho = density(L=self.L, beta_range=[beta])
 
-        for t in range(1,int(maxiter)+1):
+        for t in range(1, int(maxiter) + 1):
             self.sol.nit += 1
             # get the relative entropy value and its gradient w.r.t. variables
             dkl, grad_t = self.gradient(self.sol.x, rho, beta, batch_size=batch_size)
-            print('\rIteration %d beta=%.3f dkl=%.3f x=%f' % (t,beta,dkl,self.sol.x), end='')
+            print(
+                "\rIteration %d beta=%.3f dkl=%.3f x=%f" % (t, beta, dkl, self.sol.x),
+                end="",
+            )
             # Convergence status
             if np.linalg.norm(grad_t) < gtol:
                 self.sol.success = True
-                self.sol.message = 'Exceeded minimum gradient |grad| < %g' % gtol
+                self.sol.message = "Exceeded minimum gradient |grad| < %g" % gtol
                 break
 
             self.mt = beta1 * self.mt + (1.0 - beta1) * grad_t
             self.vt = beta2 * self.vt + (1.0 - beta2) * (grad_t * grad_t)
-            mttilde = self.mt / (1.0 - (beta1 ** t))  # compute bias corrected first moment estimate
-            vttilde = self.vt / (1.0 - (beta2 ** t))  # compute bias-corrected second raw moment estimate
-            if quasi_hyperbolic: # quasi hyperbolic adam
-                deltax = ((1-nu1) * grad_t + nu1 * mttilde)/(np.sqrt((1-nu2) * (grad_t**2) + nu2 * vttilde ) + epsilon)
-            else: # vanilla Adam
+            mttilde = self.mt / (
+                1.0 - (beta1 ** t)
+            )  # compute bias corrected first moment estimate
+            vttilde = self.vt / (
+                1.0 - (beta2 ** t)
+            )  # compute bias-corrected second raw moment estimate
+            if quasi_hyperbolic:  # quasi hyperbolic adam
+                deltax = ((1 - nu1) * grad_t + nu1 * mttilde) / (
+                    np.sqrt((1 - nu2) * (grad_t ** 2) + nu2 * vttilde) + epsilon
+                )
+            else:  # vanilla Adam
                 deltax = mttilde / np.sqrt(vttilde + epsilon)
             self.sol.x -= learning_rate * deltax
-            #print(self.sol.x.shape)
-            #print(beta,dkl)
-            #self.logfile.write( u"%g\t%g\t%g\n" % (self.sol.x, beta, dkl) )
+            # print(self.sol.x.shape)
+            # print(beta,dkl)
+            # self.logfile.write( u"%g\t%g\t%g\n" % (self.sol.x, beta, dkl) )
             if t % 50:
                 self.logfile.flush()
         return self.sol

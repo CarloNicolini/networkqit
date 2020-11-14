@@ -1,23 +1,3 @@
-#! /usr/bin/env python
-# -*- coding: utf-8 -*-
-#
-# networkqit -- a python module for manipulations of spectral entropies framework
-#
-# Copyright (C) 2017-2018 Carlo Nicolini <carlo.nicolini@iit.it>
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 """
 The basinhopping global optimization algorithm with modifications 
 to work within the spectral entropies framework.
@@ -31,18 +11,18 @@ from __future__ import division, print_function, absolute_import
 
 import autograd.numpy as np
 import math
-from numpy import cos, sin
 import scipy.optimize
 import collections
 from scipy._lib._util import check_random_state
 
-__all__ = ['basinhopping','BHBounds','BHRandStepBounded']
+__all__ = ["basinhopping", "BHBounds", "BHRandStepBounded"]
 
 
 class Storage(object):
     """
     Class used to store the lowest energy structure
     """
+
     def __init__(self, minres):
         self._add(minres)
 
@@ -84,6 +64,7 @@ class BasinHoppingRunner(object):
         Display status messages.
 
     """
+
     def __init__(self, x0, minimizer, step_taking, accept_tests, disp=False):
         self.x = np.copy(x0)
         self.minimizer = minimizer
@@ -152,29 +133,37 @@ class BasinHoppingRunner(object):
         # steps are not sufficient.
         accept = True
         for test in self.accept_tests:
-            testres = test(f_new=energy_after_quench, x_new=x_after_quench,
-                           f_old=self.energy, x_old=self.x)
-            if testres == 'force accept':
+            testres = test(
+                f_new=energy_after_quench,
+                x_new=x_after_quench,
+                f_old=self.energy,
+                x_old=self.x,
+            )
+            if testres == "force accept":
                 accept = True
                 break
             elif testres is None:
-                raise ValueError("accept_tests must return True, False, or "
-                                 "'force accept'")
+                raise ValueError(
+                    "accept_tests must return True, False, or " "'force accept'"
+                )
             elif not testres:
                 accept = False
 
         # Report the result of the acceptance test to the take step class.
         # This is for adaptive step taking
         if hasattr(self.step_taking, "report"):
-            self.step_taking.report(accept, f_new=energy_after_quench,
-                                    x_new=x_after_quench, f_old=self.energy,
-                                    x_old=self.x)
+            self.step_taking.report(
+                accept,
+                f_new=energy_after_quench,
+                x_new=x_after_quench,
+                f_old=self.energy,
+                x_old=self.x,
+            )
 
         return accept, minres
 
     def one_cycle(self):
-        """Do one cycle of the basinhopping algorithm
-        """
+        """Do one cycle of the basinhopping algorithm"""
         self.nstep += 1
         new_global_min = False
 
@@ -189,8 +178,10 @@ class BasinHoppingRunner(object):
         if self.disp:
             self.print_report(minres.fun, accept)
             if new_global_min:
-                print("found new global minimum on step %d with function"
-                      " value %g" % (self.nstep, self.energy))
+                print(
+                    "found new global minimum on step %d with function"
+                    " value %g" % (self.nstep, self.energy)
+                )
 
         # save some variables as BasinHoppingRunner attributes
         self.xtrial = minres.x
@@ -202,9 +193,10 @@ class BasinHoppingRunner(object):
     def print_report(self, energy_trial, accept):
         """print a status update"""
         minres = self.storage.get_lowest()
-        print("basinhopping step %d: f %g trial_f %g accepted %d "
-              " lowest_f %g" % (self.nstep, self.energy, energy_trial,
-                                accept, minres.fun))
+        print(
+            "basinhopping step %d: f %g trial_f %g accepted %d "
+            " lowest_f %g" % (self.nstep, self.energy, energy_trial, accept, minres.fun)
+        )
 
 
 class AdaptiveStepsize(object):
@@ -230,8 +222,10 @@ class AdaptiveStepsize(object):
         Print information about each update
 
     """
-    def __init__(self, takestep, accept_rate=0.5, interval=50, factor=0.9,
-                 verbose=True):
+
+    def __init__(
+        self, takestep, accept_rate=0.5, interval=50, factor=0.9, verbose=True
+    ):
         self.takestep = takestep
         self.target_accept_rate = accept_rate
         self.interval = interval
@@ -256,10 +250,16 @@ class AdaptiveStepsize(object):
             # We're not accepting enough steps.  Take smaller steps
             self.takestep.stepsize *= self.factor
         if self.verbose:
-            print("adaptive stepsize: acceptance rate %f target %f new "
-                  "stepsize %g old stepsize %g" % (accept_rate,
-                  self.target_accept_rate, self.takestep.stepsize,
-                  old_stepsize))
+            print(
+                "adaptive stepsize: acceptance rate %f target %f new "
+                "stepsize %g old stepsize %g"
+                % (
+                    accept_rate,
+                    self.target_accept_rate,
+                    self.takestep.stepsize,
+                    old_stepsize,
+                )
+            )
 
     def take_step(self, x):
         self.nstep += 1
@@ -287,13 +287,13 @@ class RandomDisplacement(object):
     random_state : None or `np.random.RandomState` instance, optional
         The random number generator that generates the displacements
     """
+
     def __init__(self, stepsize=0.5, random_state=None):
         self.stepsize = stepsize
         self.random_state = check_random_state(random_state)
 
     def __call__(self, x):
-        x += self.random_state.uniform(-self.stepsize, self.stepsize,
-                                       np.shape(x))
+        x += self.random_state.uniform(-self.stepsize, self.stepsize, np.shape(x))
         return x
 
 
@@ -301,6 +301,7 @@ class MinimizerWrapper(object):
     """
     wrap a minimizer function as a minimizer class
     """
+
     def __init__(self, minimizer, func=None, **kwargs):
         self.minimizer = minimizer
         self.func = func
@@ -324,11 +325,12 @@ class Metropolis(object):
     random_state : None or `np.random.RandomState` object
         Random number generator used for acceptance test
     """
+
     def __init__(self, T, random_state=None):
         # Avoid ZeroDivisionError since "MBH can be regarded as a special case
         # of the BH framework with the Metropolis criterion, where temperature
         # T = 0."  (Reject all steps that increase energy.)
-        self.beta = 1.0 / T if T != 0 else float('inf')
+        self.beta = 1.0 / T if T != 0 else float("inf")
         self.random_state = check_random_state(random_state)
 
     def accept_reject(self, energy_new, energy_old):
@@ -345,15 +347,25 @@ class Metropolis(object):
         """
         f_new and f_old are mandatory in kwargs
         """
-        return bool(self.accept_reject(kwargs["f_new"],
-                    kwargs["f_old"]))
+        return bool(self.accept_reject(kwargs["f_new"], kwargs["f_old"]))
 
 
-def basinhopping(func, x0, niter=100, T=1.0, stepsize=0.5,
-                 minimizer_kwargs=None, take_step=None, accept_test=None,
-                 minimize_routine=None,
-                 callback=None, interval=50, disp=False, niter_success=None,
-                 seed=None):
+def basinhopping(
+    func,
+    x0,
+    niter=100,
+    T=1.0,
+    stepsize=0.5,
+    minimizer_kwargs=None,
+    take_step=None,
+    accept_test=None,
+    minimize_routine=None,
+    callback=None,
+    interval=50,
+    disp=False,
+    niter_success=None,
+    seed=None,
+):
     """
     Find the global minimum of a function using the basin-hopping algorithm
 
@@ -660,10 +672,16 @@ def basinhopping(func, x0, niter=100, T=1.0, stepsize=0.5,
     if minimizer_kwargs is None:
         minimizer_kwargs = dict()
     if minimize_routine is None:
-        wrapped_minimizer = MinimizerWrapper(scipy.optimize.minimize, func, **minimizer_kwargs)
+        wrapped_minimizer = MinimizerWrapper(
+            scipy.optimize.minimize, func, **minimizer_kwargs
+        )
     else:
-        wrapped_minimizer = MinimizerWrapper(minimize_routine, minimizer_kwargs['saddle_point_equations'], **minimizer_kwargs)
-    
+        wrapped_minimizer = MinimizerWrapper(
+            minimize_routine,
+            minimizer_kwargs["saddle_point_equations"],
+            **minimizer_kwargs
+        )
+
     # set up step-taking algorithm
     if take_step is not None:
         if not isinstance(take_step, collections.Callable):
@@ -671,15 +689,15 @@ def basinhopping(func, x0, niter=100, T=1.0, stepsize=0.5,
         # if take_step.stepsize exists then use AdaptiveStepsize to control
         # take_step.stepsize
         if hasattr(take_step, "stepsize"):
-            take_step_wrapped = AdaptiveStepsize(take_step, interval=interval,
-                                                 verbose=disp)
+            take_step_wrapped = AdaptiveStepsize(
+                take_step, interval=interval, verbose=disp
+            )
         else:
             take_step_wrapped = take_step
     else:
         # use default
         displace = RandomDisplacement(stepsize=stepsize, random_state=rng)
-        take_step_wrapped = AdaptiveStepsize(displace, interval=interval,
-                                             verbose=disp)
+        take_step_wrapped = AdaptiveStepsize(displace, interval=interval, verbose=disp)
 
     # set up accept tests
     if accept_test is not None:
@@ -695,13 +713,13 @@ def basinhopping(func, x0, niter=100, T=1.0, stepsize=0.5,
     if niter_success is None:
         niter_success = niter + 2
 
-    bh = BasinHoppingRunner(x0, wrapped_minimizer, take_step_wrapped,
-                            accept_tests, disp=disp)
+    bh = BasinHoppingRunner(
+        x0, wrapped_minimizer, take_step_wrapped, accept_tests, disp=disp
+    )
 
     # start main iteration loop
     count, i = 0, 0
-    message = ["requested number of basinhopping iterations completed"
-               " successfully"]
+    message = ["requested number of basinhopping iterations completed" " successfully"]
     for i in range(niter):
         new_global_min = bh.one_cycle()
 
@@ -710,8 +728,9 @@ def basinhopping(func, x0, niter=100, T=1.0, stepsize=0.5,
             val = callback(bh.xtrial, bh.energy_trial, bh.accept)
             if val is not None:
                 if val:
-                    message = ["callback function requested stop early by"
-                               "returning True"]
+                    message = [
+                        "callback function requested stop early by" "returning True"
+                    ]
                     break
 
         count += 1
@@ -735,17 +754,19 @@ class BHBounds(object):
     def __init__(self, xmin, xmax):
         self.xmin = xmin
         self.xmax = xmax
+
     def __call__(self, **kwargs):
         x = kwargs["x_new"]
         tmin = bool(np.all(x >= self.xmin))
         tmax = bool(np.all(x <= self.xmax))
         return tmin and tmax
-    
-    
+
+
 class BHRandStepBounded(object):
-    """ Bounded random displacement:  see: https://stackoverflow.com/a/21967888/2320035
-        Modified! (dropped acceptance-rejection sampling for a more specialized approach)
+    """Bounded random displacement:  see: https://stackoverflow.com/a/21967888/2320035
+    Modified! (dropped acceptance-rejection sampling for a more specialized approach)
     """
+
     def __init__(self, xmin, xmax, stepsize=0.5):
         self.xmin = xmin
         self.xmax = xmax

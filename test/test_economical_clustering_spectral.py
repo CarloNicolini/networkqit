@@ -1,4 +1,3 @@
-#!/usr/bin/python3
 from pathlib import Path
 home = str(Path.home())
 import sys

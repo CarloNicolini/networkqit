@@ -1,10 +1,6 @@
-#!/usr/bin/python3
 from pathlib import Path
 home = str(Path.home())
-import sys
-sys.path.append(home + '/workspace/networkqit')
 import matplotlib.pyplot as plt
-import autograd
 from autograd import numpy as np
 import networkqit as nq
 
